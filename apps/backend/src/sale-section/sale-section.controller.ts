@@ -1,0 +1,42 @@
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { SaleSectionService } from './sale-section.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '@prisma/client';
+
+@Controller('sale-section')
+export class SaleSectionController {
+  constructor(private readonly saleSectionService: SaleSectionService) {}
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  create(@Body() data: any) {
+    return this.saleSectionService.create(data);
+  }
+
+  @Get()
+  findAll() {
+    return this.saleSectionService.findAll();
+  }
+
+  @Get('active')
+  findActive() {
+    return this.saleSectionService.findActive();
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  update(@Param('id') id: string, @Body() data: any) {
+    return this.saleSectionService.update(id, data);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  remove(@Param('id') id: string) {
+    return this.saleSectionService.remove(id);
+  }
+}

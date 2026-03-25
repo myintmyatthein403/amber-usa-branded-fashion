@@ -1,0 +1,182 @@
+"use client";
+
+import { motion } from "motion/react";
+import Image from "next/image";
+import { ShoppingBag, Eye, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import QuickViewModal from "@/components/modals/QuickViewModal";
+import { useStore } from "@/store/useStore";
+import { cn } from "@/lib/utils";
+import Price from "./Price";
+
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: string;
+  compareAtPrice?: string;
+  isUsdPrice?: boolean;
+  onSale: boolean;
+  isFeatured: boolean;
+  image?: string;
+  secondaryImage?: string;
+  category?: { name: string };
+  brand?: { name: string; logo?: string };
+  inStock?: boolean;
+}
+
+export default function ProductGrid({ title, filter }: { title: string, filter?: Record<string, string | boolean> }) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
+  
+  const selectedQuickViewProduct = useStore((state) => state.selectedQuickViewProduct);
+  const setQuickViewProduct = useStore((state) => state.setQuickViewProduct);
+  const addToCart = useStore((state) => state.addToCart);
+  const [addingId, setAddingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const queryParams = new URLSearchParams();
+        if (filter) {
+          Object.entries(filter).forEach(([key, value]) => {
+            queryParams.append(key, value.toString());
+          });
+        }
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?${queryParams.toString()}`);
+        const data = await response.json();
+        // Add placeholder images since DB doesn't have them yet
+        const productsWithImages = data.map((p: any) => ({
+          ...p,
+          inStock: true,
+          image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
+          secondaryImage: p.images?.[1] || p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
+        }));
+        setProducts(productsWithImages);
+      } catch (error) {
+        console.error('Failed to fetch products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
+  }, [filter]);
+
+  const handleAddToCart = (e: React.MouseEvent, product: any) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setAddingId(product.id);
+    addToCart({
+      ...product,
+      price: parseFloat(product.price),
+      isUsdPrice: product.isUsdPrice !== false,
+    });
+    setTimeout(() => setAddingId(null), 1000);
+  };
+
+  return (
+    <section className="py-24 px-6 md:px-12 bg-background">
+      <QuickViewModal 
+        product={selectedQuickViewProduct} 
+        isOpen={!!selectedQuickViewProduct} 
+        onClose={() => setQuickViewProduct(null)} 
+      />
+
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-end mb-12">
+          <div className="space-y-2">
+            <span className="text-amber-gold text-[10px] uppercase font-bold tracking-[0.4em]">USA Authentic</span>
+            <h2 className="text-4xl md:text-5xl font-serif text-foreground">{title}</h2>
+          </div>
+          <button className="text-sm font-bold uppercase tracking-widest text-foreground/40 border-b border-transparent hover:border-amber-gold hover:text-amber-gold transition-all pb-1">
+            Browse All
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {loading ? (
+            <div className="col-span-full py-20 text-center text-muted-foreground italic">Loading products from Myanmar Heritage...</div>
+          ) : products.length === 0 ? (
+             <div className="col-span-full py-20 text-center text-muted-foreground italic">No products available at the moment.</div>
+          ) : products.map((product, idx) => (
+            <motion.div
+              key={product.id}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: idx * 0.1 }}
+              onMouseEnter={() => setHoveredProduct(product.id)}
+              onMouseLeave={() => setHoveredProduct(null)}
+              className="group cursor-pointer"
+            >
+              <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-neutral-100 shadow-sm">
+                <Image
+                  src={(hoveredProduct === product.id ? product.secondaryImage : product.image) || ""}
+                  alt={product.name}
+                  fill
+                  className="object-cover transition-transform duration-1000 group-hover:scale-110"
+                />
+
+                {/* Overlays */}
+                <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                {/* Floating Actions */}
+                <div className="absolute bottom-4 left-4 right-4 flex space-x-2 translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                  <button 
+                    disabled={!product.inStock || addingId === product.id}
+                    onClick={(e) => handleAddToCart(e, product)}
+                    className={cn(
+                      "flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center space-x-2",
+                      addingId === product.id 
+                        ? "bg-amber-gold text-white" 
+                        : "bg-background text-foreground hover:bg-amber-gold hover:text-white"
+                    )}
+                  >
+                    {addingId === product.id ? <Check className="w-3.5 h-3.5" /> : <ShoppingBag className="w-3.5 h-3.5" />}
+                    <span>{addingId === product.id ? "Added" : "Quick Buy"}</span>
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setQuickViewProduct(product); }}
+                    className="w-12 h-12 bg-background text-foreground flex items-center justify-center hover:bg-amber-gold hover:text-white transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Brand Badge */}
+                <div className="absolute top-4 left-4 flex items-center space-x-2">
+                  <span className="bg-amber-gold backdrop-blur-md text-white text-[8px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-none">
+                    {product.brand?.name || product.category?.name || "Authentic"}
+                  </span>
+                </div>
+
+                {product.onSale && (
+                  <div className="absolute top-4 right-4">
+                    <span className="bg-red-500 text-white text-[8px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-none shadow-lg">
+                      Sale
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex flex-col items-center text-center space-y-1">
+                <a href={`/shop/${product.id}`} className="block group-hover:translate-y-[-2px] transition-transform">
+                  <h3 className="text-lg font-serif text-foreground group-hover:text-amber-gold transition-colors">
+                    {product.name}
+                  </h3>
+                </a>
+                <div className="flex items-center space-x-3">
+                  <Price amount={product.price} isUsdPrice={product.isUsdPrice !== false} className="text-sm text-amber-gold font-bold tracking-widest" />
+                  {product.onSale && product.compareAtPrice && (
+                    <Price amount={product.compareAtPrice} isUsdPrice={product.isUsdPrice !== false} className="text-[10px] text-muted-foreground line-through decoration-red-500/50" />
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
