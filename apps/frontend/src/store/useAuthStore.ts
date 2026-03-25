@@ -19,9 +19,11 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  isLoggingOut: boolean;
   setAuth: (user: User, token: string) => void;
   updateUser: (user: User) => void;
   logout: () => void;
+  setLoggingOut: (val: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -30,9 +32,13 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
-      setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
+      isLoggingOut: false,
+      setAuth: (user, token) => set({ user, token, isAuthenticated: true, isLoggingOut: false }),
       updateUser: (user) => set({ user }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      logout: () => {
+        set({ user: null, token: null, isAuthenticated: false });
+      },
+      setLoggingOut: (val) => set({ isLoggingOut: val }),
     }),
     {
       name: 'amber-auth-storage',

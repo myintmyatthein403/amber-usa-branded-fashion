@@ -1,13 +1,43 @@
 import React, { useState } from 'react';
 import { useAdminUIStore } from '../store/useAdminUIStore';
 import { ShoppingBag, Lock, Mail, Loader2 } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const setAuth = useAdminUIStore((state) => state.setAuth);
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setGoogleLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: credentialResponse.credential }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Google login failed');
+      }
+
+      if (data.user.role === 'USER') {
+        throw new Error('Access Denied: You do not have permission to access the admin portal.');
+      }
+
+      setAuth(data.user, data.access_token);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,11 +125,28 @@ export const LoginPage: React.FC = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || googleLoading}
             className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground h-10 px-4 py-2 rounded-md font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
           </button>
+
+          <div className="relative py-2 flex items-center">
+            <div className="flex-grow border-t border-border"></div>
+            <span className="flex-shrink mx-4 text-xs text-muted-foreground uppercase tracking-widest">Or</span>
+            <div className="flex-grow border-t border-border"></div>
+          </div>
+
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Google Login Failed')}
+              useOneTap
+              theme="outline"
+              shape="rectangular"
+              width="100%"
+            />
+          </div>
         </form>
 
         <p className="text-center text-xs text-muted-foreground">

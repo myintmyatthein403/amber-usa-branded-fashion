@@ -1,22 +1,90 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
+  private googleClient: OAuth2Client;
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    this.googleClient = new OAuth2Client(
+      this.configService.get<string>('GOOGLE_CLIENT_ID'),
+    );
+  }
 
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (user && await bcrypt.compare(pass, user.password)) {
+    if (user && user.password && await bcrypt.compare(pass, user.password)) {
       const { password, ...result } = user;
       return result;
     }
     return null;
+  }
+
+  async verifyGoogleToken(idToken: string) {
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: this.configService.get<string>('GOOGLE_CLIENT_ID'),
+      });
+      return ticket.getPayload();
+    } catch (error) {
+      throw new UnauthorizedException('Invalid Google token');
+    }
+  }
+
+  async googleLogin(idToken: string) {
+    const payload = await this.verifyGoogleToken(idToken);
+    if (!payload || !payload.email) {
+      throw new UnauthorizedException('Invalid Google payload');
+    }
+
+    const { email, sub: providerId, name, picture: avatar } = payload;
+
+    // Try to find user by providerId first
+    let user = await this.prisma.user.findUnique({
+      where: { providerId },
+    });
+
+    if (!user) {
+      // Try to find user by email
+      user = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (user) {
+        // Link existing user to Google
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { 
+            provider: 'google', 
+            providerId,
+            avatar: user.avatar || avatar
+          },
+        });
+      } else {
+        // Create new user
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            name,
+            provider: 'google',
+            providerId,
+            avatar,
+            roleName: 'USER',
+          },
+        });
+      }
+    }
+
+    return this.login(user);
   }
 
   async login(user: any) {

@@ -10,10 +10,36 @@ import Image from "next/image";
 import Link from "next/link";
 import Price from "@/components/Price";
 import { useAuthStore } from "@/store/useAuthStore";
+import { signOut } from "next-auth/react";
 
 export default function ProfilePage() {
   const { user, token, isAuthenticated, logout, updateUser } = useAuthStore();
+  const setLoggingOut = useAuthStore((state) => state.setLoggingOut);
   const router = useRouter();
+  
+  const [avatarError, setAvatarError] = useState(false);
+
+  const handleLogout = async () => {
+    // 1. Lock the re-auth guard
+    setLoggingOut(true);
+    
+    try {
+      // 2. Clear NextAuth session (controlled)
+      await signOut({ redirect: false });
+      
+      // 3. Clear Zustand state (Zustand will remain locked by isLoggingOut: true)
+      logout();
+      
+      // 4. Reset the guard and redirect
+      setLoggingOut(false);
+      router.push("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Fallback: clear state and force reload
+      logout();
+      window.location.href = "/";
+    }
+  };
   
   const [activeTab, setActiveTab] = useState("profile");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
@@ -111,10 +137,18 @@ export default function ProfilePage() {
             <div className="bg-white p-8 border border-[#1A1A1A]/5 shadow-sm space-y-6">
               <div className="relative w-24 h-24 mx-auto group">
                 <div className="w-full h-full rounded-full bg-[#F5F0E1] flex items-center justify-center overflow-hidden border-2 border-[#D4AF37]">
-                  {user?.avatar ? (
-                    <Image src={user.avatar} alt={user.name || ""} fill className="object-cover" />
+                  {user?.avatar && !avatarError ? (
+                    <Image 
+                      src={user.avatar} 
+                      alt={user.name || ""} 
+                      fill 
+                      className="object-cover"
+                      onError={() => setAvatarError(true)}
+                    />
                   ) : (
-                    <User className="w-12 h-12 text-[#D4AF37]" />
+                    <div className="w-full h-full flex items-center justify-center bg-[#D4AF37]/10 text-[#D4AF37] font-serif text-2xl font-bold">
+                      {user?.name?.charAt(0) || "A"}
+                    </div>
                   )}
                 </div>
                 <button className="absolute bottom-0 right-0 p-2 bg-[#1A1A1A] rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
@@ -176,7 +210,7 @@ export default function ProfilePage() {
                 </button>
               ))}
               <button 
-                onClick={() => { logout(); router.push("/"); }}
+                onClick={handleLogout}
                 className="flex items-center space-x-4 p-4 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all"
               >
                 <LogOut className="w-4 h-4" />

@@ -11,9 +11,11 @@ model User {
   email           String   @unique
   username        String?  @unique
   name            String?
-  password        String
+  password        String?
   roleName        String?
   role            Role?    @relation(fields: [roleName], references: [name])
+  provider        String?  // 'google', 'github', etc.
+  providerId      String?  @unique // sub ID from provider
   phone           String?
   address         String?  @db.Text
   avatar          String?

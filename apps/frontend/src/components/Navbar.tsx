@@ -126,9 +126,21 @@ export default function Navbar() {
               <Search className="w-5 h-5" />
             </button>
             <Link href="/profile" className="hover:text-[#D4AF37] transition-colors flex items-center gap-2">
-              {isAuthenticated && user?.avatar ? (
-                <div className="w-6 h-6 rounded-full overflow-hidden border border-[#D4AF37]">
-                  <img src={user.avatar} alt={user.name || ""} className="w-full h-full object-cover" />
+              {isAuthenticated ? (
+                <div className="w-6 h-6 rounded-full overflow-hidden border border-[#D4AF37] flex items-center justify-center bg-[#D4AF37]/10">
+                  {user?.avatar ? (
+                    <img 
+                      src={user.avatar} 
+                      alt={user.name || ""} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).parentElement!.innerHTML = `<span class="text-[10px] font-bold text-[#D4AF37]">${user?.name?.charAt(0) || 'A'}</span>`;
+                      }}
+                    />
+                  ) : (
+                    <span className="text-[10px] font-bold text-[#D4AF37]">{user?.name?.charAt(0) || "A"}</span>
+                  )}
                 </div>
               ) : (
                 <User className="w-5 h-5" />

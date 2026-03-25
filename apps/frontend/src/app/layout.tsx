@@ -6,6 +6,7 @@ import CompareDrawer from "@/components/CompareDrawer";
 import Footer from "@/components/Footer";
 import AnnouncementModal from "@/components/modals/AnnouncementModal";
 import Preloader from "@/components/Preloader";
+import { Providers } from "@/context/Providers";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -32,12 +33,14 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${playfair.variable} antialiased font-sans`}
       >
-        <Preloader />
-        {children}
-        <Footer />
-        <CartDrawer />
-        <CompareDrawer />
-        <AnnouncementModal />
+        <Providers>
+          <Preloader />
+          {children}
+          <Footer />
+          <CartDrawer />
+          <CompareDrawer />
+          <AnnouncementModal />
+        </Providers>
       </body>
     </html>
   );
