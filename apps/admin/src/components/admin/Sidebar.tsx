@@ -20,7 +20,8 @@ import {
   MessageSquare,
   Truck,
   Megaphone,
-  Lock
+  Lock,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAdminUIStore } from '../../store/useAdminUIStore';
 import { clsx, type ClassValue } from 'clsx';

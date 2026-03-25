@@ -109,6 +109,7 @@ export const API_ROUTES = {
     BY_ID: (id: string) => `/orders/${id}`,
     UPDATE_STATUS: (id: string) => `/orders/${id}/status`,
     UPDATE_PAYMENT_STATUS: (id: string) => `/orders/${id}/payment-status`,
+    BULK_STATUS: '/orders/bulk-status',
     BULK_PAYMENT_STATUS: '/orders/bulk-payment-status',
     PENDING_COUNT: '/orders/pending-count',
     },

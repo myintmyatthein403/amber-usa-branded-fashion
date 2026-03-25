@@ -20,7 +20,7 @@ export const MediaSelector: React.FC<MediaSelectorProps> = ({
       isOpen={isOpen} 
       onClose={onClose} 
       title="Select Media"
-      maxWidth="max-w-6xl"
+      size="xl"
     >
       <div className="h-[70vh]">
         <MediaLibrary 

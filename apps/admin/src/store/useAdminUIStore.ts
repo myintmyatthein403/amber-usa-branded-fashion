@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 interface AdminUIState {
   isSidebarOpen: boolean;
-  activeTab: 'dashboard' | 'products' | 'categories' | 'brands' | 'variants' | 'hero' | 'mission' | 'gift-card-section' | 'sale-section' | 'footer-section' | 'testimonials' | 'community-posts' | 'collections' | 'coupons' | 'gift-cards' | 'sales' | 'reviews' | 'orders' | 'customers' | 'staff' | 'roles' | 'settings' | 'delivery-methods' | 'ads' | 'warehouses' | 'cargo' | 'inventory';
+  activeTab: 'dashboard' | 'products' | 'categories' | 'brands' | 'variants' | 'hero' | 'mission' | 'gift-card-section' | 'sale-section' | 'footer-section' | 'testimonials' | 'community-posts' | 'collections' | 'coupons' | 'gift-cards' | 'sales' | 'reviews' | 'orders' | 'customers' | 'staff' | 'roles' | 'settings' | 'delivery-methods' | 'ads' | 'warehouses' | 'cargo' | 'inventory' | 'media';
   user: any | null;
   token: string | null;
   isAuthenticated: boolean;
