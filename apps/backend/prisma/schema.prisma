@@ -332,19 +332,20 @@ model GiftCardSection {
   title           String
   titleSecondary  String?
   description     String   @db.Text
-  
+
   ctaText         String?  @default("Purchase a Gift Card")
   ctaLink         String?  @default("/gift-cards")
-  
+
   cardTitle       String   @default("Amber")
   cardAmount      String   @default("100,000 MMK")
   cardType        String   @default("Gift Card")
-  
+
+  amounts         String[] @default(["50,000 MMK", "100,000 MMK", "200,000 MMK", "500,000 MMK"])
+
   isActive        Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
-
 model SaleSection {
   id              String   @id @default(uuid())
   badge           String?  @default("Limited Time Event")
@@ -480,6 +481,7 @@ model DeliveryMethod {
   description    String?  @db.Text
   price          Decimal  @db.Decimal(10, 2)
   isUsdPrice     Boolean  @default(false)
+  isDigital      Boolean  @default(false)
   estimatedDays  String?
   isActive       Boolean  @default(true)
   freeOverAmount Decimal? @db.Decimal(10, 2)

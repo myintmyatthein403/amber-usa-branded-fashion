@@ -122,6 +122,21 @@ export default function CheckoutPage() {
   
   const getShippingCostValue = () => {
     if (!selectedMethod) return 0;
+    
+    // Check if cart only contains digital items/gift cards
+    const hasPhysicalItems = cartItems.some(item => item.category !== 'Gift Card' && item.size !== 'Digital');
+    
+    // If it's a digital-only order, shipping is always free
+    if (!hasPhysicalItems || cartItems.length === 0) {
+      return 0;
+    }
+
+    // If the method itself is digital/email but there are physical items, this shouldn't happen 
+    // but we respect the method's price if it's not marked digital
+    if (selectedMethod.isDigital) {
+      return 0;
+    }
+
     if (selectedMethod.freeOverAmount && subtotal >= parseFloat(selectedMethod.freeOverAmount)) {
       return 0;
     }

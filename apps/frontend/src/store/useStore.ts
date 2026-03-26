@@ -195,7 +195,15 @@ export const useStore = create<AppState>()(
         }, 0);
       },
       getDeliveryFee: () => {
-        const { currency, exchangeRate } = get();
+        const { cartItems, currency, exchangeRate } = get();
+        
+        // If cart is empty or only contains gift cards/digital items, delivery is free
+        const hasPhysicalItems = cartItems.some(item => item.category !== 'Gift Card' && item.size !== 'Digital');
+        
+        if (!hasPhysicalItems || cartItems.length === 0) {
+          return 0;
+        }
+
         const baseMmk = 3000;
         return currency === 'MMK' ? baseMmk : baseMmk / exchangeRate;
       },

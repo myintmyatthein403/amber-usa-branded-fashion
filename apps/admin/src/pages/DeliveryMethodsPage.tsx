@@ -17,6 +17,7 @@ interface DeliveryMethod {
   description?: string;
   price: string;
   isUsdPrice: boolean;
+  isDigital: boolean;
   estimatedDays?: string;
   isActive: boolean;
   freeOverAmount?: string;
@@ -35,6 +36,7 @@ export const DeliveryMethodsPage: React.FC = () => {
     description: '',
     price: '',
     isUsdPrice: false,
+    isDigital: false,
     estimatedDays: '',
     isActive: true,
     freeOverAmount: ''
@@ -72,7 +74,7 @@ export const DeliveryMethodsPage: React.FC = () => {
     setEditingMethod(null);
     setForm({ 
       name: '', description: '', price: '', 
-      isUsdPrice: false, estimatedDays: '', 
+      isUsdPrice: false, isDigital: false, estimatedDays: '', 
       isActive: true, freeOverAmount: '' 
     });
     setModalOpen(true);
@@ -85,6 +87,7 @@ export const DeliveryMethodsPage: React.FC = () => {
       description: method.description || '', 
       price: method.price.toString(),
       isUsdPrice: method.isUsdPrice,
+      isDigital: method.isDigital || false,
       estimatedDays: method.estimatedDays || '',
       isActive: method.isActive,
       freeOverAmount: method.freeOverAmount?.toString() || ''
@@ -254,7 +257,11 @@ export const DeliveryMethodsPage: React.FC = () => {
               />
               <p className="text-[9px] text-muted-foreground/60 italic uppercase tracking-widest">Delivery fee becomes zero if subtotal exceeds this amount.</p>
             </div>
-            <div className="flex items-center gap-6 pt-6">
+            <div className="flex flex-col gap-4 pt-4">
+               <label className="flex items-center gap-3 cursor-pointer group">
+                 <input type="checkbox" checked={form.isDigital} onChange={(e) => setForm({...form, isDigital: e.target.checked})} className="w-5 h-5 accent-primary" />
+                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors">Digital / Email Only</span>
+               </label>
                <label className="flex items-center gap-3 cursor-pointer group">
                  <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({...form, isActive: e.target.checked})} className="w-5 h-5 accent-primary" />
                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors">Activate Method</span>

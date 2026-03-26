@@ -22,6 +22,7 @@ interface GiftCardSection {
   cardTitle: string;
   cardAmount: string;
   cardType: string;
+  amounts: string[];
   isActive: boolean;
 }
 
@@ -43,6 +44,7 @@ export const GiftCardSectionPage: React.FC = () => {
     cardTitle: 'Amber',
     cardAmount: '100,000 MMK',
     cardType: 'Gift Card',
+    amounts: ['50,000 MMK', '100,000 MMK', '200,000 MMK', '500,000 MMK'],
     isActive: false
   });
 
@@ -94,6 +96,7 @@ export const GiftCardSectionPage: React.FC = () => {
       cardTitle: 'Amber',
       cardAmount: '100,000 MMK',
       cardType: 'Gift Card',
+      amounts: ['50,000 MMK', '100,000 MMK', '200,000 MMK', '500,000 MMK'],
       isActive: false
     });
     setModalOpen(true);
@@ -111,9 +114,25 @@ export const GiftCardSectionPage: React.FC = () => {
       cardTitle: section.cardTitle,
       cardAmount: section.cardAmount,
       cardType: section.cardType,
+      amounts: section.amounts || ['50,000 MMK', '100,000 MMK', '200,000 MMK', '500,000 MMK'],
       isActive: section.isActive
     });
     setModalOpen(true);
+  };
+
+  const handleAmountChange = (index: number, value: string) => {
+    const newAmounts = [...formData.amounts];
+    newAmounts[index] = value;
+    setFormData({ ...formData, amounts: newAmounts });
+  };
+
+  const addAmountField = () => {
+    setFormData({ ...formData, amounts: [...formData.amounts, ''] });
+  };
+
+  const removeAmountField = (index: number) => {
+    const newAmounts = formData.amounts.filter((_, i) => i !== index);
+    setFormData({ ...formData, amounts: newAmounts });
   };
 
   return (
@@ -265,6 +284,35 @@ export const GiftCardSectionPage: React.FC = () => {
                    <label className="text-[10px] uppercase font-bold text-muted-foreground">Card Type Label</label>
                    <input type="text" value={formData.cardType} onChange={(e) => setFormData({...formData, cardType: e.target.value})} className="w-full border-b border-border bg-transparent text-sm focus:border-primary outline-none" />
                  </div>
+               </div>
+            </div>
+
+            <div className="space-y-6 pt-6 border-t border-border">
+               <div className="flex justify-between items-center">
+                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary">Selectable Purchase Amounts</h4>
+                 <button type="button" onClick={addAmountField} className="text-[10px] font-bold uppercase text-primary hover:underline">+ Add Amount</button>
+               </div>
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                 {formData.amounts.map((amount, index) => (
+                   <div key={index} className="relative group">
+                     <input
+                       type="text"
+                       value={amount}
+                       onChange={(e) => handleAmountChange(index, e.target.value)}
+                       placeholder="e.g. 50,000 MMK"
+                       className="w-full h-10 border border-input bg-transparent px-3 text-xs focus:border-primary focus:outline-none transition-colors"
+                     />
+                     {formData.amounts.length > 1 && (
+                       <button
+                         type="button"
+                         onClick={() => removeAmountField(index)}
+                         className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                       >
+                         <Trash2 size={10} />
+                       </button>
+                     )}
+                   </div>
+                 ))}
                </div>
             </div>
           </div>
