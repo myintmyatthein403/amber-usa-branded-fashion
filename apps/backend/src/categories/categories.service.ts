@@ -7,7 +7,8 @@ export class CategoriesService {
   constructor(private prisma: PrismaService) {}
 
   async createCategory(data: Prisma.CategoryCreateInput) {
-    return this.prisma.category.create({ data });
+    const sanitizedData = this.prisma.sanitizeData(data);
+    return this.prisma.category.create({ data: sanitizedData });
   }
 
   async getAllCategories() {

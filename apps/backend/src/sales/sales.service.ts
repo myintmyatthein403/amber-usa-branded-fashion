@@ -7,7 +7,8 @@ export class SalesService {
   constructor(private prisma: PrismaService) {}
 
   async createSale(data: Prisma.SaleCreateInput & { productIds?: string[] }): Promise<Sale> {
-    const { productIds, ...saleData } = data;
+    const sanitizedData = this.prisma.sanitizeData(data);
+    const { productIds, ...saleData } = sanitizedData;
     const sale = await this.prisma.sale.create({
       data: saleData as Prisma.SaleCreateInput,
     });
@@ -71,7 +72,8 @@ export class SalesService {
   }
 
   async updateSale(id: string, data: Prisma.SaleUpdateInput & { productIds?: string[] }): Promise<Sale> {
-    const { productIds, ...saleData } = data;
+    const sanitizedData = this.prisma.sanitizeData(data);
+    const { productIds, ...saleData } = sanitizedData;
     const sale = await this.prisma.sale.update({
       where: { id },
       data: saleData as Prisma.SaleUpdateInput,

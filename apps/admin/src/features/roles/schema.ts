@@ -25,7 +25,9 @@ export const RoleSchema = z.object({
 export type Role = z.infer<typeof RoleSchema> & { id: string };
 export type CreateRoleInput = z.infer<typeof RoleSchema>;
 
-export const AVAILABLE_PERMISSIONS: z.infer<typeof z.array(PermissionGroupSchema)> = [
+export type PermissionGroup = z.infer<typeof PermissionGroupSchema>;
+
+export const AVAILABLE_PERMISSIONS: PermissionGroup[] = [
   {
     category: 'Catalog Management',
     items: [

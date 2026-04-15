@@ -36,15 +36,17 @@ export class AdsService {
   }
 
   async create(data: any) {
+    const sanitizedData = this.prisma.sanitizeData(data);
     return this.prisma.ad.create({
-      data,
+      data: sanitizedData,
     });
   }
 
   async update(id: string, data: any) {
+    const sanitizedData = this.prisma.sanitizeData(data);
     return this.prisma.ad.update({
       where: { id },
-      data,
+      data: sanitizedData,
     });
   }
 

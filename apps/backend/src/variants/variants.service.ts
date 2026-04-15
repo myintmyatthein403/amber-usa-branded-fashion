@@ -7,7 +7,8 @@ export class VariantsService {
   constructor(private prisma: PrismaService) {}
 
   async createVariant(data: any) {
-    const { warehouseId, ...variantData } = data;
+    const sanitizedData = this.prisma.sanitizeData(data);
+    const { warehouseId, ...variantData } = sanitizedData;
     
     const variant = await this.prisma.variant.create({ 
       data: {
@@ -38,7 +39,8 @@ export class VariantsService {
   }
 
   async updateVariant(id: string, data: Prisma.VariantUpdateInput) {
-    return this.prisma.variant.update({ where: { id }, data });
+    const sanitizedData = this.prisma.sanitizeData(data);
+    return this.prisma.variant.update({ where: { id }, data: sanitizedData });
   }
 
   async deleteVariant(id: string) {

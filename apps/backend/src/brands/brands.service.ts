@@ -7,8 +7,9 @@ export class BrandsService {
   constructor(private prisma: PrismaService) {}
 
   async createBrand(data: Prisma.BrandCreateInput): Promise<Brand> {
+    const sanitizedData = this.prisma.sanitizeData(data);
     return this.prisma.brand.create({
-      data,
+      data: sanitizedData,
     });
   }
 
@@ -25,9 +26,10 @@ export class BrandsService {
   }
 
   async updateBrand(id: string, data: Prisma.BrandUpdateInput): Promise<Brand> {
+    const sanitizedData = this.prisma.sanitizeData(data);
     return this.prisma.brand.update({
       where: { id },
-      data,
+      data: sanitizedData,
     });
   }
 
