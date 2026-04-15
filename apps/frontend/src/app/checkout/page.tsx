@@ -181,6 +181,7 @@ export default function CheckoutPage() {
           currency: currency,
           items: cartItems.map(item => ({
             productId: item.id,
+            variantId: item.variantId,
             name: item.name,
             price: item.price,
             isUsd: item.isUsdPrice !== false,
@@ -240,7 +241,7 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cartItems.map(item => ({
           productId: item.id,
-          variantId: item.variantId || (typeof item.id === 'string' && item.id.startsWith('gc-') ? undefined : item.id),
+          variantId: item.variantId,
           quantity: item.quantity
         }))),
       });
@@ -252,7 +253,7 @@ export default function CheckoutPage() {
       
       if (outOfStockItems.length > 0) {
         const itemNames = outOfStockItems.map((r: any) => {
-          const item = cartItems.find(i => i.id === r.productId || i.id === r.variantId);
+          const item = cartItems.find(i => i.id === r.productId || i.variantId === r.variantId);
           return item ? item.name : 'Unknown item';
         }).join(', ');
         setStockError(`Some items are out of stock: ${itemNames}. Please update your bag.`);
@@ -298,6 +299,7 @@ export default function CheckoutPage() {
             currency: currency,
             items: cartItems.map(item => ({
               productId: item.id,
+              variantId: item.variantId,
               name: item.name,
               price: item.price,
               isUsd: item.isUsdPrice !== false,

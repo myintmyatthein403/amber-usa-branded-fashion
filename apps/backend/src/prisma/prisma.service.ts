@@ -19,4 +19,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   async onModuleInit() {
     await this.$connect();
   }
+
+  sanitizeData<T>(data: T): T {
+    if (!data || typeof data !== 'object') return data;
+    const sanitized = { ...data };
+    for (const key in sanitized) {
+      if ((sanitized as any)[key] === '') {
+        (sanitized as any)[key] = null;
+      }
+    }
+    return sanitized;
+  }
 }

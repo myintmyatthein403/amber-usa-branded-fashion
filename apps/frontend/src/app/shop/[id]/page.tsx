@@ -73,7 +73,11 @@ export default function ProductDetailPage() {
       return;
     }
     setAddingId(product.id);
-    addToCart(product, selectedSize || undefined, product.isPreOrder, product.preOrderShippingDate);
+    
+    // Find the actual variant ID based on selected size
+    const selectedVariant = product.variants?.find((v: any) => v.size === selectedSize);
+    
+    addToCart(product, selectedSize || undefined, selectedVariant?.id, product.isPreOrder, product.preOrderShippingDate);
     setTimeout(() => setAddingId(null), 1000);
   };
 

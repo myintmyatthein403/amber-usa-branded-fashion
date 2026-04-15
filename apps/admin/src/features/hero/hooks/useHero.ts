@@ -40,7 +40,8 @@ export const useHero = () => {
         body: data,
         isMultipart: true
       });
-      return `${import.meta.env.VITE_API_URL}${response.url}`;
+      // Cloudinary returns absolute URL, so check before prepending
+      return response.url.startsWith('http') ? response.url : `${import.meta.env.VITE_API_URL}${response.url}`;
     } catch (error) {
       console.error('Upload error:', error);
       return null;

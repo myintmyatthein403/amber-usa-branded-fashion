@@ -68,19 +68,22 @@ export const useStore = create<AppState>()(
       isCartOpen: false,
       isCartAnimating: false,
       setCartOpen: (open) => set({ isCartOpen: open }),
-      addToCart: (product: any, size?: string, isPreOrder?: boolean, expectedShippingDate?: string) => {
+      addToCart: (product: any, size?: string, variantId?: string, isPreOrder?: boolean, expectedShippingDate?: string) => {
     const cartItems = get().cartItems;
-    const existingItem = cartItems.find((item) => item.id === product.id && item.size === size);
+    const existingItem = cartItems.find((item) => 
+      item.id === product.id && 
+      (variantId ? item.variantId === variantId : item.size === size)
+    );
     
     let newItems;
     if (existingItem) {
       newItems = cartItems.map((item) =>
-        item.id === product.id && item.size === size
+        item.id === product.id && (variantId ? item.variantId === variantId : item.size === size)
           ? { ...item, quantity: item.quantity + 1, isPreOrder, expectedShippingDate }
           : item
       );
     } else {
-      newItems = [...cartItems, { ...product, quantity: 1, size, isPreOrder, expectedShippingDate }];
+      newItems = [...cartItems, { ...product, quantity: 1, size, variantId, isPreOrder, expectedShippingDate }];
     }
 
     set({ 

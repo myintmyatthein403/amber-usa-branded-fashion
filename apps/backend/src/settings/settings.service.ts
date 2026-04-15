@@ -27,6 +27,16 @@ export class SettingsService implements OnModuleInit {
   async getSettings() {
     return this.prisma.settings.findUnique({
       where: { id: 'global' },
+      select: {
+        id: true,
+        privacyPolicy: true,
+        termsConditions: true,
+        usdToMmkRate: true,
+        stripePublishableKey: true,
+        // stripeSecretKey: false,
+        // stripeWebhookSecret: false,
+        updatedAt: true,
+      }
     });
   }
 
@@ -38,9 +48,10 @@ export class SettingsService implements OnModuleInit {
     stripeSecretKey?: string;
     stripeWebhookSecret?: string;
   }) {
-    return this.prisma.settings.update({
+    await this.prisma.settings.update({
       where: { id: 'global' },
       data,
     });
+    return this.getSettings();
   }
 }

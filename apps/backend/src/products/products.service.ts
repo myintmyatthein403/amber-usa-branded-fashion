@@ -6,9 +6,36 @@ import { Product, Prisma } from '@prisma/client';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async createProduct(data: Prisma.ProductCreateInput): Promise<Product> {
+  async createProduct(data: any): Promise<Product> {
+    const sanitizedData = this.prisma.sanitizeData(data);
+    const { variants, ...productData } = sanitizedData;
+
     return this.prisma.product.create({
-      data,
+      data: {
+        ...productData,
+        variants: variants && variants.length > 0 ? {
+          create: variants.map((v: any) => ({
+            sku: v.sku,
+            barcode: v.barcode,
+            size: v.size,
+            color: v.color,
+            stock: Number(v.stock) || 0,
+            lowStockThreshold: Number(v.lowStockThreshold) || 5,
+            price: v.price ? Number(v.price) : undefined,
+            compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
+            weight: Number(v.weight) || 0,
+            images: v.images || [],
+            isPreOrder: v.isPreOrder || false,
+            preOrderShippingDate: v.preOrderShippingDate
+          }))
+        } : undefined
+      },
+      include: {
+        category: true,
+        brand: true,
+        variants: true,
+        sale: true,
+      }
     });
   }
 
@@ -57,11 +84,109 @@ export class ProductsService {
     });
   }
 
-  async updateProduct(id: string, data: Prisma.ProductUpdateInput): Promise<Product> {
-    return this.prisma.product.update({
-      where: { id },
-      data,
-    });
+  async updateProduct(id: string, data: any): Promise<Product> {
+    const sanitizedData = this.prisma.sanitizeData(data);
+    const { variants, ...productData } = sanitizedData;
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Update the core product data
+      const product = await tx.product.update({
+        where: { id },
+        data: productData,
+      });
+
+      // 2. Sync variants if provided
+      if (variants) {
+        // Get existing variant IDs for this product
+        const existingVariants = await tx.variant.findMany({
+          where: { productId: id },
+          select: { id: true, sku: true }
+        });
+        const existingIds = existingVariants.map(v => v.id);
+        
+        // Identify variants to delete (those in DB but NOT in incoming request)
+        // Note: For variants, we usually rely on IDs or SKU for matching
+        const incomingIds = variants.map((v: any) => v.id).filter(Boolean);
+        let idsToDelete = existingIds.filter(eid => !incomingIds.includes(eid));
+
+        // Safety check: Don't delete variants that are referenced in orders
+        if (idsToDelete.length > 0) {
+          const referencedVariants = await tx.orderItem.findMany({
+            where: { variantId: { in: idsToDelete } },
+            select: { variantId: true }
+          });
+          const referencedIds = referencedVariants.map(rv => rv.variantId as string);
+          idsToDelete = idsToDelete.filter(id => !referencedIds.includes(id));
+        }
+
+        // Delete removed variants that are NOT referenced
+        if (idsToDelete.length > 0) {
+          await tx.variant.deleteMany({
+            where: { id: { in: idsToDelete } }
+          });
+        }
+
+        // Upsert incoming variants
+        for (const v of variants) {
+          const variantData = {
+            sku: v.sku,
+            barcode: v.barcode,
+            size: v.size,
+            color: v.color,
+            stock: Number(v.stock) || 0,
+            lowStockThreshold: Number(v.lowStockThreshold) || 5,
+            price: v.price ? Number(v.price) : undefined,
+            compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
+            weight: Number(v.weight) || 0,
+            images: v.images || [],
+            isPreOrder: v.isPreOrder || false,
+            preOrderShippingDate: v.preOrderShippingDate,
+            productId: id
+          };
+
+          // If it has an ID and that ID exists in this product's variants, update it
+          if (v.id && existingIds.includes(v.id)) {
+            await tx.variant.update({
+              where: { id: v.id },
+              data: variantData
+            });
+          } else {
+            // Check if SKU already exists globally to avoid unique constraint error
+            const existingWithSku = await tx.variant.findUnique({
+               where: { sku: v.sku }
+            });
+
+            if (existingWithSku) {
+               // If it exists but belongs to this product (maybe ID changed or mismatch), update it
+               if (existingWithSku.productId === id) {
+                  await tx.variant.update({
+                    where: { id: existingWithSku.id },
+                    data: variantData
+                  });
+               } else {
+                 // Error: SKU belongs to another product
+                 throw new Error(`SKU ${v.sku} already exists for another product.`);
+               }
+            } else {
+              // Create new
+              await tx.variant.create({
+                data: variantData
+              });
+            }
+          }
+        }
+      }
+
+      return tx.product.findUnique({
+        where: { id },
+        include: {
+          category: true,
+          brand: true,
+          variants: true,
+          sale: true
+        }
+      });
+    }) as Promise<Product>;
   }
 
   async deleteProduct(id: string): Promise<Product> {
