@@ -46,6 +46,11 @@ export class ProductsController {
     return this.productsService.getProductById(id);
   }
 
+  @Post('validate-stock')
+  validateStock(@Body() items: Array<{ productId: string; variantId?: string; quantity: number }>) {
+    return this.productsService.validateStock(items);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Permissions('products:write')
   @Patch(':id')

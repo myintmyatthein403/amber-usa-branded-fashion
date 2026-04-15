@@ -1,5 +1,5 @@
 import React from 'react';
-import { MediaLibrary } from '../components/admin/MediaLibrary';
+import { MediaLibrary } from '../features/media/components/MediaLibrary';
 
 export const MediaPage: React.FC = () => {
   return (

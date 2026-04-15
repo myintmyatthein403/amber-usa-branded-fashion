@@ -20,6 +20,7 @@ interface DeliveryMethod {
   description?: string;
   price: string;
   isUsdPrice: boolean;
+  isDigital: boolean;
   estimatedDays?: string;
   freeOverAmount?: string;
 }
@@ -46,6 +47,8 @@ export default function CheckoutPage() {
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isCreatingIntent, setIsCreatingIntent] = useState(false);
+  const [stockError, setStockError] = useState<string | null>(null);
+  const [isValidatingStock, setIsValidatingStock] = useState(false);
   
   const cartItems = useStore((state) => state.cartItems);
   const subtotal = useStore((state) => state.getSubtotal());
@@ -228,8 +231,55 @@ export default function CheckoutPage() {
     }
   }, [step, formData.paymentMethod, clientSecret, mounted, selectedPayment]);
 
-  const handleNext = () => setStep(step + 1);
-  const handleBack = () => setStep(step - 1);
+  const checkStock = async () => {
+    setIsValidatingStock(true);
+    setStockError(null);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products/validate-stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cartItems.map(item => ({
+          productId: item.id,
+          variantId: item.variantId || (typeof item.id === 'string' && item.id.startsWith('gc-') ? undefined : item.id),
+          quantity: item.quantity
+        }))),
+      });
+
+      if (!response.ok) throw new Error('Failed to validate stock');
+      
+      const results = await response.json();
+      const outOfStockItems = results.filter((r: any) => !r.inStock);
+      
+      if (outOfStockItems.length > 0) {
+        const itemNames = outOfStockItems.map((r: any) => {
+          const item = cartItems.find(i => i.id === r.productId || i.id === r.variantId);
+          return item ? item.name : 'Unknown item';
+        }).join(', ');
+        setStockError(`Some items are out of stock: ${itemNames}. Please update your bag.`);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Stock validation error:', error);
+      setStockError('Failed to validate stock. Please try again.');
+      return false;
+    } finally {
+      setIsValidatingStock(false);
+    }
+  };
+
+  const handleNext = async () => {
+    if (step === 1 || step === 2) {
+      const isStockOk = await checkStock();
+      if (!isStockOk) return;
+    }
+    setStep(step + 1);
+  };
+
+  const handleBack = () => {
+    setStockError(null);
+    setStep(step - 1);
+  };
   const handleComplete = async () => {
     if (selectedPayment?.type !== 'STRIPE') {
       try {

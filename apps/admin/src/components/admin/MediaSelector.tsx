@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal } from './Modal';
-import { MediaLibrary } from './MediaLibrary';
+import { MediaLibrary } from '../../features/media/components/MediaLibrary';
 
 interface MediaSelectorProps {
   isOpen: boolean;
