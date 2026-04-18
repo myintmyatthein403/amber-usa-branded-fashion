@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Review, Prisma } from '@prisma/client';
 
@@ -54,7 +54,7 @@ export class ReviewsService {
 
   async toggleApproval(id: string): Promise<Review> {
     const review = await this.prisma.review.findUnique({ where: { id } });
-    if (!review) throw new Error('Review not found');
+    if (!review) throw new NotFoundException('Review not found');
     
     return this.prisma.review.update({
       where: { id },

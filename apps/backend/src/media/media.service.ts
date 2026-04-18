@@ -17,19 +17,26 @@ export class MediaService {
     try {
       const result = await this.cloudinary.uploadFile(file);
       
-      return this.prisma.media.create({
-        data: {
-          url: result.secure_url,
-          publicId: result.public_id,
-          fileName: file.originalname,
-          format: result.format,
-          size: result.bytes,
-          width: result.width,
-          height: result.height,
-        },
-      });
+      try {
+        return await this.prisma.media.create({
+          data: {
+            url: result.secure_url,
+            publicId: result.public_id,
+            fileName: file.originalname,
+            format: result.format,
+            size: result.bytes,
+            width: result.width,
+            height: result.height,
+          },
+        });
+      } catch (dbError) {
+        // Cleanup Cloudinary if DB fails (Finding 3)
+        await this.cloudinary.deleteFile(result.public_id);
+        throw dbError;
+      }
     } catch (error) {
-      throw new BadRequestException(`Failed to upload to Cloudinary: ${error.message}`);
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException(`Failed to upload media: ${error.message}`);
     }
   }
 

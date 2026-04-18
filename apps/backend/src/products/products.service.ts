@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Product, Prisma } from '@prisma/client';
 
@@ -10,33 +10,60 @@ export class ProductsService {
     const sanitizedData = this.prisma.sanitizeData(data);
     const { variants, ...productData } = sanitizedData;
 
-    return this.prisma.product.create({
-      data: {
-        ...productData,
-        variants: variants && variants.length > 0 ? {
-          create: variants.map((v: any) => ({
-            sku: v.sku,
-            barcode: v.barcode,
-            size: v.size,
-            color: v.color,
-            stock: Number(v.stock) || 0,
-            lowStockThreshold: Number(v.lowStockThreshold) || 5,
-            price: v.price ? Number(v.price) : undefined,
-            compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
-            weight: Number(v.weight) || 0,
-            images: v.images || [],
-            isPreOrder: v.isPreOrder || false,
-            preOrderShippingDate: v.preOrderShippingDate
-          }))
-        } : undefined
-      },
-      include: {
-        category: true,
-        brand: true,
-        variants: true,
-        sale: true,
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
+        data: {
+          ...productData,
+        },
+      });
+
+      if (variants && variants.length > 0) {
+        // Find a default warehouse for initial stock (Finding 1 & 2)
+        const defaultWarehouse = await tx.warehouse.findFirst({
+          where: { location: 'USA' }
+        }) || await tx.warehouse.findFirst();
+
+        for (const v of variants) {
+          const variant = await tx.variant.create({
+            data: {
+              sku: v.sku,
+              barcode: v.barcode,
+              size: v.size,
+              color: v.color,
+              stock: Number(v.stock) || 0,
+              lowStockThreshold: Number(v.lowStockThreshold) || 5,
+              price: v.price ? Number(v.price) : undefined,
+              compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
+              weight: Number(v.weight) || 0,
+              images: v.images || [],
+              isPreOrder: v.isPreOrder || false,
+              preOrderShippingDate: v.preOrderShippingDate,
+              productId: product.id
+            }
+          });
+
+          if (defaultWarehouse && variant.stock > 0) {
+            await tx.inventory.create({
+              data: {
+                variantId: variant.id,
+                warehouseId: defaultWarehouse.id,
+                quantity: variant.stock
+              }
+            });
+          }
+        }
       }
-    });
+
+      return tx.product.findUnique({
+        where: { id: product.id },
+        include: {
+          category: true,
+          brand: true,
+          variants: true,
+          sale: true,
+        }
+      });
+    }) as Promise<Product>;
   }
 
   async getAllProducts(params: {
@@ -146,6 +173,41 @@ export class ProductsService {
 
           // If it has an ID and that ID exists in this product's variants, update it
           if (v.id && existingIds.includes(v.id)) {
+            const variant = await tx.variant.findUnique({
+              where: { id: v.id },
+              include: { inventory: true }
+            });
+
+            if (variant && variantData.stock !== undefined) {
+              // Reconcile stock with Inventory (Finding 1)
+              if (variant.inventory.length > 1) {
+                // To avoid corruption, we don't allow direct stock updates if multiple warehouses are involved
+                // But for bulk product update, we might want to just update the first one or skip it.
+                // Given the risk, let's only update if exactly one record exists.
+                delete (variantData as any).stock; 
+              } else if (variant.inventory.length === 1) {
+                await tx.inventory.update({
+                  where: { id: variant.inventory[0].id },
+                  data: { quantity: variantData.stock }
+                });
+              } else {
+                // Create a default inventory record if none exists
+                const defaultWarehouse = await tx.warehouse.findFirst({
+                  where: { location: 'USA' }
+                }) || await tx.warehouse.findFirst();
+                
+                if (defaultWarehouse) {
+                  await tx.inventory.create({
+                    data: {
+                      variantId: variant.id,
+                      warehouseId: defaultWarehouse.id,
+                      quantity: variantData.stock
+                    }
+                  });
+                }
+              }
+            }
+
             await tx.variant.update({
               where: { id: v.id },
               data: variantData
@@ -176,9 +238,26 @@ export class ProductsService {
                }
             } else {
               // Create new
-              await tx.variant.create({
+              const newVariant = await tx.variant.create({
                 data: variantData
               });
+
+              // Create inventory record (Finding 1 & 2)
+              if (newVariant.stock > 0) {
+                const defaultWarehouse = await tx.warehouse.findFirst({
+                  where: { location: 'USA' }
+                }) || await tx.warehouse.findFirst();
+
+                if (defaultWarehouse) {
+                  await tx.inventory.create({
+                    data: {
+                      variantId: newVariant.id,
+                      warehouseId: defaultWarehouse.id,
+                      quantity: newVariant.stock
+                    }
+                  });
+                }
+              }
             }
           }
         }

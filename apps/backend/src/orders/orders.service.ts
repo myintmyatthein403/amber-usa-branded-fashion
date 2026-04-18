@@ -19,6 +19,7 @@ export class OrdersService {
     totalAmount: number; // Still received but will be validated
     currency: string;
     deliveryFee?: number;
+    warehouseId?: string;
     items: Array<{
       productId: string;
       variantId?: string;
@@ -34,6 +35,9 @@ export class OrdersService {
       let hasPreOrderItems = false;
       const itemsWithPreOrderInfo = [];
       let calculatedTotal = 0;
+
+      // Find fulfillment warehouse (Finding 1)
+      const warehouseId = data.warehouseId || (await tx.warehouse.findFirst({ where: { location: 'MYANMAR' } }))?.id || (await tx.warehouse.findFirst())?.id;
 
       for (const item of data.items) {
         let isPreOrder = false;
@@ -60,7 +64,15 @@ export class OrdersService {
           // Stock Check for Non-PreOrder Items
           if (!isPreOrder) {
             try {
-              // Atomic conditional update to prevent lost-update/overselling (Finding 1)
+              // 1. Update Inventory (Source of Truth)
+              if (warehouseId) {
+                await tx.inventory.update({
+                  where: { variantId_warehouseId: { variantId: variant.id, warehouseId } },
+                  data: { quantity: { decrement: item.quantity } }
+                });
+              }
+
+              // 2. Atomic conditional update on Variant to prevent lost-update/overselling (Finding 1)
               await tx.variant.update({
                 where: { 
                   id: variant.id,
@@ -69,8 +81,9 @@ export class OrdersService {
                 data: { stock: { decrement: item.quantity } }
               });
             } catch (error) {
-              if (error.code === 'P2025') { // Record not found (because stock < quantity)
-                throw new BadRequestException(`Insufficient stock for item: ${item.name} (${item.size}). Available: ${variant.stock}`);
+              // Prisma error P2025: Record not found (because stock < quantity or inventory missing)
+              if (error.code === 'P2025') {
+                throw new BadRequestException(`Insufficient stock for item: ${item.name} (${item.size}) in selected warehouse.`);
               }
               throw error;
             }
@@ -127,6 +140,7 @@ export class OrdersService {
               paymentMethod: data.paymentMethod,
               shippingAddress: `${data.firstName} ${data.lastName}, ${data.address}, ${data.city}. Phone: ${data.phone}`,
               userId: data.userId,
+              warehouseId,
               hasPreOrderItems,
               items: {
                 create: itemsWithPreOrderInfo.map(item => ({
@@ -346,6 +360,20 @@ export class OrdersService {
     await this.prisma.$transaction(async (tx) => {
       for (const item of order.items) {
         if (item.variantId && !item.isPreOrder) {
+          // Reconcile Inventory (Finding 1)
+          if (order.warehouseId) {
+            await tx.inventory.update({
+              where: { 
+                variantId_warehouseId: { 
+                  variantId: item.variantId, 
+                  warehouseId: order.warehouseId 
+                } 
+              },
+              data: { quantity: { increment: item.quantity } }
+            });
+          }
+
+          // Update Variant cached stock
           await tx.variant.update({
             where: { id: item.variantId },
             data: { stock: { increment: item.quantity } }

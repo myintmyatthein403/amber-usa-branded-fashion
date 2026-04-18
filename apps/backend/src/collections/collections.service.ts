@@ -64,7 +64,7 @@ export class CollectionsService {
     
     const updateData: Prisma.CollectionUpdateInput = { ...rest };
 
-    if (productIds) {
+    if (productIds !== undefined) {
       updateData.products = {
         set: productIds.map((pid: string) => ({ id: pid })),
       };
