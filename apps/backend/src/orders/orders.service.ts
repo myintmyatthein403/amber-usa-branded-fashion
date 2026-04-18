@@ -36,8 +36,26 @@ export class OrdersService {
       const itemsWithPreOrderInfo = [];
       let calculatedTotal = 0;
 
-      // Find fulfillment warehouse (Finding 1)
-      const warehouseId = data.warehouseId || (await tx.warehouse.findFirst({ where: { location: 'MYANMAR' } }))?.id || (await tx.warehouse.findFirst())?.id;
+      // Find fulfillment warehouse (Finding 1 & 2)
+      let warehouseId = data.warehouseId;
+      if (!warehouseId) {
+        // Try to find a warehouse that has stock for at least the first item
+        const firstItem = data.items.find(item => item.variantId);
+        if (firstItem) {
+          const inventory = await tx.inventory.findFirst({
+            where: { 
+              variantId: firstItem.variantId,
+              quantity: { gte: firstItem.quantity }
+            }
+          });
+          warehouseId = inventory?.warehouseId;
+        }
+      }
+
+      // Fallback to Myanmar then any if still not found
+      if (!warehouseId) {
+        warehouseId = (await tx.warehouse.findFirst({ where: { location: 'MYANMAR' } }))?.id || (await tx.warehouse.findFirst())?.id;
+      }
 
       for (const item of data.items) {
         let isPreOrder = false;
@@ -64,27 +82,36 @@ export class OrdersService {
           // Stock Check for Non-PreOrder Items
           if (!isPreOrder) {
             try {
-              // 1. Update Inventory (Source of Truth)
+              // 1. Update Inventory (Source of Truth) - Conditional update (Finding 1)
               if (warehouseId) {
-                await tx.inventory.update({
-                  where: { variantId_warehouseId: { variantId: variant.id, warehouseId } },
+                const updatedInventory = await tx.inventory.updateMany({
+                  where: { 
+                    variantId: variant.id, 
+                    warehouseId,
+                    quantity: { gte: item.quantity }
+                  },
                   data: { quantity: { decrement: item.quantity } }
                 });
+
+                if (updatedInventory.count === 0) {
+                  throw new BadRequestException(`Insufficient stock for item: ${item.name} in selected warehouse.`);
+                }
               }
 
               // 2. Atomic conditional update on Variant to prevent lost-update/overselling (Finding 1)
-              await tx.variant.update({
+              const updatedVariant = await tx.variant.updateMany({
                 where: { 
                   id: variant.id,
                   stock: { gte: item.quantity }
                 },
                 data: { stock: { decrement: item.quantity } }
               });
-            } catch (error) {
-              // Prisma error P2025: Record not found (because stock < quantity or inventory missing)
-              if (error.code === 'P2025') {
-                throw new BadRequestException(`Insufficient stock for item: ${item.name} (${item.size}) in selected warehouse.`);
+
+              if (updatedVariant.count === 0) {
+                throw new BadRequestException(`Insufficient total stock for item: ${item.name}.`);
               }
+            } catch (error) {
+              if (error instanceof BadRequestException) throw error;
               throw error;
             }
           }
