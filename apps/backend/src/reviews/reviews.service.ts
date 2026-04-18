@@ -8,7 +8,10 @@ export class ReviewsService {
 
   async createReview(data: Prisma.ReviewCreateInput): Promise<Review> {
     return this.prisma.review.create({
-      data,
+      data: {
+        ...data,
+        isApproved: false, // Force moderation (Finding 1)
+      },
     });
   }
 

@@ -17,6 +17,8 @@ export class CommunityPostsController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   findAll() {
     return this.communityPostsService.findAll();
   }

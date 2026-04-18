@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import Image from "next/image";
 import { ShoppingBag, Star, ArrowRight, Check } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { cn } from "@/lib/utils";
 import Price from "./Price";
@@ -14,6 +14,17 @@ export default function QuickBuy() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const addToCart = useStore((state) => state.addToCart);
   const [isAdding, setIsAdding] = useState(false);
+
+  const activeImage = useMemo(() => {
+    if (!product) return "";
+    if (selectedSize) {
+      const variant = product.variants?.find((v: any) => v.size === selectedSize);
+      if (variant?.images && variant.images.length > 0) {
+        return variant.images[0];
+      }
+    }
+    return product.image;
+  }, [product, selectedSize]);
 
   useEffect(() => {
     const fetchFeatured = async () => {
@@ -28,7 +39,7 @@ export default function QuickBuy() {
             originalPrice: p.compareAtPrice ? parseFloat(p.compareAtPrice) : null,
             isUsdPrice: p.isUsdPrice !== false,
             image: p.images?.[0] || "https://images.unsplash.com/photo-1556905055-8f358a7a4bb4?auto=format&fit=crop&q=80&w=800",
-            sizes: Array.from(new Set(p.variants?.map((v: any) => v.size) || ["S", "M", "L", "XL"]))
+            sizes: Array.from(new Set(p.variants?.map((v: any) => v.size) || []))
           });
         }
       } catch (error) {
@@ -47,7 +58,20 @@ export default function QuickBuy() {
       return;
     }
     setIsAdding(true);
-    addToCart(product, selectedSize || undefined);
+    
+    // Find the actual variant ID based on selected size
+    const selectedVariant = product.variants?.find((v: any) => v.size === selectedSize);
+    
+    addToCart(
+      product, 
+      selectedSize || undefined, 
+      selectedVariant?.id,
+      undefined,
+      undefined,
+      undefined,
+      selectedVariant?.price ? Number(selectedVariant.price) : undefined,
+      selectedVariant?.images?.[0] || undefined
+    );
     setTimeout(() => setIsAdding(false), 1000);
   };
 
@@ -60,7 +84,7 @@ export default function QuickBuy() {
           {/* Left: Product Image */}
           <div className="w-full lg:w-1/2 relative aspect-[4/5] lg:aspect-auto h-[600px] overflow-hidden group">
             <Image 
-              src={product.image} 
+              src={activeImage} 
               alt={product.name} 
               fill 
               className="object-cover transition-transform duration-[2s] group-hover:scale-110" 

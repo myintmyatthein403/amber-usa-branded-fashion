@@ -17,6 +17,8 @@ export class GiftCardSectionController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   findAll() {
     return this.giftCardSectionService.findAll();
   }

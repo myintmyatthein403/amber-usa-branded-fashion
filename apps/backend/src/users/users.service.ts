@@ -52,9 +52,11 @@ export class UsersService {
       data.password = await bcrypt.hash(data.password, 10);
     }
 
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data,
     });
+    const { password: _, ...result } = user;
+    return result;
   }
 
   async update(id: string, data: any, currentUser: any) {
@@ -64,6 +66,11 @@ export class UsersService {
     // Rule: ADMIN cannot modify or delete a SUPERADMIN
     if (currentUser.role === 'ADMIN' && userToUpdate.roleName === 'SUPERADMIN') {
       throw new ForbiddenException('Admins cannot modify Superadmins');
+    }
+
+    // Rule: ADMIN cannot modify another ADMIN
+    if (currentUser.role === 'ADMIN' && userToUpdate.roleName === 'ADMIN' && currentUser.userId !== id) {
+      throw new ForbiddenException('Admins cannot modify other Admins');
     }
 
     // Rule: ADMIN cannot elevate their own role or others to SUPERADMIN
@@ -83,10 +90,12 @@ export class UsersService {
       data.password = await bcrypt.hash(data.password, 10);
     }
 
-    return this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id },
       data,
     });
+    const { password: _, ...result } = updatedUser;
+    return result;
   }
 
   async remove(id: string, currentUser: any) {

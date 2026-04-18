@@ -619,7 +619,7 @@ export default function CheckoutPage() {
             
             <div className="space-y-8 max-h-[400px] overflow-y-auto pr-4 custom-scrollbar">
               {cartItems.map((item) => (
-                <div key={`${item.id}-${item.size}`} className="flex space-x-6 items-center">
+                <div key={item.variantId ? `${item.id}-${item.variantId}` : `${item.id}-${item.size}`} className="flex space-x-6 items-center">
                   <div className="relative w-20 aspect-[3/4] rounded-sm overflow-hidden bg-white shadow-sm shrink-0">
                     <Image src={item.image} alt={item.name} fill className="object-cover" />
                     <span className="absolute -top-2 -right-2 bg-[#1A1A1A] text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">

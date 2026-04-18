@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import DOMPurify from 'isomorphic-dompurify';
 
 @Injectable()
 export class SettingsService implements OnModuleInit {
@@ -48,9 +49,25 @@ export class SettingsService implements OnModuleInit {
     stripeSecretKey?: string;
     stripeWebhookSecret?: string;
   }) {
+    const updateData: any = { ...data };
+
+    // Sanitize HTML content (Finding 2)
+    if (updateData.privacyPolicy) {
+      updateData.privacyPolicy = DOMPurify.sanitize(updateData.privacyPolicy);
+    }
+    if (updateData.termsConditions) {
+      updateData.termsConditions = DOMPurify.sanitize(updateData.termsConditions);
+    }
+
+    // Don't overwrite secrets if they are empty strings (Finding 3)
+    // The admin UI sends '' for fields it doesn't have values for.
+    if (updateData.stripeSecretKey === '') delete updateData.stripeSecretKey;
+    if (updateData.stripeWebhookSecret === '') delete updateData.stripeWebhookSecret;
+    if (updateData.stripePublishableKey === '') delete updateData.stripePublishableKey;
+
     await this.prisma.settings.update({
       where: { id: 'global' },
-      data,
+      data: updateData,
     });
     return this.getSettings();
   }

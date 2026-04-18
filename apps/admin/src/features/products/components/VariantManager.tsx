@@ -19,7 +19,8 @@ interface VariantManagerProps {
   handleDeleteVariant: (id: string) => void;
   warehouses: any[];
   setStep: (step: number) => void;
-  setModalOpen: (open: boolean) => void;
+  onSave: () => void;
+  submitting?: boolean;
   onOpenMedia: () => void;
 }
 
@@ -34,7 +35,8 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
   handleDeleteVariant,
   warehouses,
   setStep,
-  setModalOpen,
+  onSave,
+  submitting,
   onOpenMedia
 }) => {
   const [urlInput, setUrlInput] = React.useState('');
@@ -211,7 +213,23 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
       
       <div className="flex justify-between items-center pt-10 border-t border-border">
         <button onClick={() => setStep(1)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-300"><ChevronLeft size={14} /> Core Definition</button>
-        <button onClick={() => setModalOpen(false)} className="bg-primary text-primary-foreground px-10 py-4 text-xs font-bold uppercase tracking-[0.3em] hover:opacity-90 transition-all duration-300 shadow-xl shadow-primary/20"><Save size={16} /> Sync to Catalog</button>
+        <button 
+          onClick={onSave} 
+          disabled={submitting}
+          className="bg-primary text-primary-foreground px-10 py-4 text-xs font-bold uppercase tracking-[0.3em] hover:opacity-90 transition-all duration-300 shadow-xl shadow-primary/20 flex items-center gap-2"
+        >
+          {submitting ? (
+            <>
+              <Save size={16} className="animate-pulse" />
+              <span>Syncing...</span>
+            </>
+          ) : (
+            <>
+              <Save size={16} />
+              <span>Sync to Catalog</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

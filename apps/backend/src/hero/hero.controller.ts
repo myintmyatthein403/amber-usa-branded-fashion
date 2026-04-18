@@ -17,6 +17,8 @@ export class HeroController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   findAll() {
     return this.heroService.findAll();
   }

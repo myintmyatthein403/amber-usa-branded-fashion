@@ -40,23 +40,31 @@ export const ProductsPage: React.FC = () => {
   } = useProducts();
 
   const [mediaTarget, setMediaTarget] = React.useState<'product' | 'variant'>('product');
+  const [replacingImageIndex, setReplacingImageIndex] = React.useState<number | null>(null);
 
   const handleMediaSelect = (url: string) => {
     if (mediaTarget === 'product') {
-      setProductForm((prev: any) => ({
-        ...prev,
-        images: [...prev.images, url]
-      }));
+      setProductForm((prev: any) => {
+        const newImages = [...prev.images];
+        if (replacingImageIndex !== null) {
+          newImages[replacingImageIndex] = url;
+        } else {
+          newImages.push(url);
+        }
+        return { ...prev, images: newImages };
+      });
     } else {
       setNewVariant((prev: any) => ({
         ...prev,
         images: [...(prev.images || []), url]
       }));
     }
+    setReplacingImageIndex(null);
   };
 
-  const openProductMedia = () => {
+  const openProductMedia = (index?: number) => {
     setMediaTarget('product');
+    setReplacingImageIndex(index !== undefined ? index : null);
     setMediaSelectorOpen(true);
   };
 
@@ -145,7 +153,8 @@ export const ProductsPage: React.FC = () => {
             handleDeleteVariant={handleDeleteVariant}
             warehouses={warehouses}
             setStep={setStep}
-            setModalOpen={setModalOpen}
+            onSave={handleProductSubmit}
+            submitting={submitting}
             onOpenMedia={openVariantMedia}
           />
         )}

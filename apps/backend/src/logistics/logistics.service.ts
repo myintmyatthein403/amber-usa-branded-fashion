@@ -41,13 +41,16 @@ export class LogisticsService {
   }
 
   async updateStock(variantId: string, warehouseId: string, quantity: number) {
+    // Prevent negative stock (Finding 3)
+    const safeQuantity = Math.max(0, quantity);
+
     // Upsert inventory record
     const inventory = await this.prisma.inventory.upsert({
       where: {
         variantId_warehouseId: { variantId, warehouseId }
       },
-      update: { quantity },
-      create: { variantId, warehouseId, quantity }
+      update: { quantity: safeQuantity },
+      create: { variantId, warehouseId, quantity: safeQuantity }
     });
 
     // Update global stock summary in Variant model
@@ -72,28 +75,43 @@ export class LogisticsService {
     trackingNumber?: string;
     items: { variantId: string; quantity: number }[];
   }) {
-    const shipmentNumber = `CARGO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        const shipmentNumber = `CARGO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    return this.prisma.cargoShipment.create({
-      data: {
-        shipmentNumber,
-        originId: data.originId,
-        destinationId: data.destinationId,
-        carrier: data.carrier,
-        trackingNumber: data.trackingNumber,
-        items: {
-          create: data.items.map(item => ({
-            variantId: item.variantId,
-            quantity: item.quantity
-          }))
+        return await this.prisma.cargoShipment.create({
+          data: {
+            shipmentNumber,
+            originId: data.originId,
+            destinationId: data.destinationId,
+            carrier: data.carrier,
+            trackingNumber: data.trackingNumber,
+            items: {
+              create: data.items.map(item => ({
+                variantId: item.variantId,
+                quantity: item.quantity
+              }))
+            }
+          },
+          include: {
+            items: { include: { variant: true } },
+            origin: true,
+            destination: true
+          }
+        });
+      } catch (error) {
+        // Handle unique constraint violation for shipmentNumber (Prisma error P2002)
+        if (error.code === 'P2002' && (error.meta?.target as string[])?.includes('shipmentNumber')) {
+          retries--;
+          if (retries === 0) {
+            throw new BadRequestException('Failed to generate a unique shipment number after multiple attempts. Please try again.');
+          }
+          continue;
         }
-      },
-      include: {
-        items: { include: { variant: true } },
-        origin: true,
-        destination: true
+        throw error;
       }
-    });
+    }
   }
 
   async updateCargoStatus(id: string, status: CargoStatus) {
@@ -104,21 +122,32 @@ export class LogisticsService {
 
     if (!shipment) throw new NotFoundException('Shipment not found');
 
-    // If status is moving to DEPARTED, ensure stock exists and deduct it from origin
-    if (status === 'DEPARTED' && shipment.status === 'PREPARING') {
-      for (const item of shipment.items) {
-        const inventory = await this.prisma.inventory.findUnique({
-          where: { variantId_warehouseId: { variantId: item.variantId, warehouseId: shipment.originId } }
-        });
+    // Handle origin deduction if moving beyond PREPARING and not already deducted (Finding 2)
+    const isMovingAwayFromPreparing = status !== 'PREPARING' && shipment.status === 'PREPARING';
+    const isDirectlyCompleting = status === 'COMPLETED' && !shipment.originDeducted;
 
-        if (!inventory || inventory.quantity < item.quantity) {
-          throw new BadRequestException(`Insufficient stock for variant ${item.variantId} in origin warehouse`);
+    if (isMovingAwayFromPreparing || isDirectlyCompleting) {
+      if (!shipment.originDeducted) {
+        for (const item of shipment.items) {
+          const inventory = await this.prisma.inventory.findUnique({
+            where: { variantId_warehouseId: { variantId: item.variantId, warehouseId: shipment.originId } }
+          });
+
+          if (!inventory || inventory.quantity < item.quantity) {
+            throw new BadRequestException(`Insufficient stock for variant ${item.variantId} in origin warehouse`);
+          }
         }
-      }
 
-      // Deduct from origin
-      for (const item of shipment.items) {
-        await this.addStockToWarehouse(item.variantId, shipment.originId, -item.quantity);
+        // Deduct from origin
+        for (const item of shipment.items) {
+          await this.addStockToWarehouse(item.variantId, shipment.originId, -item.quantity);
+        }
+
+        // Mark as deducted
+        await this.prisma.cargoShipment.update({
+          where: { id },
+          data: { originDeducted: true }
+        });
       }
     }
 
@@ -127,16 +156,22 @@ export class LogisticsService {
       data: { 
         status,
         arrivalDate: status === 'COMPLETED' ? new Date() : undefined,
-        departureDate: status === 'DEPARTED' ? new Date() : undefined
+        departureDate: (status === 'DEPARTED' || (status === 'COMPLETED' && !shipment.departureDate)) ? new Date() : undefined
       }
     });
 
-    // If shipment is COMPLETED, move inventory to destination
-    if (status === 'COMPLETED') {
+    // If shipment is COMPLETED and not already added to destination (Finding 2)
+    if (status === 'COMPLETED' && !shipment.destinationAdded) {
       for (const item of shipment.items) {
         // Add to destination stock
         await this.addStockToWarehouse(item.variantId, shipment.destinationId, item.quantity);
       }
+
+      // Mark as added
+      await this.prisma.cargoShipment.update({
+        where: { id },
+        data: { destinationAdded: true }
+      });
     }
 
     return updatedShipment;

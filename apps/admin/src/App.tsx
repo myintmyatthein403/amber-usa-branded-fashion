@@ -118,12 +118,16 @@ function App() {
       }
 
       try {
-        const [profile, pendingCount] = await Promise.all([
-          apiService(API_ROUTES.AUTH.PROFILE),
-          apiService(API_ROUTES.ORDERS.PENDING_COUNT)
-        ]);
+        const profile = await apiService(API_ROUTES.AUTH.PROFILE);
         updateUser(profile);
-        setPendingOrdersCount(pendingCount);
+        
+        // Only fetch pending count if user is admin/superadmin (Finding 5)
+        if (profile && ['ADMIN', 'SUPERADMIN'].includes(profile.role)) {
+          const pendingCount = await apiService(API_ROUTES.ORDERS.PENDING_COUNT);
+          setPendingOrdersCount(pendingCount);
+        } else {
+          setPendingOrdersCount(0);
+        }
       } catch (error) {
         console.error('Failed to sync backend data:', error);
         if ((error as any).message?.includes('401')) {

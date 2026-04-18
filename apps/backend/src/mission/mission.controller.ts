@@ -17,6 +17,8 @@ export class MissionController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   findAll() {
     return this.missionService.findAll();
   }

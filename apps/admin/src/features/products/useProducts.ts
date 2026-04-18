@@ -163,6 +163,21 @@ export const useProducts = () => {
     setProductForm(initialProductForm);
     setCurrentVariants([]);
     setEditingProduct(null);
+    setEditingVariant(null);
+    setNewVariant({ 
+      sku: '', 
+      barcode: '', 
+      size: '', 
+      color: '', 
+      stock: '0', 
+      lowStockThreshold: '5', 
+      price: '', 
+      compareAtPrice: '', 
+      weight: '0', 
+      images: [], 
+      warehouseId: '', 
+      isPreOrder: false 
+    });
     setStep(1);
   };
 

@@ -8,4 +8,17 @@ export default defineConfig({
   server: {
     port: 3000
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['react', 'react-dom', 'zustand'],
+          'ui-icons': ['lucide-react'],
+          'editor': ['react-quill-new'],
+          'animation': ['framer-motion']
+        }
+      }
+    }
+  }
 })

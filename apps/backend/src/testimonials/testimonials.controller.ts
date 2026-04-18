@@ -17,6 +17,8 @@ export class TestimonialsController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   findAll() {
     return this.testimonialsService.findAll();
   }

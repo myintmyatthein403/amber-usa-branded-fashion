@@ -151,21 +151,28 @@ export class ProductsService {
               data: variantData
             });
           } else {
-            // Check if SKU already exists globally to avoid unique constraint error
-            const existingWithSku = await tx.variant.findUnique({
-               where: { sku: v.sku }
+            // Check if SKU or Barcode already exists globally to avoid unique constraint error
+            const existingVariant = await tx.variant.findFirst({
+               where: { 
+                 OR: [
+                   { sku: v.sku },
+                   ...(variantData.barcode ? [{ barcode: variantData.barcode }] : [])
+                 ]
+               }
             });
 
-            if (existingWithSku) {
-               // If it exists but belongs to this product (maybe ID changed or mismatch), update it
-               if (existingWithSku.productId === id) {
+            if (existingVariant) {
+               // If it exists but belongs to this product, update it
+               if (existingVariant.productId === id) {
                   await tx.variant.update({
-                    where: { id: existingWithSku.id },
+                    where: { id: existingVariant.id },
                     data: variantData
                   });
                } else {
-                 // Error: SKU belongs to another product
-                 throw new Error(`SKU ${v.sku} already exists for another product.`);
+                 // Error: SKU/Barcode belongs to another product
+                 const conflictField = existingVariant.sku === v.sku ? 'SKU' : 'Barcode';
+                 const conflictValue = existingVariant.sku === v.sku ? v.sku : variantData.barcode;
+                 throw new Error(`${conflictField} "${conflictValue}" already exists for another product.`);
                }
             } else {
               // Create new
@@ -237,7 +244,8 @@ export class ProductsService {
         
         results.push({
           ...item,
-          inStock: isDigital || product.isPreOrder ? true : true, // Default to true for now if no variant
+          inStock: isDigital || product.isPreOrder ? true : (product.stock >= item.quantity),
+          available: product.stock,
           isPreOrder: product.isPreOrder,
           isDigital
         });

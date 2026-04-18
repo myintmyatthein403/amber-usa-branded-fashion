@@ -17,6 +17,8 @@ export class FooterSectionController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   findAll() {
     return this.footerSectionService.findAll();
   }

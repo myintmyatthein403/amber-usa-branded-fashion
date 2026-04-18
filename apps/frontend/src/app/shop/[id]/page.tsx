@@ -21,13 +21,38 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("description");
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [sanitizedDescription, setSanitizedDescription] = useState("");
+  const [userSelectedImage, setUserSelectedImage] = useState<string | null>(null);
 
   const addToCart = useStore((state) => state.addToCart);
   const addToCompare = useStore((state) => state.addToCompare);
+
+  const activeImage = useMemo(() => {
+    if (!product) return "";
+    
+    // 1. If user manually clicked a thumbnail, that takes priority
+    if (userSelectedImage) return userSelectedImage;
+
+    // 2. If a variant is selected, show variant image
+    if (selectedSize || selectedColor) {
+      const variant = product.variants?.find((v: any) => {
+        const matchesSize = selectedSize ? v.size === selectedSize : true;
+        const matchesColor = selectedColor ? v.color === selectedColor : true;
+        return matchesSize && matchesColor;
+      });
+
+      if (variant?.images && variant.images.length > 0) {
+        return variant.images[0];
+      }
+    }
+    
+    // 3. Fallback to default product image
+    return product.image;
+  }, [product, selectedSize, selectedColor, userSelectedImage]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -67,17 +92,55 @@ export default function ProductDetailPage() {
     if (id) fetchProduct();
   }, [id]);
 
+  // Reset user selection when variant attributes change to allow variant image to take over
+  useEffect(() => {
+    setUserSelectedImage(null);
+  }, [selectedSize, selectedColor]);
+
+  const allImages = useMemo(() => {
+    if (!product) return [];
+    const images = [...(product.images || [])];
+    
+    // Add images from variants if they are not already in the main list
+    product.variants?.forEach((v: any) => {
+      v.images?.forEach((img: string) => {
+        if (!images.includes(img)) {
+          images.push(img);
+        }
+      });
+    });
+    
+    return images;
+  }, [product]);
+
   const handleAddToCart = () => {
     if (!selectedSize && product.sizes?.length > 0) {
       alert("Please select a size");
       return;
     }
+    if (!selectedColor && product.colors?.length > 0) {
+      alert("Please select a color");
+      return;
+    }
     setAddingId(product.id);
     
-    // Find the actual variant ID based on selected size
-    const selectedVariant = product.variants?.find((v: any) => v.size === selectedSize);
+    // Find the actual variant ID based on selected size/color
+    const selectedVariant = product.variants?.find((v: any) => {
+      const matchesSize = selectedSize ? v.size === selectedSize : true;
+      const matchesColor = selectedColor ? v.color === selectedColor : true;
+      return matchesSize && matchesColor;
+    });
     
-    addToCart(product, selectedSize || undefined, selectedVariant?.id, product.isPreOrder, product.preOrderShippingDate);
+    addToCart(
+      product, 
+      selectedSize || undefined, 
+      selectedVariant?.id, 
+      product.isPreOrder, 
+      product.preOrderShippingDate,
+      selectedColor || undefined,
+      selectedVariant?.price ? Number(selectedVariant.price) : undefined,
+      selectedVariant?.images?.[0] || undefined
+    );
     setTimeout(() => setAddingId(null), 1000);
   };
 
@@ -112,6 +175,7 @@ export default function ProductDetailPage() {
 
   return (
     <main className="relative min-h-screen bg-[#FDFDFD]">
+
       <Navbar />
 
       <SizeGuideModal isOpen={isSizeGuideOpen} onClose={() => setIsSizeGuideOpen(false)} />
@@ -128,17 +192,17 @@ export default function ProductDetailPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
           {/* Left: Product Images */}
-          <div className="space-y-8">
+          <div className="flex flex-col gap-6">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="relative aspect-[4/5] bg-[#F5F0E1] overflow-hidden rounded-sm"
+              className="relative aspect-[4/5] bg-[#F5F0E1] overflow-hidden rounded-sm w-full"
             >
               <Image
-                src={product.image}
+                src={activeImage || product.image}
                 alt={product.name}
                 fill
-                className="object-cover"
+                className="object-cover transition-all duration-700"
                 priority
               />
               {product.onSale && (
@@ -147,6 +211,24 @@ export default function ProductDetailPage() {
                 </div>
               )}
             </motion.div>
+
+            {/* Thumbnails */}
+            {allImages.length > 1 && (
+              <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
+                {allImages.map((img: string, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => setUserSelectedImage(img)}
+                    className={cn(
+                      "relative aspect-[4/5] w-20 lg:w-28 flex-shrink-0 bg-[#F5F0E1] overflow-hidden rounded-sm border transition-all duration-300",
+                      activeImage === img ? "border-[#D4AF37] ring-1 ring-[#D4AF37]" : "border-transparent opacity-60 hover:opacity-100"
+                    )}
+                  >
+                    <Image src={img} alt={`${product.name} ${idx}`} fill className="object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right: Product Info */}
@@ -244,10 +326,23 @@ export default function ProductDetailPage() {
                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]">Available Colors</h4>
                    <div className="flex flex-wrap gap-3">
                       {product.colors?.map((color: string) => (
-                        <div key={color} className="flex items-center space-x-2 border border-[#1A1A1A]/5 px-3 py-2 rounded-sm bg-white">
-                           <div className="w-3 h-3 rounded-full bg-[#D4AF37]" />
-                           <span className="text-[10px] font-medium text-[#1A1A1A]/60 uppercase tracking-widest">{color}</span>
-                        </div>
+                        <button 
+                          key={color} 
+                          onClick={() => setSelectedColor(color)}
+                          className={cn(
+                            "flex items-center space-x-2 border px-3 py-2 rounded-sm bg-white transition-all",
+                            selectedColor === color ? "border-[#D4AF37] shadow-sm" : "border-[#1A1A1A]/5"
+                          )}
+                        >
+                           <div className={cn(
+                             "w-3 h-3 rounded-full bg-[#D4AF37]",
+                             selectedColor === color ? "scale-110" : "opacity-50"
+                           )} />
+                           <span className={cn(
+                             "text-[10px] font-medium uppercase tracking-widest",
+                             selectedColor === color ? "text-[#1A1A1A]" : "text-[#1A1A1A]/40"
+                           )}>{color}</span>
+                        </button>
                       ))}
                    </div>
                 </div>
@@ -296,7 +391,7 @@ export default function ProductDetailPage() {
                     )}
                     {product.preOrderNote && (
                       <p className="text-xs text-[#1A1A1A]/60 mt-1 italic">
-                        "{product.preOrderNote}"
+                        &quot;{product.preOrderNote}&quot;
                       </p>
                     )}
                   </div>

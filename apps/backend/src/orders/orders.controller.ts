@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, Param, UseGuards, Req, Patch, Delete, Query } from '@nestjs/common';
 import { Request } from 'express';
 import { OrdersService } from './orders.service';
+import { StripeService } from '../stripe/stripe.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -10,18 +11,28 @@ interface AuthenticatedRequest extends Request {
   user: {
     userId: string;
     email: string;
+    role: string;
+    permissions: string[];
   };
 }
 
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly stripeService: StripeService
+  ) {}
 
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
   createOrder(@Req() req: AuthenticatedRequest, @Body() data: any) {
     const userId = req.user?.userId || null;
     return this.ordersService.createOrder({ ...data, userId });
+  }
+
+  @Post(':id/verify-payment')
+  async verifyPayment(@Param('id') id: string) {
+    return this.stripeService.verifyPayment(id);
   }
 
   @Get('my')
@@ -39,8 +50,8 @@ export class OrdersController {
 
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
-  getOrder(@Param('id') id: string) {
-    return this.ordersService.getOrderById(id);
+  getOrder(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.ordersService.getOrderById(id, req.user);
   }
 
   @Get()

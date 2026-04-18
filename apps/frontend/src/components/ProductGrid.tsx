@@ -46,12 +46,14 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
         }
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?${queryParams.toString()}`);
         const data = await response.json();
-        // Add placeholder images since DB doesn't have them yet
+        // Add placeholder images and derive sizes/colors from variants
         const productsWithImages = data.map((p: any) => ({
           ...p,
-          inStock: true,
+          inStock: p.variants?.some((v: any) => v.stock > 0) ?? true,
           image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
           secondaryImage: p.images?.[1] || p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
+          sizes: Array.from(new Set(p.variants?.map((v: any) => v.size) || [])),
+          colors: Array.from(new Set(p.variants?.map((v: any) => v.color) || [])),
         }));
         setProducts(productsWithImages);
       } catch (error) {

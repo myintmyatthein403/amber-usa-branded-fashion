@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
@@ -13,12 +13,19 @@ export class StripeService {
     private configService: ConfigService,
   ) {}
 
-  private getStripeInstance(): Stripe {
+  private async getStripeInstance(): Promise<Stripe> {
     if (this.stripe) return this.stripe;
 
-    const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    // Try to get secret key from DB (Finding 3)
+    const settings = await this.prisma.settings.findUnique({
+      where: { id: 'global' },
+      select: { stripeSecretKey: true }
+    });
+
+    const secretKey = settings?.stripeSecretKey || this.configService.get<string>('STRIPE_SECRET_KEY');
+    
     if (!secretKey) {
-      throw new BadRequestException('STRIPE_SECRET_KEY is not configured in environment variables');
+      throw new BadRequestException('Stripe secret key is not configured');
     }
 
     this.stripe = new Stripe(secretKey, {
@@ -28,10 +35,33 @@ export class StripeService {
   }
 
   async createPaymentIntent(amount: number, currency: string, orderId?: string) {
-    const stripe = this.getStripeInstance();
+    const stripe = await this.getStripeInstance();
     
+    let verifiedAmount = amount;
+    
+    // Recalculate amount from DB if orderId is provided (Finding 2)
+    if (orderId) {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true }
+      });
+      
+      if (!order) {
+        throw new NotFoundException(`Order ${orderId} not found`);
+      }
+
+      // Re-sum items
+      const itemsTotal = order.items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+      
+      // We need to account for delivery fee if it's not in items
+      // totalAmount in DB is already calculated correctly by OrdersService.createOrder
+      verifiedAmount = Number(order.totalAmount);
+      
+      this.logger.log(`Creating payment intent for order ${orderId}. Verified amount: ${verifiedAmount}`);
+    }
+
     const intent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // convert to cents
+      amount: Math.round(verifiedAmount * 100), // convert to cents
       currency: currency.toLowerCase(),
       metadata: { orderId: orderId || '' },
       automatic_payment_methods: { enabled: true },
@@ -49,12 +79,56 @@ export class StripeService {
     };
   }
 
+  async verifyPayment(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { 
+        id: true, 
+        paymentStatus: true, 
+        stripePaymentIntentId: true 
+      }
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+
+    // If already marked as PAID in our DB (via webhook), return success
+    if (order.paymentStatus === 'PAID') {
+      return { success: true, status: 'PAID' };
+    }
+
+    // If we have an intent ID, check directly with Stripe as a fallback
+    if (order.stripePaymentIntentId) {
+      const stripe = await this.getStripeInstance();
+      const intent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
+      
+      if (intent.status === 'succeeded') {
+        // Manually update if webhook was missed/delayed
+        await this.prisma.order.update({
+          where: { id: orderId },
+          data: { paymentStatus: 'PAID' }
+        });
+        return { success: true, status: 'PAID' };
+      }
+    }
+
+    return { success: false, status: order.paymentStatus };
+  }
+
   async handleWebhook(payload: Buffer, signature: string) {
-    const stripe = this.getStripeInstance();
-    const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
+    const stripe = await this.getStripeInstance();
+    
+    // Try to get webhook secret from DB (Finding 3)
+    const settings = await this.prisma.settings.findUnique({
+      where: { id: 'global' },
+      select: { stripeWebhookSecret: true }
+    });
+
+    const webhookSecret = settings?.stripeWebhookSecret || this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
     
     if (!webhookSecret) {
-      throw new BadRequestException('STRIPE_WEBHOOK_SECRET is not configured in environment variables');
+      throw new BadRequestException('Stripe webhook secret is not configured');
     }
 
     let event: Stripe.Event;

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import { X, ShoppingBag, Heart, Star, ShieldCheck, Truck, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import SizeGuideModal from "./SizeGuideModal";
 import { useStore } from "@/store/useStore";
 import Price from "../Price";
@@ -18,10 +18,13 @@ interface Product {
   onSale?: boolean;
   category: string;
   color: string;
+  colors?: string[];
   sizes: string[];
   inStock: boolean;
   image: string;
+  images?: string[];
   description?: string;
+  variants?: any[];
 }
 
 interface QuickViewModalProps {
@@ -32,21 +35,84 @@ interface QuickViewModalProps {
 
 export default function QuickViewModal({ product, isOpen, onClose }: QuickViewModalProps) {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [userSelectedImage, setUserSelectedImage] = useState<string | null>(null);
   
   const addToCart = useStore((state) => state.addToCart);
   const addToCompare = useStore((state) => state.addToCompare);
   const [isAdding, setIsAdding] = useState(false);
 
+  const allImages = useMemo(() => {
+    if (!product) return [];
+    const images = [...(product.images || [])];
+    
+    product.variants?.forEach((v: any) => {
+      v.images?.forEach((img: string) => {
+        if (!images.includes(img)) {
+          images.push(img);
+        }
+      });
+    });
+    
+    return images;
+  }, [product]);
+
+  const activeImage = useMemo(() => {
+    if (!product) return "";
+    
+    if (userSelectedImage) return userSelectedImage;
+
+    if (selectedSize || selectedColor) {
+      const variant = product.variants?.find((v: any) => {
+        const matchesSize = selectedSize ? v.size === selectedSize : true;
+        const matchesColor = selectedColor ? v.color === selectedColor : true;
+        return matchesSize && matchesColor;
+      });
+
+      if (variant?.images && variant.images.length > 0) {
+        return variant.images[0];
+      }
+    }
+    
+    return product.image;
+  }, [product, selectedSize, selectedColor, userSelectedImage]);
+
+  // Reset user selection when variant attributes change to allow variant image to take over
+  useEffect(() => {
+    setUserSelectedImage(null);
+  }, [selectedSize, selectedColor]);
+
   if (!product) return null;
 
   const handleAddToCart = () => {
-    if (!selectedSize && product.sizes.length > 0) {
+    if (!selectedSize && product.sizes?.length > 0) {
       alert("Please select a size");
       return;
     }
+    if (!selectedColor && product.colors && product.colors.length > 0) {
+      alert("Please select a color");
+      return;
+    }
     setIsAdding(true);
-    addToCart(product, selectedSize || undefined);
+    
+    // Find the actual variant ID based on selected size/color
+    const selectedVariant = product.variants?.find((v: any) => {
+      const matchesSize = selectedSize ? v.size === selectedSize : true;
+      const matchesColor = selectedColor ? v.color === selectedColor : true;
+      return matchesSize && matchesColor;
+    });
+    
+    addToCart(
+      product, 
+      selectedSize || undefined, 
+      selectedVariant?.id,
+      undefined,
+      undefined,
+      selectedColor || undefined,
+      selectedVariant?.price ? Number(selectedVariant.price) : undefined,
+      selectedVariant?.images?.[0] || undefined
+    );
     setTimeout(() => {
       setIsAdding(false);
     }, 800);
@@ -82,24 +148,44 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Left: Product Image */}
-              <div className="w-full md:w-1/2 relative bg-[#FAF8F5] overflow-hidden group">
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  priority
-                />
-                
-                {/* Authentic Badge */}
-                <div className="absolute top-8 left-8 bg-[#0F0F0F] text-[#C9A962] px-5 py-2.5 text-[10px] font-bold tracking-[0.2em] shadow-xl">
-                  100% AUTHENTIC
+              {/* Left: Product Image & Gallery */}
+              <div className="w-full md:w-1/2 flex flex-col bg-[#FAF8F5] overflow-hidden group">
+                <div className="relative flex-1 min-h-[400px]">
+                  <Image
+                    src={activeImage || product.image}
+                    alt={product.name}
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    priority
+                  />
+                  
+                  {/* Authentic Badge */}
+                  <div className="absolute top-8 left-8 bg-[#0F0F0F] text-[#C9A962] px-5 py-2.5 text-[10px] font-bold tracking-[0.2em] shadow-xl">
+                    100% AUTHENTIC
+                  </div>
+
+                  {product.onSale && (
+                    <div className="absolute bottom-8 left-8 bg-[#F87171] text-white px-5 py-2.5 text-[10px] font-bold tracking-[0.2em]">
+                      SALE
+                    </div>
+                  )}
                 </div>
 
-                {product.onSale && (
-                  <div className="absolute bottom-8 left-8 bg-[#F87171] text-white px-5 py-2.5 text-[10px] font-bold tracking-[0.2em]">
-                    SALE
+                {/* Thumbnails */}
+                {allImages.length > 1 && (
+                  <div className="flex gap-2 p-4 overflow-x-auto no-scrollbar bg-white/50 backdrop-blur-sm border-t border-[#F0F0F0]">
+                    {allImages.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setUserSelectedImage(img)}
+                        className={cn(
+                          "relative w-16 h-20 flex-shrink-0 bg-white overflow-hidden transition-all duration-300 border",
+                          activeImage === img ? "border-[#C9A962] opacity-100" : "border-transparent opacity-40 hover:opacity-100"
+                        )}
+                      >
+                        <Image src={img} alt={`${product.name} ${idx}`} fill className="object-cover" />
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -138,33 +224,62 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                     {product.description || "Expertly crafted from premium materials, this piece embodies our commitment to timeless elegance and modern functionality. A signature addition to any sophisticated wardrobe."}
                   </p>
 
-                  {/* Size Selection */}
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-end border-b border-[#F0F0F0] pb-2">
-                      <span className="text-[11px] font-bold tracking-[0.15em] text-[#0F0F0F] uppercase">Select Size</span>
-                      <button 
-                        onClick={() => setIsSizeGuideOpen(true)}
-                        className="text-[10px] text-[#C9A962] font-bold tracking-[0.15em] uppercase hover:opacity-70 transition-opacity"
-                      >
-                        Size Guide
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-4 gap-3">
-                      {product.sizes.map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => setSelectedSize(size)}
-                          className={cn(
-                            "aspect-square flex items-center justify-center text-[12px] font-bold transition-all duration-300 border rounded-none",
-                            selectedSize === size
-                              ? "bg-[#0F0F0F] text-white border-[#0F0F0F]"
-                              : "bg-white text-[#0F0F0F] border-[#E5E5E5] hover:border-[#C9A962] hover:text-[#C9A962]"
-                          )}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-1 gap-8">
+                    {/* Color Selection */}
+                    {product.colors && product.colors.length > 0 && (
+                      <div className="space-y-4">
+                        <span className="text-[11px] font-bold tracking-[0.15em] text-[#0F0F0F] uppercase border-b border-[#F0F0F0] pb-2 block">
+                          Select Color
+                        </span>
+                        <div className="flex flex-wrap gap-3">
+                          {product.colors.map((color: string) => (
+                            <button
+                              key={color}
+                              onClick={() => setSelectedColor(color)}
+                              className={cn(
+                                "px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all border",
+                                selectedColor === color
+                                  ? "bg-[#0F0F0F] text-white border-[#0F0F0F]"
+                                  : "bg-white text-[#0F0F0F] border-[#E5E5E5] hover:border-[#C9A962]"
+                              )}
+                            >
+                              {color}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Size Selection */}
+                    {product.sizes && product.sizes.length > 0 && (
+                      <div className="space-y-6">
+                        <div className="flex justify-between items-end border-b border-[#F0F0F0] pb-2">
+                          <span className="text-[11px] font-bold tracking-[0.15em] text-[#0F0F0F] uppercase">Select Size</span>
+                          <button 
+                            onClick={() => setIsSizeGuideOpen(true)}
+                            className="text-[10px] text-[#C9A962] font-bold tracking-[0.15em] uppercase hover:opacity-70 transition-opacity"
+                          >
+                            Size Guide
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-4 gap-3">
+                          {product.sizes.map((size) => (
+                            <button
+                              key={size}
+                              onClick={() => setSelectedSize(size)}
+                              className={cn(
+                                "aspect-square flex items-center justify-center text-[12px] font-bold transition-all duration-300 border rounded-none",
+                                selectedSize === size
+                                  ? "bg-[#0F0F0F] text-white border-[#0F0F0F]"
+                                  : "bg-white text-[#0F0F0F] border-[#E5E5E5] hover:border-[#C9A962] hover:text-[#C9A962]"
+                              )}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}

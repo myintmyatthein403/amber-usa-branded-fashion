@@ -17,6 +17,8 @@ export class SaleSectionController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   findAll() {
     return this.saleSectionService.findAll();
   }

@@ -17,23 +17,45 @@ export default function CheckoutSuccessPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
   useEffect(() => {
-    // If we have redirect_status, use it. If not, but we have payment_intent, assume success for now
-    // or if we came here from handleComplete (although handleComplete doesn't redirect here)
-    if (redirectStatus === "succeeded" || (!redirectStatus && paymentIntent)) {
-      setStatus("success");
-      clearCart();
-    } else if (redirectStatus === "failed") {
-      setStatus("error");
-    } else {
-      // Default to success if we have an orderId but no error
-      if (orderId && !redirectStatus) {
-        setStatus("success");
-        clearCart();
-      } else {
-        setStatus("loading");
+    const verifyPayment = async () => {
+      if (!orderId) {
+        setStatus("error");
+        return;
       }
+
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/verify-payment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        const data = await res.json();
+        
+        if (data.success && data.status === 'PAID') {
+          setStatus("success");
+          clearCart();
+        } else if (data.status === 'FAILED') {
+          setStatus("error");
+        } else {
+          // If still PENDING, we could retry or just show loading/error
+          // For now, let's treat it as loading and it will re-run if needed
+          // but we probably shouldn't clear the cart yet.
+          setStatus("loading");
+        }
+      } catch (error) {
+        console.error("Payment verification failed:", error);
+        setStatus("error");
+      }
+    };
+
+    if (orderId && status === 'loading') {
+      verifyPayment();
+    } else if (!orderId) {
+      setStatus("error");
     }
-  }, [redirectStatus, paymentIntent, orderId, clearCart]);
+  }, [orderId, clearCart, status]);
 
   return (
     <main className="min-h-screen bg-[#FDFDFD] flex items-center justify-center p-6">

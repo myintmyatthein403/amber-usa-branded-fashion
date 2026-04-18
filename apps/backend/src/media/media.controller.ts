@@ -7,6 +7,9 @@ import {
   UseInterceptors,
   UploadedFile,
   UseGuards,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MediaService } from './media.service';
@@ -22,7 +25,17 @@ export class MediaController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+  async uploadFile(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|webp|gif)$' }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
     return this.mediaService.uploadFile(file);
   }
 

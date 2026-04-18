@@ -21,13 +21,24 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   }
 
   sanitizeData<T>(data: T): T {
-    if (!data || typeof data !== 'object') return data;
-    const sanitized = { ...data };
-    for (const key in sanitized) {
-      if ((sanitized as any)[key] === '') {
-        (sanitized as any)[key] = null;
-      }
+    if (data === null || data === undefined) return data;
+    
+    if (Array.isArray(data)) {
+      return data.map(item => this.sanitizeData(item)) as any;
     }
-    return sanitized;
+
+    if (typeof data === 'object') {
+      const sanitized = { ...data };
+      for (const key in sanitized) {
+        if ((sanitized as any)[key] === '') {
+          (sanitized as any)[key] = null;
+        } else if (typeof (sanitized as any)[key] === 'object') {
+          (sanitized as any)[key] = this.sanitizeData((sanitized as any)[key]);
+        }
+      }
+      return sanitized;
+    }
+
+    return data;
   }
 }

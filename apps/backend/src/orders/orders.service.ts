@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 
@@ -16,8 +16,9 @@ export class OrdersService {
     phone: string;
     shippingMethod: string;
     paymentMethod: string;
-    totalAmount: number;
+    totalAmount: number; // Still received but will be validated
     currency: string;
+    deliveryFee?: number;
     items: Array<{
       productId: string;
       variantId?: string;
@@ -29,18 +30,17 @@ export class OrdersService {
       size?: string;
     }>;
   }) {
-    // Generate an order number (e.g., AMB-2026-XXXX)
-    const orderNumber = `AMB-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
     return this.prisma.$transaction(async (tx) => {
       let hasPreOrderItems = false;
       const itemsWithPreOrderInfo = [];
+      let calculatedTotal = 0;
 
       for (const item of data.items) {
         let isPreOrder = false;
         let expectedShippingDate = null;
         let variant = null;
         let product = null;
+        let dbPrice = 0;
 
         if (item.variantId) {
           variant = await tx.variant.findUnique({
@@ -52,23 +52,31 @@ export class OrdersService {
             throw new NotFoundException(`Variant not found: ${item.variantId}`);
           }
 
+          // Use DB price for total calculation
+          dbPrice = Number(variant.price || variant.product.price);
           isPreOrder = variant.isPreOrder || variant.product.isPreOrder;
           expectedShippingDate = variant.preOrderShippingDate || variant.product.preOrderShippingDate;
 
           // Stock Check for Non-PreOrder Items
           if (!isPreOrder) {
-            if (variant.stock < item.quantity) {
-              throw new BadRequestException(`Insufficient stock for item: ${item.name} (${item.size}). Available: ${variant.stock}`);
+            try {
+              // Atomic conditional update to prevent lost-update/overselling (Finding 1)
+              await tx.variant.update({
+                where: { 
+                  id: variant.id,
+                  stock: { gte: item.quantity }
+                },
+                data: { stock: { decrement: item.quantity } }
+              });
+            } catch (error) {
+              if (error.code === 'P2025') { // Record not found (because stock < quantity)
+                throw new BadRequestException(`Insufficient stock for item: ${item.name} (${item.size}). Available: ${variant.stock}`);
+              }
+              throw error;
             }
-            // Decrement stock
-            await tx.variant.update({
-              where: { id: variant.id },
-              data: { stock: variant.stock - item.quantity }
-            });
           }
 
         } else {
-          // Logic for products without variants (if any)
           product = await tx.product.findUnique({
             where: { id: item.productId }
           });
@@ -77,57 +85,83 @@ export class OrdersService {
             throw new NotFoundException(`Product not found: ${item.productId}`);
           }
           
+          dbPrice = Number(product.price);
           isPreOrder = product.isPreOrder;
           expectedShippingDate = product.preOrderShippingDate;
-          // Note: If product has no variants, we might need stock on product level? 
-          // Schema doesn't show stock on Product, only Variant. 
-          // Assuming all purchasable items have variants or unlimited stock if no variant logic exists (or it's handled elsewhere).
-          // For now, no stock check on product-level items without variants (e.g. digital goods?) or just skip.
         }
 
+        calculatedTotal += dbPrice * item.quantity;
         if (isPreOrder) hasPreOrderItems = true;
 
         itemsWithPreOrderInfo.push({
           ...item,
+          price: dbPrice, // Override with DB price
           isPreOrder,
           expectedShippingDate
         });
       }
 
-      return tx.order.create({
-        data: {
-          orderNumber,
-          status: 'PENDING',
-          paymentStatus: 'PENDING', // default
-          totalAmount: data.totalAmount,
-          currency: data.currency || 'USD',
-          paymentMethod: data.paymentMethod,
-          shippingAddress: `${data.firstName} ${data.lastName}, ${data.address}, ${data.city}. Phone: ${data.phone}`,
-          userId: data.userId,
-          hasPreOrderItems,
-          items: {
-            create: itemsWithPreOrderInfo.map(item => ({
-              productId: item.productId,
-              variantId: item.variantId,
-              name: item.name,
-              price: item.price,
-              isUsd: item.isUsd ?? true,
-              quantity: item.quantity,
-              image: item.image,
-              size: item.size,
-              isPreOrder: item.isPreOrder,
-              expectedShippingDate: item.expectedShippingDate,
-            })),
-          },
-        },
-        include: {
-          items: true,
+      // Add delivery fee to calculation
+      const deliveryFee = data.deliveryFee || 0;
+      calculatedTotal += deliveryFee;
+
+      // Note: We should probably check if calculatedTotal matches data.totalAmount or just use calculatedTotal.
+      // For security, we MUST use calculatedTotal.
+
+      // Retry logic for order number generation (Finding 4)
+      let order: any;
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          const timestamp = Date.now().toString().slice(-4);
+          const random = Math.floor(1000 + Math.random() * 9000);
+          const orderNumber = `AMB-${new Date().getFullYear()}-${timestamp}-${random}`;
+          
+          order = await tx.order.create({
+            data: {
+              orderNumber,
+              status: 'PENDING',
+              paymentStatus: 'PENDING',
+              totalAmount: calculatedTotal,
+              currency: data.currency || 'USD',
+              paymentMethod: data.paymentMethod,
+              shippingAddress: `${data.firstName} ${data.lastName}, ${data.address}, ${data.city}. Phone: ${data.phone}`,
+              userId: data.userId,
+              hasPreOrderItems,
+              items: {
+                create: itemsWithPreOrderInfo.map(item => ({
+                  productId: item.productId,
+                  variantId: item.variantId,
+                  name: item.name,
+                  price: item.price,
+                  isUsd: item.isUsd ?? true,
+                  quantity: item.quantity,
+                  image: item.image,
+                  size: item.size,
+                  isPreOrder: item.isPreOrder,
+                  expectedShippingDate: item.expectedShippingDate,
+                })),
+              },
+            },
+            include: {
+              items: true,
+            }
+          });
+          break; // Success
+        } catch (error) {
+          if (error.code === 'P2002' && retries > 1) { // Unique constraint violation
+            retries--;
+            continue;
+          }
+          throw error;
         }
-      });
+      }
+
+      return order;
     });
   }
 
-  async getOrderById(id: string) {
+  async getOrderById(id: string, user?: { userId: string; role: string }) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -146,10 +180,38 @@ export class OrdersService {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
+    // Ownership check (Finding 1)
+    if (user) {
+      const isOwner = order.userId === user.userId;
+      const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(user.role);
+      
+      if (!isOwner && !isAdmin) {
+        throw new ForbiddenException('You do not have permission to access this order');
+      }
+    } else {
+      // If no user object is passed, but route is OptionalJwtAuthGuard, 
+      // we might want to strictly forbid or allow depending on context.
+      // Typically, for order tracking of guest orders, we might use a special token or just orderNumber + email.
+      // For this specific finding, let's enforce that if we can't verify ownership, we restrict data.
+      throw new ForbiddenException('Authentication required to access order details');
+    }
+
     return order;
   }
 
   async updateOrderStatus(id: string, status: OrderStatus) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+
+    // If moving to CANCELLED, restock items (Finding 2)
+    if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
+      await this.restockItems(order.id);
+    }
+
     return this.prisma.order.update({
       where: { id },
       data: { status },
@@ -157,6 +219,18 @@ export class OrdersService {
   }
 
   async updatePaymentStatus(id: string, paymentStatus: PaymentStatus) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+
+    // If payment fails, restock (Finding 2)
+    if (paymentStatus === 'FAILED' && order.paymentStatus !== 'FAILED') {
+      await this.restockItems(order.id);
+    }
+
     return this.prisma.order.update({
       where: { id },
       data: { paymentStatus },
@@ -261,7 +335,41 @@ export class OrdersService {
     };
   }
 
+  async restockItems(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }
+    });
+
+    if (!order || order.restocked) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of order.items) {
+        if (item.variantId && !item.isPreOrder) {
+          await tx.variant.update({
+            where: { id: item.variantId },
+            data: { stock: { increment: item.quantity } }
+          });
+        }
+      }
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: { restocked: true }
+      });
+    });
+  }
+
   async deleteOrder(id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (order && !order.restocked && order.status !== 'CANCELLED' && order.paymentStatus !== 'FAILED') {
+      await this.restockItems(id);
+    }
+
     return this.prisma.order.delete({
       where: { id },
     });

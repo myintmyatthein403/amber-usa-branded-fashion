@@ -23,9 +23,9 @@ interface AppState {
   cartItems: CartItem[];
   isCartOpen: boolean;
   isCartAnimating: boolean;
-  addToCart: (product: any, size?: string, isPreOrder?: boolean, expectedShippingDate?: string) => void;
-  removeFromCart: (id: number | string, size?: string) => void;
-  updateQuantity: (id: number | string, size: string | undefined, delta: number) => void;
+  addToCart: (product: any, size?: string, variantId?: string, isPreOrder?: boolean, expectedShippingDate?: string, color?: string, price?: number, image?: string) => void;
+  removeFromCart: (id: number | string, size?: string, variantId?: string) => void;
+  updateQuantity: (id: number | string, size: string | undefined, delta: number, variantId?: string) => void;
   clearCart: () => void;
   setCartOpen: (open: boolean) => void;
 
@@ -68,22 +68,33 @@ export const useStore = create<AppState>()(
       isCartOpen: false,
       isCartAnimating: false,
       setCartOpen: (open) => set({ isCartOpen: open }),
-      addToCart: (product: any, size?: string, variantId?: string, isPreOrder?: boolean, expectedShippingDate?: string) => {
+      addToCart: (product: any, size?: string, variantId?: string, isPreOrder?: boolean, expectedShippingDate?: string, color?: string, price?: number, image?: string) => {
     const cartItems = get().cartItems;
     const existingItem = cartItems.find((item) => 
       item.id === product.id && 
-      (variantId ? item.variantId === variantId : item.size === size)
+      (variantId && item.variantId ? item.variantId === variantId : item.size === size && item.color === color)
     );
     
     let newItems;
     if (existingItem) {
       newItems = cartItems.map((item) =>
-        item.id === product.id && (variantId ? item.variantId === variantId : item.size === size)
+        item.id === product.id && (variantId && item.variantId ? item.variantId === variantId : item.size === size && item.color === color)
           ? { ...item, quantity: item.quantity + 1, isPreOrder, expectedShippingDate }
           : item
       );
     } else {
-      newItems = [...cartItems, { ...product, quantity: 1, size, variantId, isPreOrder, expectedShippingDate }];
+      const cartItem: CartItem = { 
+        ...product, 
+        quantity: 1, 
+        size, 
+        variantId, 
+        isPreOrder, 
+        expectedShippingDate,
+        color: color || product.color,
+        price: price !== undefined ? price : product.price,
+        image: image || product.image
+      };
+      newItems = [...cartItems, cartItem];
     }
 
     set({ 
@@ -94,15 +105,24 @@ export const useStore = create<AppState>()(
     
     setTimeout(() => set({ isCartAnimating: false }), 1000);
   },
-      removeFromCart: (id, size) => {
+      removeFromCart: (id, size, variantId) => {
         set({
-          cartItems: get().cartItems.filter((item) => !(item.id === id && item.size === size))
+          cartItems: get().cartItems.filter((item) => {
+            if (variantId && item.variantId) {
+              return !(item.id === id && item.variantId === variantId);
+            }
+            return !(item.id === id && item.size === size);
+          })
         });
       },
-      updateQuantity: (id, size, delta) => {
+      updateQuantity: (id, size, delta, variantId) => {
         set({
           cartItems: get().cartItems.map((item) => {
-            if (item.id === id && item.size === size) {
+            const matches = variantId && item.variantId 
+              ? item.id === id && item.variantId === variantId
+              : item.id === id && item.size === size;
+            
+            if (matches) {
               return { ...item, quantity: Math.max(1, item.quantity + delta) };
             }
             return item;
