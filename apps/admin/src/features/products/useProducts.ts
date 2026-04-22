@@ -2,15 +2,55 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
-import { Product, Variant, Category, Brand, Sale } from './schema';
+import { Product, Variant, Category, Brand, Sale, Meta } from './schema';
 
 export const useProducts = () => {
-  const { data: products, loading, refresh } = useFetch<Product>(API_ROUTES.PRODUCTS.BASE);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search effect
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1); // Reset to first page on search
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [search]);
+
   const { data: categories } = useFetch<Category>(API_ROUTES.CATEGORIES.BASE);
   const { data: brands } = useFetch<Brand>(API_ROUTES.BRANDS.BASE);
   const { data: rawWarehouses } = useFetch<any>(API_ROUTES.LOGISTICS.WAREHOUSES);
   const { data: sales } = useFetch<Sale>(API_ROUTES.SALES.BASE);
   const { deleteItem } = useDelete(API_ROUTES.PRODUCTS.BASE);
+
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+      if (debouncedSearch) params.append('search', debouncedSearch);
+
+      const response = await apiService(`${API_ROUTES.PRODUCTS.BASE}?${params.toString()}`);
+      setProducts(response.data);
+      setMeta(response.meta);
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit, debouncedSearch]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [mediaSelectorOpen, setMediaSelectorOpen] = useState(false);
@@ -149,7 +189,7 @@ export const useProducts = () => {
       });
 
       setModalOpen(false);
-      refresh();
+      fetchProducts();
       resetForm();
     } catch (error) {
       console.error('Failed to save product:', error);
@@ -214,12 +254,19 @@ export const useProducts = () => {
 
   const handleDelete = async (id: string) => {
     const success = await deleteItem(id, 'Delete this product and all its variants permanently?');
-    if (success) refresh();
+    if (success) fetchProducts();
   };
 
   return {
     products,
+    meta,
     loading,
+    page,
+    setPage,
+    limit,
+    setLimit,
+    search,
+    setSearch,
     categories,
     brands,
     warehouses,
@@ -247,6 +294,6 @@ export const useProducts = () => {
     handleDelete,
     openEditModal,
     resetForm,
-    refresh
+    refresh: fetchProducts
   };
 };

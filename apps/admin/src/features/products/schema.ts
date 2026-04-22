@@ -55,3 +55,10 @@ export type Product = z.infer<typeof ProductSchema> & {
 export type Category = { id: string; name: string };
 export type Brand = { id: string; name: string; logo?: string };
 export type Sale = { id: string; name: string };
+
+export type Meta = {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};

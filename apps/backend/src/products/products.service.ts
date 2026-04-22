@@ -73,26 +73,82 @@ export class ProductsService {
     onSale?: boolean;
     categoryId?: string;
     brandId?: string;
-  } = {}): Promise<Product[]> {
-    const { isFeatured, isNewArrival, isBestSeller, onSale, categoryId, brandId } = params;
+    page?: number;
+    limit?: number;
+    search?: string;
+  } = {}): Promise<any> {
+    const { 
+      isFeatured, 
+      isNewArrival, 
+      isBestSeller, 
+      onSale, 
+      categoryId, 
+      brandId,
+      page,
+      limit,
+      search
+    } = params;
     
-    return this.prisma.product.findMany({
-      where: {
-        isFeatured,
-        isNewArrival,
-        isBestSeller,
-        onSale,
-        categoryId,
-        brandId,
-      },
-      include: {
-        category: true,
-        brand: true,
-        variants: true,
-        sale: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const where: Prisma.ProductWhereInput = {
+      isFeatured,
+      isNewArrival,
+      isBestSeller,
+      onSale,
+      categoryId,
+      brandId,
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+        { shortDescription: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Backward compatibility: if no pagination or search, return full list
+    if (!page && !limit && !search) {
+      return this.prisma.product.findMany({
+        where,
+        include: {
+          category: true,
+          brand: true,
+          variants: true,
+          sale: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+    
+    const currentPage = Number(page) || 1;
+    const currentLimit = Number(limit) || 20;
+    const skip = (currentPage - 1) * currentLimit;
+    
+    const [data, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        include: {
+          category: true,
+          brand: true,
+          variants: true,
+          sale: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: currentLimit,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page: currentPage,
+        limit: currentLimit,
+        totalPages: Math.ceil(total / currentLimit),
+      }
+    };
   }
 
   async getProductById(id: string): Promise<Product | null> {

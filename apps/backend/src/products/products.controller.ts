@@ -28,6 +28,9 @@ export class ProductsController {
     @Query('onSale') onSale?: string,
     @Query('categoryId') categoryId?: string,
     @Query('brandId') brandId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
   ) {
     return this.productsService.getAllProducts({
       isFeatured: isFeatured !== undefined ? isFeatured === 'true' : undefined,
@@ -36,6 +39,9 @@ export class ProductsController {
       onSale: onSale !== undefined ? onSale === 'true' : undefined,
       categoryId,
       brandId,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
     });
   }
 
