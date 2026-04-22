@@ -29,6 +29,10 @@
 /apps/admin/dist
 /apps/admin/.env
 
+# shared package
+/packages/shared/node_modules
+/packages/shared/dist
+
 # misc
 .DS_Store
 .env
