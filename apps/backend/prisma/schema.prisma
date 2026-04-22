@@ -115,7 +115,7 @@ model OrderItem {
 model RefundRequest {
   id        String       @id @default(uuid())
   orderId   String       @unique
-  order     Order        @relation(fields: [orderId], references: [id])
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   
   userId    String
   user      User         @relation(fields: [userId], references: [id])

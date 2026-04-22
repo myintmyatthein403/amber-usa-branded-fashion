@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Req, Patch, Delete, Query } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, Req, Patch, Delete, Query, UsePipes } from '@nestjs/common';
 import { Request } from 'express';
 import { OrdersService } from './orders.service';
 import { StripeService } from '../stripe/stripe.service';
@@ -6,6 +6,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { OrderSchema } from '@amber/shared';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -25,6 +27,7 @@ export class OrdersController {
 
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
+  @UsePipes(new ZodValidationPipe(OrderSchema))
   createOrder(@Req() req: AuthenticatedRequest, @Body() data: any) {
     const userId = req.user?.userId || null;
     return this.ordersService.createOrder({ ...data, userId });

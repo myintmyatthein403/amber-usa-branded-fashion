@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, UsePipes } from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
 import { Permissions } from '../auth/permissions.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { ProductSchema } from '@amber/shared';
 
 @Controller('products')
 export class ProductsController {
@@ -14,7 +14,8 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Permissions('products:write')
   @Post()
-  create(@Body() createProductDto: Prisma.ProductCreateInput) {
+  @UsePipes(new ZodValidationPipe(ProductSchema))
+  create(@Body() createProductDto: any) {
     return this.productsService.createProduct(createProductDto);
   }
 
@@ -60,7 +61,8 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Permissions('products:write')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: Prisma.ProductUpdateInput) {
+  @UsePipes(new ZodValidationPipe(ProductSchema.partial()))
+  update(@Param('id') id: string, @Body() updateProductDto: any) {
     return this.productsService.updateProduct(id, updateProductDto);
   }
 
