@@ -42,7 +42,7 @@ export class OrdersService {
     // 1. Resolve Warehouse & Validate Stock/Prices
     if (!warehouseId) {
       const firstItem = data.items.find(item => item.variantId);
-      if (firstItem) {
+      if (firstItem && firstItem.variantId) {
         const inventory = await this.ordersRepository.findWarehouseWithStock(firstItem.variantId, firstItem.quantity);
         warehouseId = inventory?.warehouseId;
       }
@@ -50,6 +50,10 @@ export class OrdersService {
 
     if (!warehouseId) {
       warehouseId = (await this.ordersRepository.findDefaultWarehouse('MYANMAR'))?.id || (await this.ordersRepository.findAnyWarehouse())?.id;
+    }
+
+    if (!warehouseId) {
+      throw new BadRequestException('No fulfillment warehouse available');
     }
 
     for (const item of data.items) {
