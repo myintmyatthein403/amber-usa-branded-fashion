@@ -1,17 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { CategoriesRepository } from './categories.repository';
 import { Category } from '@prisma/client';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class CategoriesService {
   constructor(
-    private prisma: PrismaService,
     private categoriesRepository: CategoriesRepository
   ) {}
 
   async createCategory(data: any): Promise<Category> {
-    const sanitizedData = this.prisma.sanitizeData(data);
+    const sanitizedData = sanitizeData(data);
     return this.categoriesRepository.create(sanitizedData);
   }
 
@@ -20,7 +19,7 @@ export class CategoriesService {
   }
 
   async updateCategory(id: string, data: any): Promise<Category> {
-    const sanitizedData = this.prisma.sanitizeData(data);
+    const sanitizedData = sanitizeData(data);
     return this.categoriesRepository.update(id, sanitizedData);
   }
 

@@ -1,17 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { Product, Prisma } from '@prisma/client';
 import { ProductsRepository } from './products.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class ProductsService {
   constructor(
-    private prisma: PrismaService,
     private productsRepository: ProductsRepository
   ) {}
 
   async createProduct(data: any): Promise<Product> {
-    const sanitizedData = this.prisma.sanitizeData(data);
+    const sanitizedData = sanitizeData(data);
     return this.productsRepository.create(sanitizedData);
   }
 
@@ -83,7 +82,7 @@ export class ProductsService {
   }
 
   async updateProduct(id: string, data: any): Promise<Product> {
-    const sanitizedData = this.prisma.sanitizeData(data);
+    const sanitizedData = sanitizeData(data);
     return this.productsRepository.update(id, sanitizedData);
   }
 

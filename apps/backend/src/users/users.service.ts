@@ -1,27 +1,16 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { UsersRepository } from './users.repository';
 import * as bcrypt from 'bcrypt';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private usersRepository: UsersRepository
+  ) {}
 
   async findAll() {
-    const users = await this.prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        roleName: true,
-        phone: true,
-        points: true,
-        memberLevel: true,
-        status: true,
-        joinedAt: true,
-      },
-    });
-
+    const users = await this.usersRepository.findAll();
     return users.map(user => ({
       ...user,
       role: user.roleName,
@@ -29,14 +18,7 @@ export class UsersService {
   }
 
   async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-      include: {
-        orders: true,
-        refundRequests: true,
-        role: true,
-      },
-    });
+    const user = await this.usersRepository.findByIdWithFullDetails(id);
     if (!user) throw new NotFoundException('User not found');
     const { password, ...result } = user;
     return result;
@@ -48,19 +30,18 @@ export class UsersService {
       throw new ForbiddenException('Only Superadmins can create staff members');
     }
 
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
+    const sanitizedData = sanitizeData(data);
+    if (sanitizedData.password) {
+      sanitizedData.password = await bcrypt.hash(sanitizedData.password, 10);
     }
 
-    const user = await this.prisma.user.create({
-      data,
-    });
+    const user = await this.usersRepository.create(sanitizedData);
     const { password: _, ...result } = user;
     return result;
   }
 
   async update(id: string, data: any, currentUser: any) {
-    const userToUpdate = await this.prisma.user.findUnique({ where: { id } });
+    const userToUpdate = await this.usersRepository.findById(id);
     if (!userToUpdate) throw new NotFoundException('User not found');
 
     // Rule: ADMIN cannot modify or delete a SUPERADMIN
@@ -80,26 +61,23 @@ export class UsersService {
 
     // Rule: Only SUPERADMIN can change roles of other staff
     if (currentUser.role === 'ADMIN' && data.roleName && data.roleName !== userToUpdate.roleName) {
-      // Allow Admin to change USER to USER (no change) or prevent elevating to ADMIN/SUPERADMIN
       if (userToUpdate.roleName === 'USER' && data.roleName !== 'USER') {
          throw new ForbiddenException('Admins cannot promote customers to staff roles');
       }
     }
 
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
+    const sanitizedData = sanitizeData(data);
+    if (sanitizedData.password) {
+      sanitizedData.password = await bcrypt.hash(sanitizedData.password, 10);
     }
 
-    const updatedUser = await this.prisma.user.update({
-      where: { id },
-      data,
-    });
+    const updatedUser = await this.usersRepository.update(id, sanitizedData);
     const { password: _, ...result } = updatedUser;
     return result;
   }
 
   async remove(id: string, currentUser: any) {
-    const userToDelete = await this.prisma.user.findUnique({ where: { id } });
+    const userToDelete = await this.usersRepository.findById(id);
     if (!userToDelete) throw new NotFoundException('User not found');
 
     // Rule: ADMIN cannot delete a SUPERADMIN
@@ -112,8 +90,6 @@ export class UsersService {
        throw new ForbiddenException('Admins cannot delete other admins');
     }
 
-    return this.prisma.user.delete({
-      where: { id },
-    });
+    return this.usersRepository.delete(id);
   }
 }

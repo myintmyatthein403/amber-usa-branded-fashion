@@ -26,6 +26,19 @@ export class LogisticsRepository {
   }
 
   // --- Inventory ---
+  async findAllInventoryWithDetails() {
+    return this.prisma.inventory.findMany({
+      include: {
+        warehouse: true,
+        variant: { include: { product: true } }
+      },
+      orderBy: [
+        { variant: { productId: 'asc' } },
+        { warehouse: { location: 'asc' } }
+      ]
+    });
+  }
+
   async findInventoryByVariant(variantId: string) {
     return this.prisma.inventory.findMany({
       where: { variantId },

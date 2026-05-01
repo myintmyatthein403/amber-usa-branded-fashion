@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { UsersRepository } from '../users/users.repository';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 
@@ -10,7 +10,7 @@ export class AuthService {
   private googleClient: OAuth2Client;
 
   constructor(
-    private prisma: PrismaService,
+    private usersRepository: UsersRepository,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {
@@ -20,7 +20,7 @@ export class AuthService {
   }
 
   async validateUser(email: string, pass: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.usersRepository.findByEmail(email);
     if (user && user.password && await bcrypt.compare(pass, user.password)) {
       const { password, ...result } = user;
       return result;
@@ -48,37 +48,26 @@ export class AuthService {
 
     const { email, sub: providerId, name, picture: avatar } = payload;
 
-    // Try to find user by providerId first
-    let user = await this.prisma.user.findUnique({
-      where: { providerId },
-    });
+    let user = await this.usersRepository.findByProviderId(providerId);
 
     if (!user) {
-      // Try to find user by email
-      user = await this.prisma.user.findUnique({
-        where: { email },
-      });
+      user = await this.usersRepository.findByEmail(email);
 
       if (user) {
-        // Link existing user to Google
-        user = await this.prisma.user.update({
-          where: { id: user.id },
-          data: { 
-            provider: 'google', 
-            providerId,
-            avatar: user.avatar || avatar
-          },
+        user = await this.usersRepository.update(user.id, {
+          provider: 'google', 
+          providerId,
+          avatar: user.avatar || avatar
         });
       } else {
-        // Create new user
-        user = await this.prisma.user.create({
-          data: {
-            email,
-            name,
-            provider: 'google',
-            providerId,
-            avatar,
-            roleName: 'USER',
+        user = await this.usersRepository.create({
+          email,
+          name,
+          provider: 'google',
+          providerId,
+          avatar,
+          role: {
+            connect: { name: 'USER' }
           },
         });
       }
@@ -88,12 +77,8 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const fullUser = await this.prisma.user.findUnique({
-      where: { id: user.id },
-      include: { role: true },
-    });
-    
-    const permissions = fullUser?.role?.permissions || [];
+    const fullUser = await this.usersRepository.findById(user.id);
+    const permissions = (fullUser as any)?.role?.permissions || [];
     const payload = { email: user.email, sub: user.id, role: user.roleName, permissions };
     
     return {
@@ -109,20 +94,18 @@ export class AuthService {
   }
 
   async register(registerDto: any) {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: registerDto.email },
-    });
+    const existingUser = await this.usersRepository.findByEmail(registerDto.email);
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-    const user = await this.prisma.user.create({
-      data: {
-        email: registerDto.email,
-        password: hashedPassword,
-        name: registerDto.name,
-        roleName: 'USER',
+    const user = await this.usersRepository.create({
+      email: registerDto.email,
+      password: hashedPassword,
+      name: registerDto.name,
+      role: {
+        connect: { name: 'USER' }
       },
     });
 
@@ -131,20 +114,7 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: true,
-        orders: {
-          include: {
-            items: true,
-          },
-          orderBy: {
-            date: 'desc',
-          },
-        },
-      },
-    });
+    const user = await this.usersRepository.findByIdWithFullDetails(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
@@ -152,20 +122,17 @@ export class AuthService {
     return {
       ...result,
       role: user.roleName,
-      permissions: user.role?.permissions || [],
+      permissions: (user as any).role?.permissions || [],
     };
   }
 
   async updateProfile(userId: string, profileData: any) {
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        name: profileData.name,
-        username: profileData.username,
-        phone: profileData.phone,
-        address: profileData.address,
-        avatar: profileData.avatar,
-      },
+    const user = await this.usersRepository.update(userId, {
+      name: profileData.name,
+      username: profileData.username,
+      phone: profileData.phone,
+      address: profileData.address,
+      avatar: profileData.avatar,
     });
     const { password, ...result } = user;
     return result;

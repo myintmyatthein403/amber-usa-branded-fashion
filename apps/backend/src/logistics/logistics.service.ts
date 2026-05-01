@@ -1,15 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { LogisticsRepository } from './logistics.repository';
 import { CargoStatus, Prisma } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ShipmentStatusChangedEvent } from '../common/events/domain.events';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class LogisticsService {
   private readonly logger = new Logger(LogisticsService.name);
 
   constructor(
-    private prisma: PrismaService,
-    private logisticsRepository: LogisticsRepository
+    private logisticsRepository: LogisticsRepository,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   // --- Warehouse Management ---
@@ -18,7 +20,7 @@ export class LogisticsService {
   }
 
   async createWarehouse(data: { name: string; location: string; address?: string }) {
-    const sanitizedData = this.prisma.sanitizeData(data) as Prisma.WarehouseCreateInput;
+    const sanitizedData = sanitizeData(data) as Prisma.WarehouseCreateInput;
     return this.logisticsRepository.createWarehouse(sanitizedData);
   }
 
@@ -68,6 +70,7 @@ export class LogisticsService {
     const shipment = await this.logisticsRepository.findCargoById(id);
     if (!shipment) throw new NotFoundException('Shipment not found');
 
+    const oldStatus = shipment.status;
     const inventoryUpdates: Array<{ variantId: string; warehouseId: string; quantity: number }> = [];
     const cargoUpdateData: Prisma.CargoShipmentUpdateInput = { status };
 
@@ -101,27 +104,25 @@ export class LogisticsService {
       cargoUpdateData.arrivalDate = new Date();
     }
 
+    let result: any;
     if (inventoryUpdates.length > 0) {
-      return this.logisticsRepository.updateCargoWithInventory(id, cargoUpdateData, inventoryUpdates);
+      result = await this.logisticsRepository.updateCargoWithInventory(id, cargoUpdateData, inventoryUpdates);
+    } else {
+      result = await this.logisticsRepository.updateCargo(id, cargoUpdateData);
     }
 
-    return this.logisticsRepository.updateCargo(id, cargoUpdateData);
+    if (oldStatus !== status) {
+      this.eventEmitter.emit(
+        'shipment.status_changed',
+        new ShipmentStatusChangedEvent(id, oldStatus, status),
+      );
+    }
+
+    return result;
   }
 
   async getInventoryOverview() {
-    return this.logisticsRepository.findAllWarehouses().then(async warehouses => {
-      // Simplified overview logic or keep current
-      return this.prisma.inventory.findMany({
-        include: {
-          warehouse: true,
-          variant: { include: { product: true } }
-        },
-        orderBy: [
-          { variant: { productId: 'asc' } },
-          { warehouse: { location: 'asc' } }
-        ]
-      });
-    });
+    return this.logisticsRepository.findAllInventoryWithDetails();
   }
 
   async getAllCargoShipments() {

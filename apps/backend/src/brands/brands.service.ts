@@ -1,17 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { BrandsRepository } from './brands.repository';
 import { Brand } from '@prisma/client';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class BrandsService {
   constructor(
-    private prisma: PrismaService,
     private brandsRepository: BrandsRepository
   ) {}
 
   async createBrand(data: any): Promise<Brand> {
-    const sanitizedData = this.prisma.sanitizeData(data);
+    const sanitizedData = sanitizeData(data);
     return this.brandsRepository.create(sanitizedData);
   }
 
@@ -26,7 +25,7 @@ export class BrandsService {
   }
 
   async updateBrand(id: string, data: any): Promise<Brand> {
-    const sanitizedData = this.prisma.sanitizeData(data);
+    const sanitizedData = sanitizeData(data);
     return this.brandsRepository.update(id, sanitizedData);
   }
 

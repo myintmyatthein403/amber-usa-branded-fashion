@@ -1,17 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { VariantsRepository } from './variants.repository';
 import { Variant } from '@prisma/client';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class VariantsService {
   constructor(
-    private prisma: PrismaService,
     private variantsRepository: VariantsRepository
   ) {}
 
   async createVariant(data: any): Promise<Variant> {
-    const sanitizedData = this.prisma.sanitizeData(data);
+    const sanitizedData = sanitizeData(data);
     return this.variantsRepository.create(sanitizedData);
   }
 
@@ -20,7 +19,7 @@ export class VariantsService {
   }
 
   async updateVariant(id: string, data: any): Promise<Variant> {
-    const sanitizedData = this.prisma.sanitizeData(data);
+    const sanitizedData = sanitizeData(data);
     const { stock, ...rest } = sanitizedData;
 
     const variant = await this.variantsRepository.findById(id);
