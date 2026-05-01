@@ -1,64 +1,47 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { Review, Prisma } from '@prisma/client';
+import { ReviewsRepository } from './reviews.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly reviewsRepository: ReviewsRepository) {}
 
-  async createReview(data: Prisma.ReviewCreateInput): Promise<Review> {
-    return this.prisma.review.create({
-      data: {
-        ...data,
-        isApproved: false, // Force moderation (Finding 1)
-      },
-    });
+  async createReview(data: any): Promise<Review> {
+    const sanitizedData = sanitizeData(data);
+    return this.reviewsRepository.create({
+      ...sanitizedData,
+      isApproved: false, // Force moderation
+    } as Prisma.ReviewCreateInput);
   }
 
   async getAllReviews(): Promise<Review[]> {
-    return this.prisma.review.findMany({
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-          }
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.reviewsRepository.findAll();
   }
 
   async getApprovedReviewsByProduct(productId: string): Promise<Review[]> {
-    return this.prisma.review.findMany({
-      where: {
-        productId,
-        isApproved: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.reviewsRepository.findApprovedByProduct(productId);
   }
 
-  async updateReview(id: string, data: Prisma.ReviewUpdateInput): Promise<Review> {
-    return this.prisma.review.update({
-      where: { id },
-      data,
-    });
+  async updateReview(id: string, data: any): Promise<Review> {
+    const review = await this.reviewsRepository.findById(id);
+    if (!review) throw new NotFoundException(`Review with ID ${id} not found`);
+
+    const sanitizedData = sanitizeData(data);
+    return this.reviewsRepository.update(id, sanitizedData as Prisma.ReviewUpdateInput);
   }
 
   async deleteReview(id: string): Promise<Review> {
-    return this.prisma.review.delete({
-      where: { id },
-    });
+    const review = await this.reviewsRepository.findById(id);
+    if (!review) throw new NotFoundException(`Review with ID ${id} not found`);
+
+    return this.reviewsRepository.delete(id);
   }
 
   async toggleApproval(id: string): Promise<Review> {
-    const review = await this.prisma.review.findUnique({ where: { id } });
-    if (!review) throw new NotFoundException('Review not found');
+    const review = await this.reviewsRepository.findById(id);
+    if (!review) throw new NotFoundException(`Review with ID ${id} not found`);
     
-    return this.prisma.review.update({
-      where: { id },
-      data: { isApproved: !review.isApproved },
-    });
+    return this.reviewsRepository.update(id, { isApproved: !review.isApproved });
   }
 }
