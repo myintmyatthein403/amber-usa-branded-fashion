@@ -1,41 +1,38 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma, Brand } from '@prisma/client';
+import { BrandsRepository } from './brands.repository';
+import { Brand } from '@prisma/client';
 
 @Injectable()
 export class BrandsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private brandsRepository: BrandsRepository
+  ) {}
 
-  async createBrand(data: Prisma.BrandCreateInput): Promise<Brand> {
+  async createBrand(data: any): Promise<Brand> {
     const sanitizedData = this.prisma.sanitizeData(data);
-    return this.prisma.brand.create({
-      data: sanitizedData,
-    });
+    return this.brandsRepository.create(sanitizedData);
   }
 
   async getAllBrands(): Promise<Brand[]> {
-    return this.prisma.brand.findMany({
-      orderBy: { name: 'asc' },
-    });
+    return this.brandsRepository.findAll();
   }
 
   async getBrandById(id: string): Promise<Brand | null> {
-    return this.prisma.brand.findUnique({
-      where: { id },
-    });
+    const brand = await this.brandsRepository.findById(id);
+    if (!brand) throw new NotFoundException(`Brand with ID ${id} not found`);
+    return brand;
   }
 
-  async updateBrand(id: string, data: Prisma.BrandUpdateInput): Promise<Brand> {
+  async updateBrand(id: string, data: any): Promise<Brand> {
     const sanitizedData = this.prisma.sanitizeData(data);
-    return this.prisma.brand.update({
-      where: { id },
-      data: sanitizedData,
-    });
+    return this.brandsRepository.update(id, sanitizedData);
   }
 
   async deleteBrand(id: string): Promise<Brand> {
-    return this.prisma.brand.delete({
-      where: { id },
-    });
+    await this.getBrandById(id);
+    return this.brandsRepository.delete(id);
   }
 }
+

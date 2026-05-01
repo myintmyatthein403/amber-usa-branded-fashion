@@ -3,10 +3,12 @@ import { CategoriesService } from './categories.service';
 import { CategoriesController } from './categories.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
+import { CategoriesRepository } from './categories.repository';
 
 @Module({
   imports: [PrismaModule, AuthModule],
   controllers: [CategoriesController],
-  providers: [CategoriesService],
+  providers: [CategoriesService, CategoriesRepository],
+  exports: [CategoriesService, CategoriesRepository],
 })
 export class CategoriesModule {}

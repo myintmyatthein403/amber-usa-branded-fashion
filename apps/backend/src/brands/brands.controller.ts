@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UsePipes } from '@nestjs/common';
 import { BrandsService } from './brands.service';
-import { Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { BrandSchema } from '@amber/shared';
 
 @Controller('brands')
 export class BrandsController {
@@ -12,7 +13,8 @@ export class BrandsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  create(@Body() createBrandDto: Prisma.BrandCreateInput) {
+  @UsePipes(new ZodValidationPipe(BrandSchema))
+  create(@Body() createBrandDto: any) {
     return this.brandsService.createBrand(createBrandDto);
   }
 
@@ -29,7 +31,8 @@ export class BrandsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBrandDto: Prisma.BrandUpdateInput) {
+  @UsePipes(new ZodValidationPipe(BrandSchema.partial()))
+  update(@Param('id') id: string, @Body() updateBrandDto: any) {
     return this.brandsService.updateBrand(id, updateBrandDto);
   }
 

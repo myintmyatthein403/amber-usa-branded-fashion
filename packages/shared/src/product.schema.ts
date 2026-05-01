@@ -61,8 +61,20 @@ export type Variant = z.infer<typeof VariantSchema>;
 export type Product = z.infer<typeof ProductSchema>;
 export type ProductFilters = z.infer<typeof ProductFiltersSchema>;
 
-export type Category = { id: string; name: string };
-export type Brand = { id: string; name: string; logo?: string };
+export const CategorySchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Category name is required'),
+});
+
+export const BrandSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Brand name is required'),
+  logo: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+
+export type Category = z.infer<typeof CategorySchema>;
+export type Brand = z.infer<typeof BrandSchema>;
 export type Sale = { id: string; name: string };
 
 export type ProductWithRelations = Product & {
