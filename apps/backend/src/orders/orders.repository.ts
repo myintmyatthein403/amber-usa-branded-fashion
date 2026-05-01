@@ -156,6 +156,13 @@ export class OrdersRepository {
     });
   }
 
+  async updateStripeInfo(id: string, stripePaymentIntentId: string): Promise<Order> {
+    return this.prisma.order.update({
+      where: { id },
+      data: { stripePaymentIntentId },
+    });
+  }
+
   async bulkUpdateStatus(ids: string[], status: OrderStatus) {
     return this.prisma.order.updateMany({
       where: { id: { in: ids } },

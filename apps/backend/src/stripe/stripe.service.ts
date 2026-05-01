@@ -1,7 +1,9 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import Stripe from 'stripe';
+import { OrderPaidEvent } from '../common/events/domain.events';
 
 @Injectable()
 export class StripeService {
@@ -11,6 +13,7 @@ export class StripeService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   private async getStripeInstance(): Promise<Stripe> {
@@ -182,28 +185,15 @@ export class StripeService {
       return;
     }
 
-    try {
-      this.logger.log(`Processing successful payment for order ${orderId}...`);
-      const order = await this.prisma.order.findUnique({ where: { id: orderId } });
-      
-      if (!order) {
-        this.logger.error(`Payment succeeded for order ${orderId} but order not found in database`);
-        return;
-      }
-
-      // Update paymentStatus to PAID but keep fulfillment status as is (likely PENDING)
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: { 
-          paymentStatus: 'PAID',
-          stripePaymentIntentId: paymentIntent.id,
-          paymentMethod: order.paymentMethod || 'Stripe',
-        },
-      });
-
-      this.logger.log(`Order ${orderId} status updated: PROCESSING, Payment: PAID`);
-    } catch (error) {
-      this.logger.error(`Failed to update order ${orderId} after successful payment: ${error.message}`);
-    }
+    this.logger.log(`Emitting OrderPaidEvent for order ${orderId}...`);
+    this.eventEmitter.emit(
+      'order.paid',
+      new OrderPaidEvent(
+        orderId,
+        paymentIntent.id,
+        paymentIntent.amount / 100,
+        paymentIntent.currency,
+      ),
+    );
   }
 }
