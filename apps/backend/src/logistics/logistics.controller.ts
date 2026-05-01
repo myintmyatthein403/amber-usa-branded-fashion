@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, UsePipes } from '@nestjs/common';
 import { LogisticsService } from './logistics.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CargoStatus } from '@prisma/client';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { WarehouseSchema, CargoShipmentSchema } from '@amber/shared';
 
 @Controller('logistics')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -17,7 +19,8 @@ export class LogisticsController {
   }
 
   @Post('warehouses')
-  createWarehouse(@Body() data: { name: string; location: string; address?: string }) {
+  @UsePipes(new ZodValidationPipe(WarehouseSchema))
+  createWarehouse(@Body() data: any) {
     return this.logisticsService.createWarehouse(data);
   }
 
@@ -47,6 +50,7 @@ export class LogisticsController {
   }
 
   @Post('cargo')
+  @UsePipes(new ZodValidationPipe(CargoShipmentSchema))
   createCargoShipment(@Body() data: any) {
     return this.logisticsService.createCargoShipment(data);
   }
