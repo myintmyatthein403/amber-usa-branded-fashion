@@ -1,68 +1,64 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator';
 import { PERMISSIONS_KEY } from './permissions.decorator';
-import { PrismaService } from '../prisma/prisma.service';
+import { JwtService } from '@nestjs/jwt';
+
+interface JWTPayload {
+  sub: string;
+  email: string;
+  role?: string;
+  permissions?: string[];
+  iat?: number;
+  exp?: number;
+}
 
 @Injectable()
 export class RolesGuard implements CanActivate {
+  private roleCache = new Map<string, { roleName: string; permissions: string[]; expiresAt: number }>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   constructor(
     private reflector: Reflector,
-    private prisma: PrismaService,
+    private jwtService: JwtService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
-      ROLES_KEY,
-      [context.getHandler(), context.getClass()],
-    );
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
-      PERMISSIONS_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [context.getHandler(), context.getClass()]);
+    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
 
-    if (!requiredRoles && !requiredPermissions) {
-      return true;
-    }
+    if (!requiredRoles && !requiredPermissions) return true;
 
-    const { user } = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest();
+    const { user } = request as { user?: JWTPayload };
 
-    // 1. If NO USER is present:
-    // - If ROLES are required: block (Roles always require auth)
-    // - If only PERMISSIONS are required: allow (assume public access is permitted)
-    if (!user) {
+    if (!user?.sub) {
       if (requiredRoles) return false;
       if (requiredPermissions) return true;
       return false;
     }
 
-    // 2. If USER is present, perform "live" check:
-    const dbUser = await this.prisma.user.findUnique({
-      where: { id: user.userId },
-      include: { role: true },
-    });
-
-    if (!dbUser || !dbUser.role) return false;
+    const { role, permissions } = user;
 
     // Superadmin always has full access
-    if (dbUser.roleName === 'SUPERADMIN') return true;
+    if (role === 'SUPERADMIN') return true;
 
-    // Check Roles (High-level override)
+    // Check roles
     if (requiredRoles) {
-      const hasRole = requiredRoles.some((role) => dbUser.roleName === role);
-      if (hasRole) return true;
+      if (!role || !requiredRoles.includes(role)) {
+        return false;
+      }
     }
 
-    // Check Permissions (Granular control)
-    // If a user is logged in and permissions are specified, they MUST have them.
+    // Check permissions from JWT
     if (requiredPermissions) {
-      const userPermissions = dbUser.role.permissions || [];
-      const hasPermission = requiredPermissions.every((perm) =>
-        userPermissions.includes(perm),
-      );
-      return hasPermission;
+      const userPermissions = permissions || [];
+      const hasPermission = requiredPermissions.every((perm) => userPermissions.includes(perm));
+      if (!hasPermission) {
+        throw new UnauthorizedException('Insufficient permissions');
+      }
     }
 
-    return false;
+    return true;
   }
 }
