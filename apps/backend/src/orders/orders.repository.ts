@@ -1,10 +1,15 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Order, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { OrderStatusChangedEvent } from '../common/events/domain.events';
 
 @Injectable()
 export class OrdersRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private eventEmitter: EventEmitter2,
+  ) {}
 
   async create(
     orderData: any,
@@ -13,7 +18,6 @@ export class OrdersRepository {
     calculatedTotal: number,
   ): Promise<Order> {
     return this.prisma.$transaction(async (tx) => {
-      // Stock updates for non-preorder items
       for (const item of itemsWithPreOrderInfo) {
         if (item.variantId && !item.isPreOrder) {
           if (warehouseId) {
@@ -49,7 +53,6 @@ export class OrdersRepository {
         }
       }
 
-      // Retry logic for order number generation
       let order: Order;
       let retries = 3;
       while (retries > 0) {
@@ -85,9 +88,7 @@ export class OrdersRepository {
                 })),
               },
             },
-            include: {
-              items: true,
-            },
+            include: { items: true },
           });
           return order;
         } catch (error) {
@@ -107,35 +108,16 @@ export class OrdersRepository {
       where: { id },
       include: {
         items: true,
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
+        user: { select: { id: true, email: true, name: true } },
       },
     });
   }
 
-  async findMany(
-    where: Prisma.OrderWhereInput,
-    skip?: number,
-    take?: number,
-    orderBy?: any,
-  ): Promise<[Order[], number]> {
+  async findMany(where: Prisma.OrderWhereInput, skip?: number, take?: number, orderBy?: any): Promise<[Order[], number]> {
     return Promise.all([
       this.prisma.order.findMany({
         where,
-        include: {
-          items: true,
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
+        include: { items: true, user: { select: { name: true, email: true } } },
         orderBy,
         skip,
         take,
@@ -147,53 +129,36 @@ export class OrdersRepository {
   async findByUser(userId: string): Promise<Order[]> {
     return this.prisma.order.findMany({
       where: { userId },
-      include: {
-        items: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async updateStatus(id: string, status: OrderStatus): Promise<Order> {
-    return this.prisma.order.update({
-      where: { id },
-      data: { status },
-    });
+    return this.prisma.order.update({ where: { id }, data: { status } });
   }
 
-  async updatePaymentStatus(
-    id: string,
-    paymentStatus: PaymentStatus,
-  ): Promise<Order> {
-    return this.prisma.order.update({
-      where: { id },
-      data: { paymentStatus },
-    });
+  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<Order> {
+    return this.prisma.order.update({ where: { id }, data: { paymentStatus } });
   }
 
-  async updateStripeInfo(
-    id: string,
-    stripePaymentIntentId: string,
-  ): Promise<Order> {
-    return this.prisma.order.update({
-      where: { id },
-      data: { stripePaymentIntentId },
-    });
+  async updateStripeInfo(id: string, stripePaymentIntentId: string): Promise<Order> {
+    return this.prisma.order.update({ where: { id }, data: { stripePaymentIntentId } });
   }
 
   async bulkUpdateStatus(ids: string[], status: OrderStatus) {
-    return this.prisma.order.updateMany({
-      where: { id: { in: ids } },
-      data: { status },
+    return this.prisma.$transaction(async (tx) => {
+      for (const id of ids) {
+        await tx.order.update({ where: { id }, data: { status } });
+      }
     });
   }
 
   async bulkUpdatePaymentStatus(ids: string[], paymentStatus: PaymentStatus) {
-    return this.prisma.order.updateMany({
-      where: { id: { in: ids } },
-      data: { paymentStatus },
+    return this.prisma.$transaction(async (tx) => {
+      for (const id of ids) {
+        await tx.order.update({ where: { id }, data: { paymentStatus } });
+      }
     });
   }
 
@@ -210,66 +175,58 @@ export class OrdersRepository {
         if (item.variantId && !item.isPreOrder) {
           if (order.warehouseId) {
             await tx.inventory.update({
-              where: {
-                variantId_warehouseId: {
-                  variantId: item.variantId,
-                  warehouseId: order.warehouseId,
-                },
-              },
+              where: { variantId_warehouseId: { variantId: item.variantId, warehouseId: order.warehouseId } },
               data: { quantity: { increment: item.quantity } },
             });
           }
-
           await tx.variant.update({
             where: { id: item.variantId },
             data: { stock: { increment: item.quantity } },
           });
         }
       }
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: { restocked: true },
-      });
+      await tx.order.update({ where: { id: orderId }, data: { restocked: true } });
     });
+  }
+
+  async restockWithTransaction(tx: any, orderId: string): Promise<void> {
+    const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+    if (!order || order.restocked) return;
+
+    for (const item of order.items) {
+      if (item.variantId && !item.isPreOrder) {
+        if (order.warehouseId) {
+          await tx.inventory.update({
+            where: { variantId_warehouseId: { variantId: item.variantId, warehouseId: order.warehouseId } },
+            data: { quantity: { increment: item.quantity } },
+          });
+        }
+        await tx.variant.update({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+    }
+    await tx.order.update({ where: { id: orderId }, data: { restocked: true } });
   }
 
   async findByOrderNumber(orderNumber: string): Promise<Order | null> {
     return this.prisma.order.findUnique({
       where: { orderNumber },
-      include: {
-        items: true,
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-      },
+      include: { items: true, user: { select: { id: true, email: true, name: true } } },
     });
   }
 
   async delete(id: string): Promise<Order> {
-    return this.prisma.order.delete({
-      where: { id },
-    });
+    return this.prisma.order.delete({ where: { id } });
   }
 
   async countPending(): Promise<number> {
-    return this.prisma.order.count({
-      where: { status: 'PENDING' },
-    });
+    return this.prisma.order.count({ where: { status: 'PENDING' } });
   }
 
-  // Helper methods for validation in service
   async findWarehouseWithStock(variantId: string, quantity: number) {
-    return this.prisma.inventory.findFirst({
-      where: {
-        variantId,
-        quantity: { gte: quantity },
-      },
-    });
+    return this.prisma.inventory.findFirst({ where: { variantId, quantity: { gte: quantity } } });
   }
 
   async findDefaultWarehouse(location: string) {
@@ -281,15 +238,17 @@ export class OrdersRepository {
   }
 
   async findVariantForOrder(id: string) {
-    return this.prisma.variant.findUnique({
-      where: { id },
-      include: { product: true },
-    });
+    return this.prisma.variant.findUnique({ where: { id }, include: { product: true } });
   }
 
   async findProductForOrder(id: string) {
-    return this.prisma.product.findUnique({
+    return this.prisma.product.findUnique({ where: { id } });
+  }
+
+  async findByIdWithItems(id: string) {
+    return this.prisma.order.findUnique({
       where: { id },
+      include: { items: true, warehouse: true },
     });
   }
 }

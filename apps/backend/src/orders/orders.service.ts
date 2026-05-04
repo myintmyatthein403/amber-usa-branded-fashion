@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { OrdersRepository } from './orders.repository';
+import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrderStatusChangedEvent } from '../common/events/domain.events';
 
@@ -13,6 +14,7 @@ import { OrderStatusChangedEvent } from '../common/events/domain.events';
 export class OrdersService {
   constructor(
     private ordersRepository: OrdersRepository,
+    private prisma: PrismaService,
     private eventEmitter: EventEmitter2,
   ) {}
 
@@ -152,15 +154,26 @@ export class OrdersService {
     return updatedOrder;
   }
 
-  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus) {
+  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus, options?: { skipRestock?: boolean }) {
     const order = await this.ordersRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
 
     if (paymentStatus === 'FAILED' && order.paymentStatus !== 'FAILED') {
-      await this.ordersRepository.restock(order.id);
+      const previousStatus = order.paymentStatus;
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.order.update({ where: { id }, data: { paymentStatus: 'FAILED' } });
+          await this.ordersRepository.restockWithTransaction(tx, id);
+        });
+      } catch (error) {
+        await this.ordersRepository.updatePaymentStatus(id, previousStatus);
+        throw new BadRequestException('Failed to process payment failure: stock rollback failed');
+      }
+    } else {
+      await this.ordersRepository.updatePaymentStatus(id, paymentStatus);
     }
 
-    return this.ordersRepository.updatePaymentStatus(id, paymentStatus);
+    return this.ordersRepository.findById(id);
   }
 
   async bulkUpdateStatus(ids: string[], status: OrderStatus) {
