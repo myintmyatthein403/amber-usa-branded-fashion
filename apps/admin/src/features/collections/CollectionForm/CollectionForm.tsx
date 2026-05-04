@@ -1,9 +1,10 @@
 import React from 'react';
 import { Image as ImageIcon, Plus, Loader2, FileText } from 'lucide-react';
+import type { CollectionFormData } from '@amber/shared';
 
 interface CollectionFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: CollectionFormData;
+  setFormData: (data: CollectionFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   submitting: boolean;

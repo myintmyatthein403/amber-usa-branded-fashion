@@ -124,7 +124,9 @@ export const useSaleSection = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Remove this promotional section?');
+    const confirmed = window.confirm('Remove this promotional section?');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

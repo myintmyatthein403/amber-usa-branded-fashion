@@ -48,6 +48,7 @@ export const HeroSectionSchema = z.object({
 });
 
 export type HeroSection = z.infer<typeof HeroSectionSchema> & { id: string };
+export type CreateHeroSectionInput = z.infer<typeof HeroSectionSchema>;
 
 export const MissionSectionSchema = z.object({
   id: z.string().uuid().optional(),
@@ -69,6 +70,7 @@ export const MissionSectionSchema = z.object({
 });
 
 export type MissionSection = z.infer<typeof MissionSectionSchema> & { id: string };
+export type CreateMissionSectionInput = z.infer<typeof MissionSectionSchema>;
 
 export const SaleSectionSchema = z.object({
   id: z.string().uuid().optional(),
@@ -84,6 +86,7 @@ export const SaleSectionSchema = z.object({
 });
 
 export type SaleSection = z.infer<typeof SaleSectionSchema> & { id: string };
+export type CreateSaleSectionInput = z.infer<typeof SaleSectionSchema>;
 
 export const GiftCardSectionSchema = z.object({
   id: z.string().uuid().optional(),
@@ -101,6 +104,7 @@ export const GiftCardSectionSchema = z.object({
 });
 
 export type GiftCardSection = z.infer<typeof GiftCardSectionSchema> & { id: string };
+export type CreateGiftCardSectionInput = z.infer<typeof GiftCardSectionSchema>;
 
 export const FooterSectionSchema = z.object({
   id: z.string().uuid().optional(),
@@ -117,6 +121,9 @@ export const FooterSectionSchema = z.object({
 });
 
 export type FooterSection = z.infer<typeof FooterSectionSchema> & { id: string };
+export type CreateFooterSectionInput = z.infer<typeof FooterSectionSchema>;
+export type CreateCollectionInput = z.infer<typeof CollectionSchema>;
+export type CreateCouponInput = z.infer<typeof CouponSchema>;
 
 export const CollectionSchema = z.object({
   id: z.string().uuid().optional(),
@@ -166,6 +173,7 @@ export type Sale = z.infer<typeof SaleSchema> & {
   id: string;
   products?: { id: string; name: string; price: number; onSale: boolean; images?: string[] }[];
 };
+export type CreateSaleInput = z.infer<typeof SaleSchema>;
 
 export const WarehouseLocationSchema = z.enum(['USA', 'MYANMAR']);
 
@@ -238,6 +246,7 @@ export type Ad = z.infer<typeof AdSchema> & {
   id: string;
   createdAt: string;
 };
+export type CreateAdInput = z.infer<typeof AdSchema>;
 
 export const CommunityPostSchema = z.object({
   id: z.string().uuid().optional(),
@@ -265,6 +274,7 @@ export const DeliveryMethodSchema = z.object({
 });
 
 export type DeliveryMethod = z.infer<typeof DeliveryMethodSchema> & { id: string };
+export type CreateDeliveryMethodInput = z.infer<typeof DeliveryMethodSchema>;
 
 export const GiftCardSchema = z.object({
   id: z.string().uuid().optional(),

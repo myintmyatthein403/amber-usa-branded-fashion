@@ -3,14 +3,15 @@ import { Search, Percent, Banknote, Calendar, CheckCircle2, X, Loader2, Info, Sh
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { SaleProduct } from '../schema';
+import type { SaleFormData } from '@amber/shared';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 interface SaleFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: SaleFormData;
+  setFormData: (data: SaleFormData) => void;
   productSearch: string;
   setProductSearch: (value: string) => void;
   filteredProducts: SaleProduct[];

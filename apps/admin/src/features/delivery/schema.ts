@@ -13,3 +13,4 @@ export const DeliveryMethodSchema = z.object({
 });
 
 export type DeliveryMethod = z.infer<typeof DeliveryMethodSchema> & { id: string };
+export type CreateDeliveryMethodInput = z.infer<typeof DeliveryMethodSchema>;

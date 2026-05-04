@@ -84,7 +84,9 @@ export const useTestimonials = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Delete this testimonial permanently?');
+    const confirmed = window.confirm('Delete this testimonial permanently?');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

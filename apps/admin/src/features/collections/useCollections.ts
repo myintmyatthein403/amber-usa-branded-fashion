@@ -80,7 +80,9 @@ export const useCollections = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure? This will remove the collection but not the products within it.');
+    const confirmed = window.confirm('Are you sure? This will remove the collection but not the products within it.');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

@@ -16,6 +16,13 @@ export const UserSchema = z.object({
 
 export type User = z.infer<typeof UserSchema>;
 
+export type CreateUserInput = z.infer<typeof UserSchema>;
+
+export type RoleData = {
+  id: string;
+  name: string;
+};
+
 export const LoginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),

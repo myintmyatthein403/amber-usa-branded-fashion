@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useFetch } from '../../hooks/useCrud';
 import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
-import { CargoShipment } from './schema';
+import { CargoShipment, Variant, Warehouse } from './schema';
 
 export const useCargo = () => {
   const { data: shipments, loading, refresh } = useFetch<CargoShipment>(API_ROUTES.LOGISTICS.CARGO);
-  const { data: warehouses } = useFetch<any>(API_ROUTES.LOGISTICS.WAREHOUSES);
-  const { data: variants } = useFetch<any>(API_ROUTES.VARIANTS.BASE);
+  const { data: warehouses } = useFetch<Warehouse>(API_ROUTES.LOGISTICS.WAREHOUSES);
+  const { data: variants } = useFetch<Variant>(API_ROUTES.VARIANTS.BASE);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
@@ -77,7 +77,7 @@ export const useCargo = () => {
 
   const openDetails = async (id: string) => {
     try {
-      const data = await apiService(API_ROUTES.LOGISTICS.CARGO_BY_ID(id));
+      const data = await apiService(API_ROUTES.LOGISTICS.CARGO_BY_ID(id)) as CargoShipment;
       setSelectedShipment(data);
       setDetailsModalOpen(true);
     } catch (error) {
@@ -93,7 +93,7 @@ export const useCargo = () => {
         body: { status }
       });
       if (selectedShipment?.id === id) {
-        const updated = await apiService(API_ROUTES.LOGISTICS.CARGO_BY_ID(id));
+        const updated = await apiService(API_ROUTES.LOGISTICS.CARGO_BY_ID(id)) as CargoShipment;
         setSelectedShipment(updated);
       }
       refresh();

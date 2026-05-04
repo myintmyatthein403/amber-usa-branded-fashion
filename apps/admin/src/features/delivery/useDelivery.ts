@@ -75,7 +75,9 @@ export const useDelivery = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure you want to delete this delivery method?');
+    const confirmed = window.confirm('Are you sure you want to delete this delivery method?');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

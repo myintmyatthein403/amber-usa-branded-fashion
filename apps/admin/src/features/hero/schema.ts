@@ -17,4 +17,18 @@ export const HeroSectionSchema = z.object({
 });
 
 export type HeroSection = z.infer<typeof HeroSectionSchema> & { id: string };
-export type CreateHeroInput = z.infer<typeof HeroSectionSchema>;
+
+export type CreateHeroInput = {
+  badge?: string;
+  titlePartOne: string;
+  titlePartTwo?: string;
+  titleItalic: boolean;
+  description: string;
+  ctaPrimaryText: string;
+  ctaPrimaryLink: string;
+  ctaSecondaryText: string;
+  ctaSecondaryLink: string;
+  imageMain: string;
+  imageSecondary?: string;
+  isActive: boolean;
+};

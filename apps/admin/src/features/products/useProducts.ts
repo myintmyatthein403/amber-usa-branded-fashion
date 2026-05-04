@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
-import { Product, Variant, Category, Brand, Sale, Meta, Collection } from './schema';
+import { Product, Variant, Category, Brand, Sale, Meta, Collection, Warehouse } from './schema';
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,7 +26,7 @@ export const useProducts = () => {
   const { data: categories } = useFetch<Category>(API_ROUTES.CATEGORIES.BASE);
   const { data: brands } = useFetch<Brand>(API_ROUTES.BRANDS.BASE);
   const { data: collections } = useFetch<Collection>(API_ROUTES.COLLECTIONS.BASE);
-  const { data: rawWarehouses } = useFetch<any>(API_ROUTES.LOGISTICS.WAREHOUSES);
+  const { data: warehouses } = useFetch<Warehouse>(API_ROUTES.LOGISTICS.WAREHOUSES);
   const { data: sales } = useFetch<Sale>(API_ROUTES.SALES.BASE);
   const { deleteItem } = useDelete(API_ROUTES.PRODUCTS.BASE);
 
@@ -104,7 +104,7 @@ export const useProducts = () => {
     isPreOrder: false
   });
 
-  const warehouses = useMemo(() => rawWarehouses || [], [rawWarehouses]);
+  const warehouseList = useMemo(() => warehouses || [], [warehouses]);
 
   const addVariant = () => {
     const variantData: Variant = {
@@ -286,7 +286,9 @@ export const useProducts = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Delete this product and all its variants permanently?');
+    const confirmed = window.confirm('Delete this product and all its variants permanently?');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) fetchProducts();
   };
 
@@ -303,7 +305,7 @@ export const useProducts = () => {
     categories,
     brands,
     collections,
-    warehouses,
+    warehouseList,
     sales,
     modalOpen,
     setModalOpen,

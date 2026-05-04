@@ -1,9 +1,10 @@
 import React from 'react';
 import { Save, Loader2 } from 'lucide-react';
+import type { DeliveryMethodFormData } from '@amber/shared';
 
 interface DeliveryMethodFormProps {
-  form: any;
-  setForm: (data: any) => void;
+  form: DeliveryMethodFormData;
+  setForm: (data: DeliveryMethodFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
   editingMethod: any;

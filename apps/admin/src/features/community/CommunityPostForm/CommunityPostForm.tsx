@@ -1,9 +1,10 @@
 import React from 'react';
 import { Image as ImageIcon, Star, Loader2 } from 'lucide-react';
+import type { CommunityPostFormData } from '@amber/shared';
 
 interface CommunityPostFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: CommunityPostFormData;
+  setFormData: (data: CommunityPostFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   submitting: boolean;

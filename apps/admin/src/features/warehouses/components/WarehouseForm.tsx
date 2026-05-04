@@ -1,9 +1,10 @@
 import React from 'react';
 import { Loader2, Globe, MapPin, Save } from 'lucide-react';
+import type { WarehouseFormData } from '@amber/shared';
 
 interface WarehouseFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: WarehouseFormData;
+  setFormData: (data: WarehouseFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
 }

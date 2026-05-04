@@ -74,7 +74,9 @@ export const useSales = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure you want to delete this sale event?');
+    const confirmed = window.confirm('Are you sure you want to delete this sale event?');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

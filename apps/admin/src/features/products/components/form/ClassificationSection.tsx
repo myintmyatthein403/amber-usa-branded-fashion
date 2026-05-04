@@ -1,5 +1,5 @@
 import React from 'react';
-import { Category, Brand, Collection } from '../../schema';
+import type { Category, Brand, Collection } from '@amber/shared';
 import { Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 
@@ -8,10 +8,10 @@ interface ClassificationSectionProps {
   categoryId?: string;
   collectionIds: string[];
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-  brands: any;
-  categories: any;
-  collections: any;
-  onChange: (field: string, value: any) => void;
+  brands: Brand[];
+  categories: Category[];
+  collections: Collection[];
+  onChange: (field: string, value: unknown) => void;
 }
 
 export const ClassificationSection: React.FC<ClassificationSectionProps> = ({
@@ -29,13 +29,6 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({
       ? (collectionIds || []).filter(item => item !== id)
       : [...(collectionIds || []), id];
     onChange('collectionIds', newIds);
-  };
-
-  // Helper to normalize the array
-  const normalize = (data: any) => {
-    if (Array.isArray(data)) return data;
-    if (data?.data && Array.isArray(data.data)) return data.data;
-    return [];
   };
 
   const brandList = normalize(brands);

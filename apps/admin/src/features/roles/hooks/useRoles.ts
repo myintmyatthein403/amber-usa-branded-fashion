@@ -5,11 +5,11 @@ import { API_ROUTES } from '../../../config/constants';
 import { Role, CreateRoleInput } from '../schema';
 
 export const useRoles = () => {
-  const { data: rawData, loading, refresh } = useFetch<any>(API_ROUTES.ROLES.BASE);
+  const { data: rawData, loading, refresh } = useFetch<Role>(API_ROUTES.ROLES.BASE);
   
   // Debug: Inspect what data we're getting
   useEffect(() => {
-    console.log("DEBUG: rawData from useFetch<any>:", rawData);
+    console.log("DEBUG: rawData from useFetch<Role>:", rawData);
   }, [rawData]);
 
   const roles = Array.isArray(rawData) ? rawData : (rawData?.data ? (Array.isArray(rawData.data) ? rawData.data : []) : []);
@@ -84,7 +84,9 @@ export const useRoles = () => {
   }, []);
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, "Are you sure you want to delete this role? This will fail if users are still assigned to it.");
+    const confirmed = window.confirm("Are you sure you want to delete this role? This will fail if users are still assigned to it.");
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

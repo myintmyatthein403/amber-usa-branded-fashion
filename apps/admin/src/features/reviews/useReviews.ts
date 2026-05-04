@@ -75,7 +75,9 @@ export const useReviews = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Delete this review permanently?');
+    const confirmed = window.confirm('Delete this review permanently?');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

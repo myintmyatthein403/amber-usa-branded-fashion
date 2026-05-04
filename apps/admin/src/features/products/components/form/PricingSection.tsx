@@ -4,7 +4,7 @@ interface PricingSectionProps {
   price: string | number;
   compareAtPrice: string | number | null;
   isUsdPrice: boolean;
-  onChange: (field: string, value: any) => void;
+  onChange: (field: string, value: unknown) => void;
 }
 
 export const PricingSection: React.FC<PricingSectionProps> = ({

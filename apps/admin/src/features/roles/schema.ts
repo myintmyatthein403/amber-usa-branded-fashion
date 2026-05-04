@@ -17,15 +17,11 @@ export const RoleSchema = z.object({
   permissions: z.array(z.string()),
   color: z.string().default('text-primary'),
   isImmutable: z.boolean().default(false),
-  _count: z.object({
-    users: z.number(),
-  }).optional(),
 });
 
 export type Role = z.infer<typeof RoleSchema> & { id: string };
-export type CreateRoleInput = z.infer<typeof RoleSchema>;
-
 export type PermissionGroup = z.infer<typeof PermissionGroupSchema>;
+export type PermissionItem = z.infer<typeof PermissionItemSchema>;
 
 export const AVAILABLE_PERMISSIONS: PermissionGroup[] = [
   {
@@ -63,3 +59,12 @@ export const AVAILABLE_PERMISSIONS: PermissionGroup[] = [
     ]
   }
 ];
+
+export type CreateRoleInput = {
+  id?: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+  color?: string;
+  isImmutable?: boolean;
+};

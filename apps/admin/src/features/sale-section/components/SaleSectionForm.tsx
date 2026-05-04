@@ -1,9 +1,10 @@
 import React from 'react';
 import { Image as ImageIcon, Loader2, Save } from 'lucide-react';
+import type { SaleSectionFormData } from '@amber/shared';
 
 interface SaleSectionFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: SaleSectionFormData;
+  setFormData: (data: SaleSectionFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   submitting: boolean;

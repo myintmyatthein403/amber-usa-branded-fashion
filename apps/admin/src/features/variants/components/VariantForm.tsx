@@ -1,12 +1,13 @@
 import React from 'react';
 import { Package, Loader2, Save } from 'lucide-react';
 import { VariantProduct } from '../schema';
+import type { VariantFormData, Warehouse } from '@amber/shared';
 
 interface VariantFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: VariantFormData;
+  setFormData: (data: VariantFormData) => void;
   products: VariantProduct[];
-  warehouses: any[];
+  warehouses: Warehouse[];
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
   editingVariant: any;
@@ -52,7 +53,7 @@ export const VariantForm: React.FC<VariantFormProps> = ({
             <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#666]">Initial Fulfillment Center</label>
             <select value={formData.warehouseId} onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })} className="w-full h-12 border-b border-[#E5E5E5] bg-transparent px-0 py-2 text-[10px] font-bold uppercase tracking-widest focus:border-[#C9A962] focus:outline-none transition-colors duration-300 rounded-none cursor-pointer">
               <option value="">Select Warehouse</option>
-              {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name} ({w.location})</option>)}
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.location})</option>)}
             </select>
           </div>
         )}

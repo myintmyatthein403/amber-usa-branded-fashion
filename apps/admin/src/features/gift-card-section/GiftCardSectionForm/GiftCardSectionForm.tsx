@@ -1,9 +1,10 @@
 import React from 'react';
 import { Trash2, Loader2 } from 'lucide-react';
+import type { GiftCardSectionFormData } from '@amber/shared';
 
 interface GiftCardSectionFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: GiftCardSectionFormData;
+  setFormData: (data: GiftCardSectionFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
   editingSection: any;

@@ -82,3 +82,13 @@ export type ProductWithRelations = Product & {
   sale?: { id: string; name: string } | null;
   collections?: { id: string; name: string }[] | null;
 };
+
+export interface Meta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export type CreateProductInput = z.infer<typeof ProductSchema>;
+export type CreateVariantInput = z.infer<typeof VariantSchema>;

@@ -88,7 +88,9 @@ export const useOrders = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure you want to delete this order? This action cannot be undone.');
+    const confirmed = window.confirm('Are you sure you want to delete this order? This action cannot be undone.');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) fetchOrders();
   };
 

@@ -62,7 +62,9 @@ export const useCoupons = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure you want to deactivate or delete this coupon?');
+    const confirmed = window.confirm('Are you sure you want to deactivate or delete this coupon?');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

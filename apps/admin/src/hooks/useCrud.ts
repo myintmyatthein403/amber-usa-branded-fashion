@@ -10,10 +10,11 @@ export function useFetch<T>(endpoint: string, options: { immediate?: boolean } =
     setLoading(true);
     setError(null);
     try {
-      const result = await apiService(endpoint);
+      const result = await apiService(endpoint) as T[];
       setData(result);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -31,14 +32,16 @@ export function useFetch<T>(endpoint: string, options: { immediate?: boolean } =
 export function useDelete(endpointBase: string) {
   const [deleting, setDeleting] = useState(false);
 
-  const deleteItem = async (id: number | string) => {
+  const deleteItem = async (id: number | string, message?: string) => {
+    if (message && !window.confirm(message)) return false;
     setDeleting(true);
     try {
       await apiService(`${endpointBase}/${id}`, { method: 'DELETE' });
       return true;
-    } catch (err: any) {
+    } catch (err) {
       console.error('Delete error:', err);
-      alert('Failed to delete: ' + err.message);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      alert('Failed to delete: ' + errorMessage);
       return false;
     } finally {
       setDeleting(false);

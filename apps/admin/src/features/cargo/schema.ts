@@ -1,7 +1,37 @@
-import { z } from 'zod';
 import { Package, Truck, MapPin, ShieldCheck, CheckCircle2, Clock, ExternalLink } from 'lucide-react';
+import { z } from 'zod';
+
+export const CargoStatusSchema = z.enum([
+  'PREPARING',
+  'DEPARTED',
+  'IN_TRANSIT',
+  'ARRIVED_MYANMAR',
+  'CUSTOMS_CLEARANCE',
+  'READY_FOR_DISTRIBUTION',
+  'COMPLETED'
+]);
 
 export type CargoStatus = 'PREPARING' | 'DEPARTED' | 'IN_TRANSIT' | 'ARRIVED_MYANMAR' | 'CUSTOMS_CLEARANCE' | 'READY_FOR_DISTRIBUTION' | 'COMPLETED';
+
+export const VariantSchema = z.object({
+  id: z.string().uuid().optional(),
+  sku: z.string().min(1, 'SKU is required'),
+  barcode: z.string().optional(),
+  size: z.string().min(1, 'Size is required'),
+  color: z.string().min(1, 'Color is required'),
+  stock: z.number().min(0),
+  price: z.number().optional(),
+  images: z.array(z.string()).default([]),
+  isPreOrder: z.boolean().default(false),
+});
+
+export type Variant = z.infer<typeof VariantSchema> & { id: string; product?: { id: string; name: string; images: string[] } };
+
+export type Warehouse = {
+  id: string;
+  name: string;
+  location: string;
+};
 
 export interface CargoShipment {
   id: string;

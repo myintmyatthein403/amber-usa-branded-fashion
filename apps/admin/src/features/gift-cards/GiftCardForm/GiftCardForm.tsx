@@ -1,9 +1,10 @@
 import React from 'react';
 import { RefreshCw, DollarSign, Calendar, FileText, Loader2 } from 'lucide-react';
+import type { GiftCardFormData } from '@amber/shared';
 
 interface GiftCardFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: GiftCardFormData;
+  setFormData: (data: GiftCardFormData) => void;
   onGenerateCode: () => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;

@@ -1,10 +1,11 @@
 import React from 'react';
 import { Star, User, Globe, MessageSquare, Loader2, ArrowRight } from 'lucide-react';
 import { ReviewProduct } from '../schema';
+import type { ReviewFormData } from '@amber/shared';
 
 interface ReviewFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: ReviewFormData;
+  setFormData: (data: ReviewFormData) => void;
   products: ReviewProduct[] | null;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;

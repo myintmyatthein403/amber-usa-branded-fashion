@@ -13,4 +13,3 @@ export const SettingsSchema = z.object({
 });
 
 export type Settings = z.infer<typeof SettingsSchema> & { id: string };
-export type UpdateSettingsInput = z.infer<typeof SettingsSchema>;

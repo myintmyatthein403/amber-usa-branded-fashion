@@ -18,7 +18,7 @@ export const useCategories = () => {
     setSubmitting(true);
     try {
       const endpoint = editingCategory 
-        ? API_ROUTES.CATEGORIES.BY_ID(editingCategory.id)
+        ? API_ROUTES.CATEGORIES.BY_ID(editingCategory.id!)
         : API_ROUTES.CATEGORIES.BASE;
       
       const method = editingCategory ? 'PATCH' : 'POST';
@@ -40,7 +40,9 @@ export const useCategories = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure? This may affect products in this category.');
+    const confirmed = window.confirm('Are you sure? This may affect products in this category.');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

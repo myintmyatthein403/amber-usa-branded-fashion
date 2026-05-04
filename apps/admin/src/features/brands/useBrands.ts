@@ -23,7 +23,7 @@ export const useBrands = () => {
     setSubmitting(true);
     try {
       const endpoint = editingBrand 
-        ? API_ROUTES.BRANDS.BY_ID(editingBrand.id)
+        ? API_ROUTES.BRANDS.BY_ID(editingBrand.id!)
         : API_ROUTES.BRANDS.BASE;
       
       const method = editingBrand ? 'PATCH' : 'POST';
@@ -45,7 +45,9 @@ export const useBrands = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure? This will affect all products associated with this brand.');
+    const confirmed = window.confirm('Are you sure? This will affect all products associated with this brand.');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

@@ -24,16 +24,18 @@ export const InventoryItemSchema = z.object({
   }),
 });
 
+export const WarehouseSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Warehouse name is required'),
+  location: z.enum(['USA', 'MYANMAR']),
+  address: z.string().optional().nullable(),
+});
+
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+export type Warehouse = z.infer<typeof WarehouseSchema>;
 
 export interface GroupedInventory {
-  variant: InventoryItem['variant'];
+  variant: { id: string; sku: string; size: string; color: string; stock: number; product: { id: string; name: string; images: string[] } };
   stocks: Record<string, number>;
   total: number;
-}
-
-export interface Warehouse {
-  id: string;
-  name: string;
-  location: string;
 }

@@ -63,7 +63,7 @@ export const ProductsPage: React.FC = () => {
 
   const handleMediaSelect = (url: string) => {
     if (mediaTarget === 'product') {
-      setProductForm((prev: any) => {
+      setProductForm((prev) => {
         const newImages = [...prev.images];
         if (replacingImageIndex !== null) {
           newImages[replacingImageIndex] = url;
@@ -73,7 +73,7 @@ export const ProductsPage: React.FC = () => {
         return { ...prev, images: newImages };
       });
     } else {
-      setNewVariant((prev: any) => ({
+      setNewVariant((prev) => ({
         ...prev,
         images: [...(prev.images || []), url]
       }));

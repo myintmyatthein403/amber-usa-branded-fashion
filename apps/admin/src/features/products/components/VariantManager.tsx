@@ -3,7 +3,7 @@ import { Plus, Edit2, Trash2, BarChart3, Search, AlertCircle, ChevronLeft, Save,
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Variant } from '@amber/shared';
+import type { Variant, Warehouse } from '@amber/shared';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -152,7 +152,7 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
                  className="w-full h-10 border-b border-input bg-transparent px-0 text-[10px] font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors duration-300 rounded-none cursor-pointer"
                >
                   <option value="">Select Warehouse</option>
-                  {warehouseList.map((w: any) => (
+                  {warehouseList.map((w: Warehouse) => (
                     <option key={w.id} value={w.id}>{w.name} ({w.location})</option>
                   ))}
                </select>
