@@ -29,7 +29,7 @@ export class UsersRepository {
       where: { id },
       include: {
         role: true,
-      }
+      },
     });
   }
 
@@ -39,7 +39,7 @@ export class UsersRepository {
       include: {
         orders: {
           include: { items: true },
-          orderBy: { date: 'desc' }
+          orderBy: { date: 'desc' },
         },
         refundRequests: true,
         role: true,
@@ -50,14 +50,14 @@ export class UsersRepository {
   async findByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({
       where: { email },
-      include: { role: true }
+      include: { role: true },
     });
   }
 
   async findByProviderId(providerId: string): Promise<User | null> {
     return this.prisma.user.findUnique({
       where: { providerId },
-      include: { role: true }
+      include: { role: true },
     });
   }
 

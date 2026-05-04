@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Delete, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Delete,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { VariantsService } from './variants.service';
 import { Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -24,7 +34,10 @@ export class VariantsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateVariantDto: Prisma.VariantUpdateInput) {
+  update(
+    @Param('id') id: string,
+    @Body() updateVariantDto: Prisma.VariantUpdateInput,
+  ) {
     return this.variantsService.updateVariant(id, updateVariantDto);
   }
 

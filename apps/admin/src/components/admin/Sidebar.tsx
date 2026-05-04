@@ -121,16 +121,22 @@ const sidebarConfig: SidebarItem[] = [
 
 export const Sidebar: React.FC = () => {
   const { isSidebarOpen, toggleSidebar, activeTab, setActiveTab, logout, user, pendingOrdersCount } = useAdminUIStore();
-  const userRole = user?.role;
-  const userPermissions = user?.permissions || user?.role?.permissions || [];
+  
+  // Navigate the response structure to find the user profile
+  const userData = user?.data || user;
+  const userRole = userData?.role;
+  const userPermissions = userData?.permissions || [];
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
-  const checkAccess = (item: { roles?: string[], permissions?: string[] }) => {
+  const checkAccess = (item: { id: string, roles?: string[], permissions?: string[] }) => {
     // Superadmin has access to everything
     if (userRole === 'SUPERADMIN') return true;
 
     // Check Roles if specified
-    if (item.roles && !item.roles.includes(userRole)) return false;
+    if (item.roles) {
+      if (!userRole) return false;
+      return item.roles.includes(userRole);
+    }
 
     // Check Permissions if specified
     if (item.permissions && item.permissions.length > 0) {
@@ -140,19 +146,21 @@ export const Sidebar: React.FC = () => {
     return true;
   };
 
-  const filteredSidebarConfig = sidebarConfig
-    .filter(item => {
-      // If it's a group, check if it has any accessible subItems
-      if (item.subItems) {
-        const accessibleSubItems = item.subItems.filter(sub => checkAccess(sub));
-        return accessibleSubItems.length > 0;
-      }
-      return checkAccess(item);
-    })
-    .map(item => ({
-      ...item,
-      subItems: item.subItems?.filter(sub => checkAccess(sub))
-    }));
+  const filteredSidebarConfig = userRole === 'SUPERADMIN' 
+    ? sidebarConfig
+    : sidebarConfig
+        .filter(item => {
+          // If it's a group, check if it has any accessible subItems
+          if (item.subItems) {
+            const accessibleSubItems = item.subItems.filter(sub => checkAccess(sub));
+            return accessibleSubItems.length > 0;
+          }
+          return checkAccess(item);
+        })
+        .map(item => ({
+          ...item,
+          subItems: item.subItems?.filter(sub => checkAccess(sub))
+        }));
 
   // Auto-expand group if a sub-item is active
   useEffect(() => {

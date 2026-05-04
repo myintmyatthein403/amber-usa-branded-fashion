@@ -4,28 +4,11 @@ import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import { X, ShoppingBag, Heart, Star, ShieldCheck, Truck, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import SizeGuideModal from "./SizeGuideModal";
 import { useStore } from "@/store/useStore";
 import Price from "../Price";
-
-interface Product {
-  id: number | string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  isUsdPrice?: boolean;
-  onSale?: boolean;
-  category: string;
-  color: string;
-  colors?: string[];
-  sizes: string[];
-  inStock: boolean;
-  image: string;
-  images?: string[];
-  description?: string;
-  variants?: any[];
-}
+import { Product } from "@amber/shared";
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -47,8 +30,8 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
     if (!product) return [];
     const images = [...(product.images || [])];
     
-    product.variants?.forEach((v: any) => {
-      v.images?.forEach((img: string) => {
+    product.variants?.forEach((v) => {
+      v.images?.forEach((img) => {
         if (!images.includes(img)) {
           images.push(img);
         }
@@ -64,7 +47,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
     if (userSelectedImage) return userSelectedImage;
 
     if (selectedSize || selectedColor) {
-      const variant = product.variants?.find((v: any) => {
+      const variant = product.variants?.find((v) => {
         const matchesSize = selectedSize ? v.size === selectedSize : true;
         const matchesColor = selectedColor ? v.color === selectedColor : true;
         return matchesSize && matchesColor;
@@ -75,29 +58,36 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
       }
     }
     
-    return product.image;
+    return product.images?.[0] || "";
   }, [product, selectedSize, selectedColor, userSelectedImage]);
 
-  // Reset user selection when variant attributes change to allow variant image to take over
-  useEffect(() => {
+  const handleSizeChange = (size: string) => {
+    setSelectedSize(size);
     setUserSelectedImage(null);
-  }, [selectedSize, selectedColor]);
+  };
+
+  const handleColorChange = (color: string) => {
+    setSelectedColor(color);
+    setUserSelectedImage(null);
+  };
 
   if (!product) return null;
 
   const handleAddToCart = () => {
-    if (!selectedSize && product.sizes?.length > 0) {
+    const hasSizes = (product.variants?.length ?? 0) > 0 && product.variants?.some(v => v.size) || product.variants?.some(v => v.size);
+    const hasColors = (product.variants?.length ?? 0) > 0 && product.variants?.some(v => v.color);
+
+    if (hasSizes && !selectedSize) {
       alert("Please select a size");
       return;
     }
-    if (!selectedColor && product.colors && product.colors.length > 0) {
+    if (hasColors && !selectedColor) {
       alert("Please select a color");
       return;
     }
     setIsAdding(true);
     
-    // Find the actual variant ID based on selected size/color
-    const selectedVariant = product.variants?.find((v: any) => {
+    const selectedVariant = product.variants?.find((v) => {
       const matchesSize = selectedSize ? v.size === selectedSize : true;
       const matchesColor = selectedColor ? v.color === selectedColor : true;
       return matchesSize && matchesColor;
@@ -107,8 +97,8 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
       product, 
       selectedSize || undefined, 
       selectedVariant?.id,
-      undefined,
-      undefined,
+      product.isPreOrder,
+      product.preOrderShippingDate || undefined,
       selectedColor || undefined,
       selectedVariant?.price ? Number(selectedVariant.price) : undefined,
       selectedVariant?.images?.[0] || undefined
@@ -125,7 +115,6 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
       <AnimatePresence>
         {isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6">
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -133,8 +122,6 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
               onClick={onClose}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-
-            {/* Modal Content */}
             <motion.div
               initial={{ opacity: 0, scale: 0.98, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -148,18 +135,16 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Left: Product Image & Gallery */}
               <div className="w-full md:w-1/2 flex flex-col bg-[#FAF8F5] overflow-hidden group">
                 <div className="relative flex-1 min-h-[400px]">
                   <Image
-                    src={activeImage || product.image}
+                    src={activeImage || product.images?.[0] || ""}
                     alt={product.name}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                     priority
                   />
                   
-                  {/* Authentic Badge */}
                   <div className="absolute top-8 left-8 bg-[#0F0F0F] text-[#C9A962] px-5 py-2.5 text-[10px] font-bold tracking-[0.2em] shadow-xl">
                     100% AUTHENTIC
                   </div>
@@ -171,7 +156,6 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                   )}
                 </div>
 
-                {/* Thumbnails */}
                 {allImages.length > 1 && (
                   <div className="flex gap-2 p-4 overflow-x-auto no-scrollbar bg-white/50 backdrop-blur-sm border-t border-[#F0F0F0]">
                     {allImages.map((img, idx) => (
@@ -190,13 +174,12 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                 )}
               </div>
 
-              {/* Right: Details */}
               <div className="w-full md:w-1/2 p-10 md:p-14 overflow-y-auto bg-white flex flex-col">
                 <div className="space-y-10 my-auto">
                   <header className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-[#C9A962] font-bold tracking-[0.25em] uppercase">
-                        {product.category || "New Collection"}
+                        {product.category?.name || "New Collection"}
                       </span>
                       <div className="flex items-center space-x-3">
                         <div className="flex space-x-0.5">
@@ -213,9 +196,9 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                     </h2>
                     
                     <div className="flex items-center space-x-5">
-                      <Price amount={product.price} isUsdPrice={product.isUsdPrice !== false} className="text-2xl text-[#0F0F0F] font-semibold tracking-tight" />
-                      {product.onSale && product.originalPrice && (
-                        <Price amount={product.originalPrice} isUsdPrice={product.isUsdPrice !== false} className="text-lg text-[#888888] font-normal line-through opacity-60" />
+                      <Price amount={Number(product.price)} isUsdPrice={product.isUsdPrice !== false} className="text-2xl text-[#0F0F0F] font-semibold tracking-tight" />
+                      {product.onSale && product.compareAtPrice && (
+                        <Price amount={Number(product.compareAtPrice)} isUsdPrice={product.isUsdPrice !== false} className="text-lg text-[#888888] font-normal line-through opacity-60" />
                       )}
                     </div>
                   </header>
@@ -225,17 +208,16 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                   </p>
 
                   <div className="grid grid-cols-1 gap-8">
-                    {/* Color Selection */}
-                    {product.colors && product.colors.length > 0 && (
+                    {product.variants?.some(v => v.color) && (
                       <div className="space-y-4">
                         <span className="text-[11px] font-bold tracking-[0.15em] text-[#0F0F0F] uppercase border-b border-[#F0F0F0] pb-2 block">
                           Select Color
                         </span>
                         <div className="flex flex-wrap gap-3">
-                          {product.colors.map((color: string) => (
+                          {Array.from(new Set(product.variants.map(v => v.color))).map((color) => (
                             <button
                               key={color}
-                              onClick={() => setSelectedColor(color)}
+                              onClick={() => handleColorChange(color)}
                               className={cn(
                                 "px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all border",
                                 selectedColor === color
@@ -250,8 +232,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                       </div>
                     )}
 
-                    {/* Size Selection */}
-                    {product.sizes && product.sizes.length > 0 && (
+                    {product.variants?.some(v => v.size) && (
                       <div className="space-y-6">
                         <div className="flex justify-between items-end border-b border-[#F0F0F0] pb-2">
                           <span className="text-[11px] font-bold tracking-[0.15em] text-[#0F0F0F] uppercase">Select Size</span>
@@ -263,10 +244,10 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                           </button>
                         </div>
                         <div className="grid grid-cols-4 gap-3">
-                          {product.sizes.map((size) => (
+                          {Array.from(new Set(product.variants.map(v => v.size))).map((size) => (
                             <button
                               key={size}
-                              onClick={() => setSelectedSize(size)}
+                              onClick={() => handleSizeChange(size)}
                               className={cn(
                                 "aspect-square flex items-center justify-center text-[12px] font-bold transition-all duration-300 border rounded-none",
                                 selectedSize === size
@@ -282,11 +263,10 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                     )}
                   </div>
 
-                  {/* Actions */}
                   <div className="space-y-4 pt-4">
                     <button
                       onClick={handleAddToCart}
-                      disabled={!product.inStock || isAdding}
+                      disabled={!product.variants?.some(v => v.stock > 0) && !product.inStock || isAdding}
                       className={cn(
                         "group relative w-full h-16 uppercase tracking-[0.25em] text-[13px] font-bold transition-all duration-500 overflow-hidden rounded-none",
                         isAdding ? "bg-[#C9A962] text-white" : "bg-[#0F0F0F] text-white hover:bg-[#C9A962]"
@@ -325,7 +305,6 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                     </div>
                   </div>
 
-                  {/* Trust Badges */}
                   <div className="flex items-center justify-between pt-10 border-t border-[#F0F0F0]">
                     <div className="flex items-center space-x-4">
                       <div className="w-10 h-10 rounded-none bg-[#FAF8F5] flex items-center justify-center">

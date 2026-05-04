@@ -17,8 +17,12 @@ interface SaleSectionData {
   imageMain: string;
 }
 
+interface ResponseData {
+  data: SaleSectionData;
+}
+
 export default function SaleSection() {
-  const [data, setData] = useState<SaleSectionData | null>(null);
+  const [data, setData] = useState<ResponseData | null>(null);
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -34,10 +38,10 @@ export default function SaleSection() {
   }, []);
 
   useEffect(() => {
-    if (!data?.endDate) return;
+    if (!data?.data?.endDate) return;
 
     const calculateTimeLeft = () => {
-      const difference = +new Date(data.endDate) - +new Date();
+      const difference = +new Date(data.data.endDate) - +new Date();
       if (difference > 0) {
         setTimeLeft({
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
@@ -78,14 +82,14 @@ export default function SaleSection() {
             <div className="space-y-4">
               <div className="flex items-center justify-center lg:justify-start space-x-3 text-[#D4AF37]">
                 <Percent className="w-6 h-6" />
-                <span className="text-[10px] uppercase font-bold tracking-[0.5em]">{data.badge}</span>
+                <span className="text-[10px] uppercase font-bold tracking-[0.5em]">{data.data.badge}</span>
               </div>
               <h2 className="text-5xl md:text-8xl font-serif text-white leading-tight">
-                {data.title} <br />
-                <span className="italic text-[#D4AF37]">{data.titleItalic}</span>
+                {data.data.title} <br />
+                <span className="italic text-[#D4AF37]">{data.data.titleItalic}</span>
               </h2>
               <p className="text-white/40 text-lg font-sans max-w-lg mx-auto lg:mx-0">
-                {data.description}
+                {data.data.description}
               </p>
             </div>
 
@@ -105,10 +109,10 @@ export default function SaleSection() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-8 pt-4">
-              <Link href={data.ctaLink || "/shop"}>
+              <Link href={data.data.ctaLink || "/shop"}>
                 <button className="bg-[#D4AF37] text-[#1A1A1A] px-12 py-5 text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-white transition-all duration-500 flex items-center space-x-4 group">
                   <ShoppingBag className="w-4 h-4" />
-                  <span>{data.ctaText}</span>
+                  <span>{data.data.ctaText}</span>
                 </button>
               </Link>
               <div className="flex items-center space-x-4 text-white/20">
@@ -120,32 +124,34 @@ export default function SaleSection() {
 
           {/* Right: Visual Side */}
           <div className="flex-1 relative">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 1 }}
-              className="relative aspect-square md:aspect-video lg:aspect-square w-full bg-white/5 rounded-sm overflow-hidden border border-white/10"
-            >
-              <Image
-                src={data.imageMain}
-                alt="Limited Sale Event"
-                fill
-                className="object-cover transition-all duration-1000"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A] via-transparent to-transparent opacity-60" />
-              
-              {/* Floating Discount Badge */}
+            {data.data.imageMain && (
               <motion.div
-                animate={{ y: [0, -20, 0] }}
-                transition={{ duration: 4, repeat: Infinity }}
-                className="absolute top-10 right-10 bg-[#D4AF37] w-24 h-24 rounded-full flex flex-col items-center justify-center text-[#1A1A1A] shadow-2xl z-20"
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1 }}
+                className="relative aspect-square md:aspect-video lg:aspect-square w-full bg-white/5 rounded-sm overflow-hidden border border-white/10"
               >
-                <span className="text-[8px] uppercase font-bold tracking-widest">Up To</span>
-                <span className="text-3xl font-serif leading-none">40%</span>
-                <span className="text-[8px] uppercase font-bold tracking-widest">Off</span>
+                <Image
+                  src={data.data.imageMain}
+                  alt="Limited Sale Event"
+                  fill
+                  className="object-cover transition-all duration-1000"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A] via-transparent to-transparent opacity-60" />
+                
+                {/* Floating Discount Badge */}
+                <motion.div
+                  animate={{ y: [0, -20, 0] }}
+                  transition={{ duration: 4, repeat: Infinity }}
+                  className="absolute top-10 right-10 bg-[#D4AF37] w-24 h-24 rounded-full flex flex-col items-center justify-center text-[#1A1A1A] shadow-2xl z-20"
+                >
+                  <span className="text-[8px] uppercase font-bold tracking-widest">Up To</span>
+                  <span className="text-3xl font-serif leading-none">40%</span>
+                  <span className="text-[8px] uppercase font-bold tracking-widest">Off</span>
+                </motion.div>
               </motion.div>
-            </motion.div>
+            )}
           </div>
 
         </div>

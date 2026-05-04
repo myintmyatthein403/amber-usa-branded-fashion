@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
-import { Category, Brand, Sale } from '../schema';
+import { Category, Brand, Product } from "@amber/shared";
 import { EditorialImagery } from './form/EditorialImagery';
 import { ProductIdentification } from './form/ProductIdentification';
 import { ProductStorytelling } from './form/ProductStorytelling';
@@ -8,14 +8,15 @@ import { PricingSection } from './form/PricingSection';
 import { ClassificationSection } from './form/ClassificationSection';
 
 interface ProductFormProps {
-  productForm: any;
-  setProductForm: (form: any) => void;
+  productForm: Partial<Product>;
+  setProductForm: (form: Partial<Product>) => void;
   categories: Category[] | null;
   brands: Brand[] | null;
-  sales: Sale[] | null;
+  collections: any[] | null;
+  sales: any[] | null;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
-  editingProduct: any;
+  editingProduct: Product | null;
   onOpenMedia: (index?: number) => void;
 }
 
@@ -24,47 +25,50 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   setProductForm,
   categories,
   brands,
+  collections,
   onSubmit,
   submitting,
   editingProduct,
   onOpenMedia
 }) => {
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = <K extends keyof Product>(field: K, value: Product[K]) => {
     setProductForm({ ...productForm, [field]: value });
   };
 
   return (
     <form onSubmit={onSubmit} className="space-y-12 py-10 animate-in fade-in slide-in-from-left-4 duration-500">
       <EditorialImagery 
-        images={productForm.images} 
+        images={productForm.images || []} 
         onChange={(images) => handleFieldChange('images', images)} 
         onOpenMedia={onOpenMedia} 
       />
 
       <ProductIdentification 
-        name={productForm.name} 
-        slug={productForm.slug} 
+        name={productForm.name || ""} 
+        slug={productForm.slug || ""} 
         onChange={handleFieldChange} 
       />
 
       <ProductStorytelling 
-        description={productForm.description} 
+        description={productForm.description || ""} 
         onChange={(val) => handleFieldChange('description', val)} 
       />
 
       <PricingSection 
-        price={productForm.price} 
-        compareAtPrice={productForm.compareAtPrice} 
-        isUsdPrice={productForm.isUsdPrice} 
+        price={productForm.price?.toString() || ""} 
+        compareAtPrice={productForm.compareAtPrice?.toString() || ""} 
+        isUsdPrice={productForm.isUsdPrice ?? true} 
         onChange={handleFieldChange} 
       />
 
       <ClassificationSection 
-        brandId={productForm.brandId} 
-        categoryId={productForm.categoryId} 
+        brandId={productForm.brandId || undefined} 
+        categoryId={productForm.categoryId || undefined} 
+        collectionIds={productForm.collectionIds || []}
         status={productForm.status} 
         brands={brands} 
         categories={categories} 
+        collections={collections}
         onChange={handleFieldChange} 
       />
 

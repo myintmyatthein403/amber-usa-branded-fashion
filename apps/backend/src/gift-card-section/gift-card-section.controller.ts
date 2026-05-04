@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { GiftCardSectionService } from './gift-card-section.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -7,7 +16,9 @@ import { Role } from '@prisma/client';
 
 @Controller('gift-card-section')
 export class GiftCardSectionController {
-  constructor(private readonly giftCardSectionService: GiftCardSectionService) {}
+  constructor(
+    private readonly giftCardSectionService: GiftCardSectionService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)

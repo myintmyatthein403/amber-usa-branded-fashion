@@ -9,10 +9,8 @@ export const LoginPage: React.FC = () => {
     password,
     setPassword,
     loading,
-    googleLoading,
     error,
     setError,
-    handleGoogleSuccess,
     handleSubmit
   } = useLogin();
 
@@ -24,10 +22,8 @@ export const LoginPage: React.FC = () => {
         password={password}
         setPassword={setPassword}
         loading={loading}
-        googleLoading={googleLoading}
         error={error}
         setError={setError}
-        handleGoogleSuccess={handleGoogleSuccess}
         handleSubmit={handleSubmit}
       />
     </div>

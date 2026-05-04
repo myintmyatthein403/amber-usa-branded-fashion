@@ -30,9 +30,9 @@ export class SaleSectionService {
   async update(id: string, data: any) {
     if (data.isActive) {
       await this.prisma.saleSection.updateMany({
-        where: { 
+        where: {
           isActive: true,
-          NOT: { id }
+          NOT: { id },
         },
         data: { isActive: false },
       });

@@ -21,13 +21,18 @@ export class OrdersListener {
       }
 
       await this.ordersRepository.updatePaymentStatus(event.orderId, 'PAID');
-      
+
       // Update Stripe info if needed
-      await this.ordersRepository.updateStripeInfo(event.orderId, event.paymentIntentId);
+      await this.ordersRepository.updateStripeInfo(
+        event.orderId,
+        event.paymentIntentId,
+      );
 
       this.logger.log(`Order ${event.orderId} successfully marked as PAID`);
     } catch (error) {
-      this.logger.error(`Failed to process order.paid for ${event.orderId}: ${error.message}`);
+      this.logger.error(
+        `Failed to process order.paid for ${event.orderId}: ${error.message}`,
+      );
     }
   }
 }

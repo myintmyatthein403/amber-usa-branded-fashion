@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -34,7 +43,10 @@ export class SalesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSaleDto: Prisma.SaleUpdateInput) {
+  update(
+    @Param('id') id: string,
+    @Body() updateSaleDto: Prisma.SaleUpdateInput,
+  ) {
     return this.salesService.updateSale(id, updateSaleDto);
   }
 

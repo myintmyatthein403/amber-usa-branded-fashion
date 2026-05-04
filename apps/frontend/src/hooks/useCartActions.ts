@@ -1,15 +1,11 @@
 "use client";
 
 import { useStore } from "@/store/useStore";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export function useCartActions() {
-  const [mounted, setMounted] = useState(false);
+  const [mounted] = useState(typeof window !== 'undefined');
   
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const cartItems = useStore((state) => state.cartItems);
   const isCartOpen = useStore((state) => state.isCartOpen);
   const setCartOpen = useStore((state) => state.setCartOpen);

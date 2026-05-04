@@ -12,21 +12,21 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
+      PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!requiredRoles && !requiredPermissions) {
       return true;
     }
 
     const { user } = context.switchToHttp().getRequest();
-    
+
     // 1. If NO USER is present:
     // - If ROLES are required: block (Roles always require auth)
     // - If only PERMISSIONS are required: allow (assume public access is permitted)
@@ -57,7 +57,9 @@ export class RolesGuard implements CanActivate {
     // If a user is logged in and permissions are specified, they MUST have them.
     if (requiredPermissions) {
       const userPermissions = dbUser.role.permissions || [];
-      const hasPermission = requiredPermissions.every((perm) => userPermissions.includes(perm));
+      const hasPermission = requiredPermissions.every((perm) =>
+        userPermissions.includes(perm),
+      );
       return hasPermission;
     }
 

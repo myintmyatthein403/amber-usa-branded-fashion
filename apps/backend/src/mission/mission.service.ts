@@ -1,51 +1,44 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { MissionRepository } from './mission.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class MissionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly missionRepository: MissionRepository) {}
 
   async create(data: any) {
-    if (data.isActive) {
-      await this.prisma.missionSection.updateMany({
-        where: { isActive: true },
-        data: { isActive: false },
-      });
+    const sanitizedData = sanitizeData(data);
+    if (sanitizedData.isActive) {
+      await this.missionRepository.deactivateAll();
     }
-    return this.prisma.missionSection.create({ data });
+    return this.missionRepository.create(sanitizedData);
   }
 
   async findAll() {
-    return this.prisma.missionSection.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.missionRepository.findAll();
   }
 
   async findActive() {
-    return this.prisma.missionSection.findFirst({
-      where: { isActive: true },
-    });
+    return this.missionRepository.findActive();
   }
 
   async update(id: string, data: any) {
-    if (data.isActive) {
-      await this.prisma.missionSection.updateMany({
-        where: { 
-          isActive: true,
-          NOT: { id }
-        },
-        data: { isActive: false },
-      });
+    const mission = await this.missionRepository.findById(id);
+    if (!mission)
+      throw new NotFoundException(`Mission section with ID ${id} not found`);
+
+    const sanitizedData = sanitizeData(data);
+    if (sanitizedData.isActive) {
+      await this.missionRepository.deactivateOthers(id);
     }
-    return this.prisma.missionSection.update({
-      where: { id },
-      data,
-    });
+    return this.missionRepository.update(id, sanitizedData);
   }
 
   async remove(id: string) {
-    return this.prisma.missionSection.delete({
-      where: { id },
-    });
+    const mission = await this.missionRepository.findById(id);
+    if (!mission)
+      throw new NotFoundException(`Mission section with ID ${id} not found`);
+
+    return this.missionRepository.delete(id);
   }
 }

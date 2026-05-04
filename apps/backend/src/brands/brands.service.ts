@@ -2,14 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { BrandsRepository } from './brands.repository';
 import { Brand } from '@prisma/client';
 import { sanitizeData } from '../common/utils/data-sanitizer';
+import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
 
 @Injectable()
 export class BrandsService {
-  constructor(
-    private brandsRepository: BrandsRepository
-  ) {}
+  constructor(private brandsRepository: BrandsRepository) {}
 
-  async createBrand(data: any): Promise<Brand> {
+  async createBrand(data: CreateBrandDto): Promise<Brand> {
     const sanitizedData = sanitizeData(data);
     return this.brandsRepository.create(sanitizedData);
   }
@@ -24,7 +23,7 @@ export class BrandsService {
     return brand;
   }
 
-  async updateBrand(id: string, data: any): Promise<Brand> {
+  async updateBrand(id: string, data: UpdateBrandDto): Promise<Brand> {
     const sanitizedData = sanitizeData(data);
     return this.brandsRepository.update(id, sanitizedData);
   }
@@ -34,4 +33,3 @@ export class BrandsService {
     return this.brandsRepository.delete(id);
   }
 }
-

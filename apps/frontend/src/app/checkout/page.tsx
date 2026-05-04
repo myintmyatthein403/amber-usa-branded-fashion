@@ -98,7 +98,8 @@ export default function CheckoutPage() {
     // Fetch Delivery Methods
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/delivery-methods/active`)
       .then(res => res.json())
-      .then(data => {
+      .then(result => {
+        const data = result?.data || result || [];
         setDeliveryMethods(data);
         if (data.length > 0) {
           setBaseFormData(prev => ({ ...prev, shippingMethod: data[0].id }));
@@ -110,7 +111,8 @@ export default function CheckoutPage() {
     // Fetch Payment Methods
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/payment-methods/active`)
       .then(res => res.json())
-      .then(data => {
+      .then(result => {
+        const data = result?.data || result || [];
         setPaymentMethods(data);
         if (data.length > 0) {
           setBaseFormData(prev => ({ ...prev, paymentMethod: data[0].name }));
@@ -118,7 +120,7 @@ export default function CheckoutPage() {
       })
       .catch(console.error)
       .finally(() => setLoadingPayments(false));
-  }, [authUser]);
+  }, [authUser, isAuthenticated, router]);
 
   const selectedMethod = deliveryMethods.find(m => m.id === formData.shippingMethod);
   const selectedPayment = paymentMethods.find(p => p.name === formData.paymentMethod);
@@ -196,7 +198,8 @@ export default function CheckoutPage() {
         throw new Error('Failed to create order');
       }
 
-      const order = await orderResponse.json();
+      const orderResult = await orderResponse.json();
+      const order = orderResult?.data || orderResult;
       setCurrentOrderId(order.id);
 
       // 2. Create payment intent with orderId
@@ -311,7 +314,8 @@ export default function CheckoutPage() {
         });
 
         if (orderResponse.ok) {
-          const order = await orderResponse.json();
+          const orderResult = await orderResponse.json();
+          const order = orderResult?.data || orderResult;
           setCurrentOrderId(order.id);
         }
       } catch (error) {

@@ -1,4 +1,11 @@
-import { Controller, Post, Body, Headers, Req, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  Req,
+  BadRequestException,
+} from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { StripeService } from './stripe.service';
 import type { Request } from 'express';
@@ -8,8 +15,14 @@ export class StripeController {
   constructor(private readonly stripeService: StripeService) {}
 
   @Post('create-payment-intent')
-  async createPaymentIntent(@Body() data: { amount: number; currency: string; orderId?: string }) {
-    return this.stripeService.createPaymentIntent(data.amount, data.currency, data.orderId);
+  async createPaymentIntent(
+    @Body() data: { amount: number; currency: string; orderId?: string },
+  ) {
+    return this.stripeService.createPaymentIntent(
+      data.amount,
+      data.currency,
+      data.orderId,
+    );
   }
 
   @Post('webhook')
@@ -21,7 +34,9 @@ export class StripeController {
       throw new BadRequestException('Missing stripe-signature header');
     }
     if (!request.rawBody) {
-      throw new BadRequestException('Missing raw body for webhook verification');
+      throw new BadRequestException(
+        'Missing raw body for webhook verification',
+      );
     }
     return this.stripeService.handleWebhook(request.rawBody, signature);
   }

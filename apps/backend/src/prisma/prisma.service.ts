@@ -22,9 +22,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
 
   sanitizeData<T>(data: T): T {
     if (data === null || data === undefined) return data;
-    
+
     if (Array.isArray(data)) {
-      return data.map(item => this.sanitizeData(item)) as any;
+      return data.map((item) => this.sanitizeData(item)) as any;
     }
 
     if (typeof data === 'object') {

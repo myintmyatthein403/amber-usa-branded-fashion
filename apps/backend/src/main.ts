@@ -13,20 +13,24 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
-  
+
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   // Setup Swagger
   const config = new DocumentBuilder()
     .setTitle('Amber Brand Fashion API')
-    .setDescription('The API documentation for Amber Brand Fashion e-commerce platform.')
+    .setDescription(
+      'The API documentation for Amber Brand Fashion e-commerce platform.',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();

@@ -10,8 +10,10 @@ export class SalesService {
   async createSale(data: any): Promise<Sale> {
     const sanitizedData = sanitizeData(data);
     const { productIds, ...saleData } = sanitizedData;
-    
-    const sale = await this.salesRepository.create(saleData as Prisma.SaleCreateInput);
+
+    const sale = await this.salesRepository.create(
+      saleData as Prisma.SaleCreateInput,
+    );
 
     if (productIds && productIds.length > 0) {
       await this.syncProducts(sale.id, productIds);
@@ -36,12 +38,16 @@ export class SalesService {
 
   async updateSale(id: string, data: any): Promise<Sale> {
     const saleToUpdate = await this.salesRepository.findById(id);
-    if (!saleToUpdate) throw new NotFoundException(`Sale with ID ${id} not found`);
+    if (!saleToUpdate)
+      throw new NotFoundException(`Sale with ID ${id} not found`);
 
     const sanitizedData = sanitizeData(data);
     const { productIds, ...saleData } = sanitizedData;
-    
-    const sale = await this.salesRepository.update(id, saleData as Prisma.SaleUpdateInput);
+
+    const sale = await this.salesRepository.update(
+      id,
+      saleData as Prisma.SaleUpdateInput,
+    );
 
     if (productIds !== undefined) {
       await this.syncProducts(id, productIds);
@@ -56,7 +62,7 @@ export class SalesService {
 
     // Before deleting, reset product onSale status
     await this.salesRepository.resetProductsInSale(id);
-    
+
     return this.salesRepository.delete(id);
   }
 
@@ -66,7 +72,11 @@ export class SalesService {
 
     // 2. Add sale association to new products
     if (productIds.length > 0) {
-      await this.salesRepository.updateProductsSaleAssociation(productIds, saleId, true);
+      await this.salesRepository.updateProductsSaleAssociation(
+        productIds,
+        saleId,
+        true,
+      );
     }
   }
 

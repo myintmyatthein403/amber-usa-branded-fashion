@@ -1,11 +1,19 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { OrdersRepository } from './orders.repository';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { OrderStatusChangedEvent } from '../common/events/domain.events';
 
 @Injectable()
 export class OrdersService {
   constructor(
-    private ordersRepository: OrdersRepository
+    private ordersRepository: OrdersRepository,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async createOrder(data: {
@@ -39,15 +47,20 @@ export class OrdersService {
 
     // 1. Resolve Warehouse & Validate Stock/Prices
     if (!warehouseId) {
-      const firstItem = data.items.find(item => item.variantId);
+      const firstItem = data.items.find((item) => item.variantId);
       if (firstItem && firstItem.variantId) {
-        const inventory = await this.ordersRepository.findWarehouseWithStock(firstItem.variantId, firstItem.quantity);
+        const inventory = await this.ordersRepository.findWarehouseWithStock(
+          firstItem.variantId,
+          firstItem.quantity,
+        );
         warehouseId = inventory?.warehouseId;
       }
     }
 
     if (!warehouseId) {
-      warehouseId = (await this.ordersRepository.findDefaultWarehouse('MYANMAR'))?.id || (await this.ordersRepository.findAnyWarehouse())?.id;
+      warehouseId =
+        (await this.ordersRepository.findDefaultWarehouse('MYANMAR'))?.id ||
+        (await this.ordersRepository.findAnyWarehouse())?.id;
     }
 
     if (!warehouseId) {
@@ -60,16 +73,23 @@ export class OrdersService {
       let dbPrice = 0;
 
       if (item.variantId) {
-        const variant = await this.ordersRepository.findVariantForOrder(item.variantId);
-        if (!variant) throw new NotFoundException(`Variant not found: ${item.variantId}`);
-        
+        const variant = await this.ordersRepository.findVariantForOrder(
+          item.variantId,
+        );
+        if (!variant)
+          throw new NotFoundException(`Variant not found: ${item.variantId}`);
+
         dbPrice = Number(variant.price || variant.product.price);
         isPreOrder = variant.isPreOrder || variant.product.isPreOrder;
-        expectedShippingDate = variant.preOrderShippingDate || variant.product.preOrderShippingDate;
+        expectedShippingDate =
+          variant.preOrderShippingDate || variant.product.preOrderShippingDate;
       } else {
-        const product = await this.ordersRepository.findProductForOrder(item.productId);
-        if (!product) throw new NotFoundException(`Product not found: ${item.productId}`);
-        
+        const product = await this.ordersRepository.findProductForOrder(
+          item.productId,
+        );
+        if (!product)
+          throw new NotFoundException(`Product not found: ${item.productId}`);
+
         dbPrice = Number(product.price);
         isPreOrder = product.isPreOrder;
         expectedShippingDate = product.preOrderShippingDate;
@@ -80,14 +100,19 @@ export class OrdersService {
         ...item,
         price: dbPrice,
         isPreOrder,
-        expectedShippingDate
+        expectedShippingDate,
       });
     }
 
-    calculatedTotal += (data.deliveryFee || 0);
+    calculatedTotal += data.deliveryFee || 0;
 
     // 2. Delegate to Repository for transactional atomic creation
-    return this.ordersRepository.create(data, warehouseId, itemsWithPreOrderInfo, calculatedTotal);
+    return this.ordersRepository.create(
+      data,
+      warehouseId,
+      itemsWithPreOrderInfo,
+      calculatedTotal,
+    );
   }
 
   async getOrderById(id: string, user?: { userId: string; role: string }) {
@@ -97,7 +122,8 @@ export class OrdersService {
     if (user) {
       const isOwner = order.userId === user.userId;
       const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(user.role);
-      if (!isOwner && !isAdmin) throw new ForbiddenException('No permission to access this order');
+      if (!isOwner && !isAdmin)
+        throw new ForbiddenException('No permission to access this order');
     } else {
       throw new ForbiddenException('Authentication required');
     }
@@ -109,11 +135,21 @@ export class OrdersService {
     const order = await this.ordersRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
 
+    const oldStatus = order.status;
     if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
       await this.ordersRepository.restock(order.id);
     }
 
-    return this.ordersRepository.updateStatus(id, status);
+    const updatedOrder = await this.ordersRepository.updateStatus(id, status);
+
+    if (oldStatus !== status) {
+      this.eventEmitter.emit(
+        'order.status_changed',
+        new OrderStatusChangedEvent(id, oldStatus, status),
+      );
+    }
+
+    return updatedOrder;
   }
 
   async updatePaymentStatus(id: string, paymentStatus: PaymentStatus) {
@@ -135,6 +171,13 @@ export class OrdersService {
     return this.ordersRepository.bulkUpdatePaymentStatus(ids, paymentStatus);
   }
 
+  async getOrderByNumber(orderNumber: string) {
+    const order = await this.ordersRepository.findByOrderNumber(orderNumber);
+    if (!order)
+      throw new NotFoundException(`Order with number ${orderNumber} not found`);
+    return order;
+  }
+
   async getOrdersByUser(userId: string) {
     return this.ordersRepository.findByUser(userId);
   }
@@ -148,21 +191,21 @@ export class OrdersService {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   }) {
-    const { 
-      page = 1, 
-      limit = 10, 
-      search, 
-      status, 
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
       paymentStatus,
-      sortBy = 'createdAt', 
-      sortOrder = 'desc' 
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = query;
-    
+
     const skip = (page - 1) * limit;
     const where: any = {};
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
-    
+
     if (search) {
       where.OR = [
         { orderNumber: { contains: search, mode: 'insensitive' } },
@@ -173,10 +216,10 @@ export class OrdersService {
     }
 
     const [orders, total] = await this.ordersRepository.findMany(
-      where, 
-      skip, 
-      Number(limit), 
-      { [sortBy]: sortOrder }
+      where,
+      skip,
+      Number(limit),
+      { [sortBy]: sortOrder },
     );
 
     return {
@@ -186,13 +229,18 @@ export class OrdersService {
         page: Number(page),
         limit: Number(limit),
         totalPages: Math.ceil(total / limit),
-      }
+      },
     };
   }
 
   async deleteOrder(id: string) {
     const order = await this.ordersRepository.findById(id);
-    if (order && !order.restocked && order.status !== 'CANCELLED' && order.paymentStatus !== 'FAILED') {
+    if (
+      order &&
+      !order.restocked &&
+      order.status !== 'CANCELLED' &&
+      order.paymentStatus !== 'FAILED'
+    ) {
       await this.ordersRepository.restock(id);
     }
     return this.ordersRepository.delete(id);

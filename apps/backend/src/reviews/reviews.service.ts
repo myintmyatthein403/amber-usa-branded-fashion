@@ -28,7 +28,10 @@ export class ReviewsService {
     if (!review) throw new NotFoundException(`Review with ID ${id} not found`);
 
     const sanitizedData = sanitizeData(data);
-    return this.reviewsRepository.update(id, sanitizedData as Prisma.ReviewUpdateInput);
+    return this.reviewsRepository.update(
+      id,
+      sanitizedData as Prisma.ReviewUpdateInput,
+    );
   }
 
   async deleteReview(id: string): Promise<Review> {
@@ -41,7 +44,9 @@ export class ReviewsService {
   async toggleApproval(id: string): Promise<Review> {
     const review = await this.reviewsRepository.findById(id);
     if (!review) throw new NotFoundException(`Review with ID ${id} not found`);
-    
-    return this.reviewsRepository.update(id, { isApproved: !review.isApproved });
+
+    return this.reviewsRepository.update(id, {
+      isApproved: !review.isApproved,
+    });
   }
 }

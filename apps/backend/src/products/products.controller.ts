@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, UsePipes } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  UsePipes,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -6,6 +17,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { ProductSchema } from '@amber/shared';
+import { CreateProductDto, ProductQueryDto, StockValidationItemDto } from './dto/product.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -15,34 +27,24 @@ export class ProductsController {
   @Permissions('products:write')
   @Post()
   @UsePipes(new ZodValidationPipe(ProductSchema))
-  create(@Body() createProductDto: any) {
+  create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.createProduct(createProductDto);
   }
 
   @UseGuards(OptionalJwtAuthGuard, RolesGuard)
   @Permissions('products:read')
   @Get()
-  async findAll(
-    @Query('isFeatured') isFeatured?: string,
-    @Query('isNewArrival') isNewArrival?: string,
-    @Query('isBestSeller') isBestSeller?: string,
-    @Query('onSale') onSale?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('brandId') brandId?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-  ) {
+  async findAll(@Query() query: ProductQueryDto) {
     return this.productsService.getAllProducts({
-      isFeatured: isFeatured !== undefined ? isFeatured === 'true' : undefined,
-      isNewArrival: isNewArrival !== undefined ? isNewArrival === 'true' : undefined,
-      isBestSeller: isBestSeller !== undefined ? isBestSeller === 'true' : undefined,
-      onSale: onSale !== undefined ? onSale === 'true' : undefined,
-      categoryId,
-      brandId,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      search,
+      isFeatured: query.isFeatured !== undefined ? query.isFeatured === 'true' : undefined,
+      isNewArrival: query.isNewArrival !== undefined ? query.isNewArrival === 'true' : undefined,
+      isBestSeller: query.isBestSeller !== undefined ? query.isBestSeller === 'true' : undefined,
+      onSale: query.onSale !== undefined ? query.onSale === 'true' : undefined,
+      categoryId: query.categoryId,
+      brandId: query.brandId,
+      page: query.page ? parseInt(query.page, 10) : undefined,
+      limit: query.limit ? parseInt(query.limit, 10) : undefined,
+      search: query.search,
     });
   }
 
@@ -54,7 +56,7 @@ export class ProductsController {
   }
 
   @Post('validate-stock')
-  validateStock(@Body() items: Array<{ productId: string; variantId?: string; quantity: number }>) {
+  validateStock(@Body() items: StockValidationItemDto[]) {
     return this.productsService.validateStock(items);
   }
 
@@ -62,7 +64,7 @@ export class ProductsController {
   @Permissions('products:write')
   @Patch(':id')
   @UsePipes(new ZodValidationPipe(ProductSchema.partial()))
-  update(@Param('id') id: string, @Body() updateProductDto: any) {
+  update(@Param('id') id: string, @Body() updateProductDto: CreateProductDto) {
     return this.productsService.updateProduct(id, updateProductDto);
   }
 

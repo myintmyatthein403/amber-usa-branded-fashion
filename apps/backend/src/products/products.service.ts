@@ -2,41 +2,42 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Product, Prisma } from '@prisma/client';
 import { ProductsRepository } from './products.repository';
 import { sanitizeData } from '../common/utils/data-sanitizer';
+import { CreateProductDto, StockValidationItemDto } from './dto/product.dto';
 
 @Injectable()
 export class ProductsService {
-  constructor(
-    private productsRepository: ProductsRepository
-  ) {}
+  constructor(private productsRepository: ProductsRepository) {}
 
-  async createProduct(data: any): Promise<Product> {
+  async createProduct(data: CreateProductDto): Promise<Product> {
     const sanitizedData = sanitizeData(data);
     return this.productsRepository.create(sanitizedData);
   }
 
-  async getAllProducts(params: {
-    isFeatured?: boolean;
-    isNewArrival?: boolean;
-    isBestSeller?: boolean;
-    onSale?: boolean;
-    categoryId?: string;
-    brandId?: string;
-    page?: number;
-    limit?: number;
-    search?: string;
-  } = {}): Promise<any> {
-    const { 
-      isFeatured, 
-      isNewArrival, 
-      isBestSeller, 
-      onSale, 
-      categoryId, 
+  async getAllProducts(
+    params: {
+      isFeatured?: boolean;
+      isNewArrival?: boolean;
+      isBestSeller?: boolean;
+      onSale?: boolean;
+      categoryId?: string;
+      brandId?: string;
+      page?: number;
+      limit?: number;
+      search?: string;
+    } = {},
+  ): Promise<any> {
+    const {
+      isFeatured,
+      isNewArrival,
+      isBestSeller,
+      onSale,
+      categoryId,
       brandId,
       page,
       limit,
-      search
+      search,
     } = params;
-    
+
     const where: Prisma.ProductWhereInput = {
       isFeatured,
       isNewArrival,
@@ -57,12 +58,16 @@ export class ProductsService {
     if (!page && !limit && !search) {
       return this.productsRepository.findAllSimple(where);
     }
-    
+
     const currentPage = Number(page) || 1;
     const currentLimit = Number(limit) || 20;
     const skip = (currentPage - 1) * currentLimit;
-    
-    const [data, total] = await this.productsRepository.findAll(where, skip, currentLimit);
+
+    const [data, total] = await this.productsRepository.findAll(
+      where,
+      skip,
+      currentLimit,
+    );
 
     return {
       data,
@@ -71,7 +76,7 @@ export class ProductsService {
         page: currentPage,
         limit: currentLimit,
         totalPages: Math.ceil(total / currentLimit),
-      }
+      },
     };
   }
 
@@ -81,8 +86,9 @@ export class ProductsService {
     return product;
   }
 
-  async updateProduct(id: string, data: any): Promise<Product> {
+  async updateProduct(id: string, data: CreateProductDto): Promise<Product> {
     const sanitizedData = sanitizeData(data);
+    console.log('DEBUG: Sanitized payload for product update:', JSON.stringify(sanitizedData, null, 2));
     return this.productsRepository.update(id, sanitizedData);
   }
 
@@ -90,15 +96,22 @@ export class ProductsService {
     return this.productsRepository.delete(id);
   }
 
-  async validateStock(items: Array<{ productId: string; variantId?: string; quantity: number }>) {
+  async validateStock(items: StockValidationItemDto[]) {
     const results = [];
 
     for (const item of items) {
       if (item.variantId) {
-        const variant = await this.productsRepository.findVariantById(item.variantId);
+        const variant = await this.productsRepository.findVariantById(
+          item.variantId,
+        );
 
         if (!variant) {
-          results.push({ ...item, inStock: false, available: 0, error: 'Variant not found' });
+          results.push({
+            ...item,
+            inStock: false,
+            available: 0,
+            error: 'Variant not found',
+          });
           continue;
         }
 
@@ -110,25 +123,35 @@ export class ProductsService {
             ...item,
             inStock: variant.stock >= item.quantity,
             available: variant.stock,
-            isPreOrder: false
+            isPreOrder: false,
           });
         }
       } else {
-        const product = await this.productsRepository.findProductSimpleById(item.productId);
+        const product = await this.productsRepository.findProductSimpleById(
+          item.productId,
+        );
 
         if (!product) {
-          results.push({ ...item, inStock: false, available: 0, error: 'Product not found' });
+          results.push({
+            ...item,
+            inStock: false,
+            available: 0,
+            error: 'Product not found',
+          });
           continue;
         }
 
         const isDigital = product.name.includes('Gift Card');
-        
+
         results.push({
           ...item,
-          inStock: isDigital || product.isPreOrder ? true : (product.stock >= item.quantity),
+          inStock:
+            isDigital || product.isPreOrder
+              ? true
+              : product.stock >= item.quantity,
           available: product.stock,
           isPreOrder: product.isPreOrder,
-          isDigital
+          isDigital,
         });
       }
     }

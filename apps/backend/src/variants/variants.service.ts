@@ -1,13 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { VariantsRepository } from './variants.repository';
 import { Variant } from '@prisma/client';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class VariantsService {
-  constructor(
-    private variantsRepository: VariantsRepository
-  ) {}
+  constructor(private variantsRepository: VariantsRepository) {}
 
   async createVariant(data: any): Promise<Variant> {
     const sanitizedData = sanitizeData(data);
@@ -27,13 +29,22 @@ export class VariantsService {
 
     if (stock !== undefined) {
       if (variant.inventory.length > 1) {
-        throw new BadRequestException('Cannot update stock directly for variants with multiple warehouse inventories. Use Logistics Management instead.');
+        throw new BadRequestException(
+          'Cannot update stock directly for variants with multiple warehouse inventories. Use Logistics Management instead.',
+        );
       }
 
       if (variant.inventory.length === 1) {
-        return this.variantsRepository.updateWithInventory(id, rest, variant.inventory[0].id, stock);
+        return this.variantsRepository.updateWithInventory(
+          id,
+          rest,
+          variant.inventory[0].id,
+          stock,
+        );
       } else {
-        throw new BadRequestException('No inventory record found for this variant. Please add stock via Logistics Management.');
+        throw new BadRequestException(
+          'No inventory record found for this variant. Please add stock via Logistics Management.',
+        );
       }
     }
 

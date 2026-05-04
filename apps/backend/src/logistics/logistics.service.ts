@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { LogisticsRepository } from './logistics.repository';
 import { CargoStatus, Prisma } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -19,7 +24,11 @@ export class LogisticsService {
     return this.logisticsRepository.findAllWarehouses();
   }
 
-  async createWarehouse(data: { name: string; location: string; address?: string }) {
+  async createWarehouse(data: {
+    name: string;
+    location: string;
+    address?: string;
+  }) {
     const sanitizedData = sanitizeData(data) as Prisma.WarehouseCreateInput;
     return this.logisticsRepository.createWarehouse(sanitizedData);
   }
@@ -35,7 +44,11 @@ export class LogisticsService {
 
   async updateStock(variantId: string, warehouseId: string, quantity: number) {
     const safeQuantity = Math.max(0, quantity);
-    return this.logisticsRepository.upsertInventory(variantId, warehouseId, safeQuantity);
+    return this.logisticsRepository.upsertInventory(
+      variantId,
+      warehouseId,
+      safeQuantity,
+    );
   }
 
   // --- Cargo Management ---
@@ -56,14 +69,19 @@ export class LogisticsService {
           shipmentNumber,
         });
       } catch (error) {
-        if (error.code === 'P2002' && (error.meta?.target as string[])?.includes('shipmentNumber')) {
+        if (
+          error.code === 'P2002' &&
+          (error.meta?.target as string[])?.includes('shipmentNumber')
+        ) {
           retries--;
           continue;
         }
         throw error;
       }
     }
-    throw new BadRequestException('Failed to generate a unique shipment number');
+    throw new BadRequestException(
+      'Failed to generate a unique shipment number',
+    );
   }
 
   async updateCargoStatus(id: string, status: CargoStatus) {
@@ -71,20 +89,29 @@ export class LogisticsService {
     if (!shipment) throw new NotFoundException('Shipment not found');
 
     const oldStatus = shipment.status;
-    const inventoryUpdates: Array<{ variantId: string; warehouseId: string; quantity: number }> = [];
+    const inventoryUpdates: Array<{
+      variantId: string;
+      warehouseId: string;
+      quantity: number;
+    }> = [];
     const cargoUpdateData: Prisma.CargoShipmentUpdateInput = { status };
 
     // 1. Handle Origin Deduction (Moving away from PREPARING)
     if (status !== 'PREPARING' && !shipment.originDeducted) {
       for (const item of shipment.items) {
-        const inventory = await this.logisticsRepository.findInventory(item.variantId, shipment.originId);
+        const inventory = await this.logisticsRepository.findInventory(
+          item.variantId,
+          shipment.originId,
+        );
         if (!inventory || inventory.quantity < item.quantity) {
-          throw new BadRequestException(`Insufficient stock for variant ${item.variantId} in origin warehouse`);
+          throw new BadRequestException(
+            `Insufficient stock for variant ${item.variantId} in origin warehouse`,
+          );
         }
-        inventoryUpdates.push({ 
-          variantId: item.variantId, 
-          warehouseId: shipment.originId, 
-          quantity: -item.quantity 
+        inventoryUpdates.push({
+          variantId: item.variantId,
+          warehouseId: shipment.originId,
+          quantity: -item.quantity,
         });
       }
       cargoUpdateData.originDeducted = true;
@@ -94,10 +121,10 @@ export class LogisticsService {
     // 2. Handle Destination Addition (Marking as COMPLETED)
     if (status === 'COMPLETED' && !shipment.destinationAdded) {
       for (const item of shipment.items) {
-        inventoryUpdates.push({ 
-          variantId: item.variantId, 
-          warehouseId: shipment.destinationId, 
-          quantity: item.quantity 
+        inventoryUpdates.push({
+          variantId: item.variantId,
+          warehouseId: shipment.destinationId,
+          quantity: item.quantity,
         });
       }
       cargoUpdateData.destinationAdded = true;
@@ -106,7 +133,11 @@ export class LogisticsService {
 
     let result: any;
     if (inventoryUpdates.length > 0) {
-      result = await this.logisticsRepository.updateCargoWithInventory(id, cargoUpdateData, inventoryUpdates);
+      result = await this.logisticsRepository.updateCargoWithInventory(
+        id,
+        cargoUpdateData,
+        inventoryUpdates,
+      );
     } else {
       result = await this.logisticsRepository.updateCargo(id, cargoUpdateData);
     }

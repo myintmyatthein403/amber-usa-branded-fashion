@@ -1,10 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UsePipes } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { BrandsService } from './brands.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { BrandSchema } from '@amber/shared';
+import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
 
 @Controller('brands')
 export class BrandsController {
@@ -14,7 +25,7 @@ export class BrandsController {
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
   @UsePipes(new ZodValidationPipe(BrandSchema))
-  create(@Body() createBrandDto: any) {
+  create(@Body() createBrandDto: CreateBrandDto) {
     return this.brandsService.createBrand(createBrandDto);
   }
 
@@ -32,7 +43,7 @@ export class BrandsController {
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
   @UsePipes(new ZodValidationPipe(BrandSchema.partial()))
-  update(@Param('id') id: string, @Body() updateBrandDto: any) {
+  update(@Param('id') id: string, @Body() updateBrandDto: UpdateBrandDto) {
     return this.brandsService.updateBrand(id, updateBrandDto);
   }
 

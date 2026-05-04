@@ -1,11 +1,19 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useFetch, useDelete } from '../../../hooks/useCrud';
 import { apiService } from '../../../services/api.service';
 import { API_ROUTES } from '../../../config/constants';
 import { Role, CreateRoleInput } from '../schema';
 
 export const useRoles = () => {
-  const { data: roles, loading, refresh } = useFetch<Role>(API_ROUTES.ROLES.BASE);
+  const { data: rawData, loading, refresh } = useFetch<any>(API_ROUTES.ROLES.BASE);
+  
+  // Debug: Inspect what data we're getting
+  useEffect(() => {
+    console.log("DEBUG: rawData from useFetch<any>:", rawData);
+  }, [rawData]);
+
+  const roles = Array.isArray(rawData) ? rawData : (rawData?.data ? (Array.isArray(rawData.data) ? rawData.data : []) : []);
+
   const { deleteItem } = useDelete(API_ROUTES.ROLES.BASE);
   
   const [modalOpen, setModalOpen] = useState(false);

@@ -17,14 +17,17 @@ export class SettingsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch()
-  updateSettings(@Body() data: { 
-    privacyPolicy?: string; 
-    termsConditions?: string; 
-    usdToMmkRate?: number;
-    stripePublishableKey?: string;
-    stripeSecretKey?: string;
-    stripeWebhookSecret?: string;
-  }) {
+  updateSettings(
+    @Body()
+    data: {
+      privacyPolicy?: string;
+      termsConditions?: string;
+      usdToMmkRate?: number;
+      stripePublishableKey?: string;
+      stripeSecretKey?: string;
+      stripeWebhookSecret?: string;
+    },
+  ) {
     return this.settingsService.updateSettings(data);
   }
 }

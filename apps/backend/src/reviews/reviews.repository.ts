@@ -17,7 +17,7 @@ export class ReviewsRepository {
           select: {
             id: true,
             name: true,
-          }
+          },
         },
       },
       orderBy: { createdAt: 'desc' },

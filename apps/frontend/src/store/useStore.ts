@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { Product } from "@amber/shared";
 
 export interface CartItem {
   id: number | string;
@@ -8,12 +9,12 @@ export interface CartItem {
   variantId?: string;
   price: number;
   originalPrice?: number;
+  isUsdPrice?: boolean;
+  onSale?: boolean;
   image: string;
   quantity: number;
   size?: string;
   color?: string;
-  onSale?: boolean;
-  isUsdPrice?: boolean;
   isPreOrder?: boolean;
   expectedShippingDate?: string;
 }
@@ -23,7 +24,16 @@ interface AppState {
   cartItems: CartItem[];
   isCartOpen: boolean;
   isCartAnimating: boolean;
-  addToCart: (product: any, size?: string, variantId?: string, isPreOrder?: boolean, expectedShippingDate?: string, color?: string, price?: number, image?: string) => void;
+  addToCart: (
+    product: Product, 
+    size?: string, 
+    variantId?: string, 
+    isPreOrder?: boolean, 
+    expectedShippingDate?: string, 
+    color?: string, 
+    price?: number, 
+    image?: string
+  ) => void;
   removeFromCart: (id: number | string, size?: string, variantId?: string) => void;
   updateQuantity: (id: number | string, size: string | undefined, delta: number, variantId?: string) => void;
   clearCart: () => void;
@@ -38,10 +48,10 @@ interface AppState {
   convertPrice: (price: number, fromUsd: boolean) => number;
 
   // Comparison State
-  compareList: any[];
+  compareList: Product[];
   isCompareDrawerOpen: boolean;
   isCompareModalOpen: boolean;
-  addToCompare: (product: any) => void;
+  addToCompare: (product: Product) => void;
   removeFromCompare: (id: number | string) => void;
   clearCompare: () => void;
   setCompareDrawerOpen: (open: boolean) => void;
@@ -50,10 +60,10 @@ interface AppState {
   // UI States
   isSearchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
-  selectedQuickViewProduct: any | null;
-  setQuickViewProduct: (product: any | null) => void;
+  selectedQuickViewProduct: Product | null;
+  setQuickViewProduct: (product: Product | null) => void;
   
-  // Computed values (handled as functions or derived in components)
+  // Computed values
   getCartCount: () => number;
   getSubtotal: () => number;
   getDeliveryFee: () => number;
@@ -68,43 +78,47 @@ export const useStore = create<AppState>()(
       isCartOpen: false,
       isCartAnimating: false,
       setCartOpen: (open) => set({ isCartOpen: open }),
-      addToCart: (product: any, size?: string, variantId?: string, isPreOrder?: boolean, expectedShippingDate?: string, color?: string, price?: number, image?: string) => {
-    const cartItems = get().cartItems;
-    const existingItem = cartItems.find((item) => 
-      item.id === product.id && 
-      (variantId && item.variantId ? item.variantId === variantId : item.size === size && item.color === color)
-    );
-    
-    let newItems;
-    if (existingItem) {
-      newItems = cartItems.map((item) =>
-        item.id === product.id && (variantId && item.variantId ? item.variantId === variantId : item.size === size && item.color === color)
-          ? { ...item, quantity: item.quantity + 1, isPreOrder, expectedShippingDate }
-          : item
-      );
-    } else {
-      const cartItem: CartItem = { 
-        ...product, 
-        quantity: 1, 
-        size, 
-        variantId, 
-        isPreOrder, 
-        expectedShippingDate,
-        color: color || product.color,
-        price: price !== undefined ? price : product.price,
-        image: image || product.image
-      };
-      newItems = [...cartItems, cartItem];
-    }
+      addToCart: (product, size, variantId, isPreOrder, expectedShippingDate, color, price, image) => {
+        const cartItems = get().cartItems;
+        const existingItem = cartItems.find((item) => 
+          item.id === product.id && 
+          (variantId && item.variantId ? item.variantId === variantId : item.size === size && item.color === color)
+        );
+        
+        let newItems: CartItem[];
+        if (existingItem) {
+          newItems = cartItems.map((item) =>
+            item.id === product.id && (variantId && item.variantId ? item.variantId === variantId : item.size === size && item.color === color)
+              ? { ...item, quantity: item.quantity + 1, isPreOrder, expectedShippingDate }
+              : item
+          );
+        } else {
+          const cartItem: CartItem = { 
+            id: product.id!,
+            name: product.name,
+            category: product.category?.name,
+            quantity: 1, 
+            size, 
+            variantId, 
+            isPreOrder, 
+            expectedShippingDate,
+            color: color || product.color,
+            price: price !== undefined ? price : Number(product.price),
+            image: image || product.images[0],
+            isUsdPrice: product.isUsdPrice,
+            onSale: product.onSale
+          };
+          newItems = [...cartItems, cartItem];
+        }
 
-    set({ 
-      cartItems: newItems,
-      isCartAnimating: true,
-      isCartOpen: true
-    });
-    
-    setTimeout(() => set({ isCartAnimating: false }), 1000);
-  },
+        set({ 
+          cartItems: newItems,
+          isCartAnimating: true,
+          isCartOpen: true
+        });
+        
+        setTimeout(() => set({ isCartAnimating: false }), 1000);
+      },
       removeFromCart: (id, size, variantId) => {
         set({
           cartItems: get().cartItems.filter((item) => {
@@ -206,8 +220,8 @@ export const useStore = create<AppState>()(
       getSubtotal: () => {
         const { cartItems, currency, exchangeRate } = get();
         return cartItems.reduce((acc, item) => {
-          const itemPrice = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
-          const itemIsUsd = item.isUsdPrice !== false; // Default to true if undefined
+          const itemPrice = item.price;
+          const itemIsUsd = item.isUsdPrice !== false;
 
           let convertedPrice = itemPrice;
           if (itemIsUsd && currency === 'MMK') {
@@ -222,7 +236,6 @@ export const useStore = create<AppState>()(
       getDeliveryFee: () => {
         const { cartItems, currency, exchangeRate } = get();
         
-        // If cart is empty or only contains gift cards/digital items, delivery is free
         const hasPhysicalItems = cartItems.some(item => item.category !== 'Gift Card' && item.size !== 'Digital');
         
         if (!hasPhysicalItems || cartItems.length === 0) {

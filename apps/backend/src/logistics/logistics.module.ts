@@ -13,4 +13,3 @@ import { LogisticsListener } from './logistics.listener';
   exports: [LogisticsService, LogisticsRepository],
 })
 export class LogisticsModule {}
-

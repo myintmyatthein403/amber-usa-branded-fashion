@@ -33,7 +33,7 @@ export class CouponsService {
   async remove(id: string): Promise<Coupon> {
     const coupon = await this.couponsRepository.findById(id);
     if (!coupon) throw new NotFoundException(`Coupon with ID ${id} not found`);
-    
+
     return this.couponsRepository.delete(id);
   }
 }

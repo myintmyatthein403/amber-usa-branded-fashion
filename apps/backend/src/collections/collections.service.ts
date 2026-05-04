@@ -10,12 +10,14 @@ export class CollectionsService {
   async create(data: any) {
     const sanitizedData = sanitizeData(data);
     const { productIds, ...rest } = sanitizedData;
-    
+
     const createData: Prisma.CollectionCreateInput = {
       ...rest,
-      products: productIds ? {
-        connect: productIds.map((id: string) => ({ id })),
-      } : undefined,
+      products: productIds
+        ? {
+            connect: productIds.map((id: string) => ({ id })),
+          }
+        : undefined,
     };
 
     return this.collectionsRepository.create(createData);
@@ -27,23 +29,26 @@ export class CollectionsService {
 
   async findOne(id: string) {
     const collection = await this.collectionsRepository.findById(id);
-    if (!collection) throw new NotFoundException(`Collection with ID ${id} not found`);
+    if (!collection)
+      throw new NotFoundException(`Collection with ID ${id} not found`);
     return collection;
   }
 
   async findBySlug(slug: string) {
     const collection = await this.collectionsRepository.findBySlug(slug);
-    if (!collection) throw new NotFoundException(`Collection with slug ${slug} not found`);
+    if (!collection)
+      throw new NotFoundException(`Collection with slug ${slug} not found`);
     return collection;
   }
 
   async update(id: string, data: any) {
     const collection = await this.collectionsRepository.findById(id);
-    if (!collection) throw new NotFoundException(`Collection with ID ${id} not found`);
+    if (!collection)
+      throw new NotFoundException(`Collection with ID ${id} not found`);
 
     const sanitizedData = sanitizeData(data);
     const { productIds, ...rest } = sanitizedData;
-    
+
     const updateData: Prisma.CollectionUpdateInput = { ...rest };
 
     if (productIds !== undefined) {
@@ -57,8 +62,9 @@ export class CollectionsService {
 
   async remove(id: string) {
     const collection = await this.collectionsRepository.findById(id);
-    if (!collection) throw new NotFoundException(`Collection with ID ${id} not found`);
-    
+    if (!collection)
+      throw new NotFoundException(`Collection with ID ${id} not found`);
+
     return this.collectionsRepository.delete(id);
   }
 }

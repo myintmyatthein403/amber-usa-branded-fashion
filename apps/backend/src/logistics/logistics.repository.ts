@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Warehouse, Inventory, CargoShipment, CargoStatus, Prisma } from '@prisma/client';
+import {
+  Warehouse,
+  Inventory,
+  CargoShipment,
+  CargoStatus,
+  Prisma,
+} from '@prisma/client';
 
 @Injectable()
 export class LogisticsRepository {
@@ -11,9 +17,9 @@ export class LogisticsRepository {
     return this.prisma.warehouse.findMany({
       include: {
         _count: {
-          select: { inventory: true }
-        }
-      }
+          select: { inventory: true },
+        },
+      },
     });
   }
 
@@ -30,60 +36,64 @@ export class LogisticsRepository {
     return this.prisma.inventory.findMany({
       include: {
         warehouse: true,
-        variant: { include: { product: true } }
+        variant: { include: { product: true } },
       },
       orderBy: [
         { variant: { productId: 'asc' } },
-        { warehouse: { location: 'asc' } }
-      ]
+        { warehouse: { location: 'asc' } },
+      ],
     });
   }
 
   async findInventoryByVariant(variantId: string) {
     return this.prisma.inventory.findMany({
       where: { variantId },
-      include: { warehouse: true }
+      include: { warehouse: true },
     });
   }
 
   async findInventoryByWarehouse(warehouseId: string) {
     return this.prisma.inventory.findMany({
       where: { warehouseId },
-      include: { 
+      include: {
         variant: {
-          include: { product: true }
-        }
-      }
+          include: { product: true },
+        },
+      },
     });
   }
 
   async findInventory(variantId: string, warehouseId: string) {
     return this.prisma.inventory.findUnique({
       where: {
-        variantId_warehouseId: { variantId, warehouseId }
-      }
+        variantId_warehouseId: { variantId, warehouseId },
+      },
     });
   }
 
-  async upsertInventory(variantId: string, warehouseId: string, quantity: number) {
+  async upsertInventory(
+    variantId: string,
+    warehouseId: string,
+    quantity: number,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const inventory = await tx.inventory.upsert({
         where: {
-          variantId_warehouseId: { variantId, warehouseId }
+          variantId_warehouseId: { variantId, warehouseId },
         },
         update: { quantity },
-        create: { variantId, warehouseId, quantity }
+        create: { variantId, warehouseId, quantity },
       });
 
       // Update global stock summary in Variant model
       const totalStock = await tx.inventory.aggregate({
         where: { variantId },
-        _sum: { quantity: true }
+        _sum: { quantity: true },
       });
 
       await tx.variant.update({
         where: { id: variantId },
-        data: { stock: totalStock._sum.quantity || 0 }
+        data: { stock: totalStock._sum.quantity || 0 },
       });
 
       return inventory;
@@ -103,15 +113,15 @@ export class LogisticsRepository {
         items: {
           create: data.items.map((item: any) => ({
             variantId: item.variantId,
-            quantity: item.quantity
-          }))
-        }
+            quantity: item.quantity,
+          })),
+        },
       },
       include: {
         items: { include: { variant: true } },
         origin: true,
-        destination: true
-      }
+        destination: true,
+      },
     });
   }
 
@@ -120,9 +130,9 @@ export class LogisticsRepository {
       include: {
         origin: true,
         destination: true,
-        _count: { select: { items: true } }
+        _count: { select: { items: true } },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -135,11 +145,11 @@ export class LogisticsRepository {
         items: {
           include: {
             variant: {
-              include: { product: true }
-            }
-          }
-        }
-      }
+              include: { product: true },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -150,43 +160,47 @@ export class LogisticsRepository {
       include: {
         items: true,
         origin: true,
-        destination: true
-      }
+        destination: true,
+      },
     });
   }
 
   async updateCargoWithInventory(
-    id: string, 
+    id: string,
     cargoData: Prisma.CargoShipmentUpdateInput,
-    inventoryUpdates: Array<{ variantId: string; warehouseId: string; quantity: number }>
+    inventoryUpdates: Array<{
+      variantId: string;
+      warehouseId: string;
+      quantity: number;
+    }>,
   ) {
     return this.prisma.$transaction(async (tx) => {
       // 1. Update Inventory
       for (const update of inventoryUpdates) {
         await tx.inventory.upsert({
           where: {
-            variantId_warehouseId: { 
-              variantId: update.variantId, 
-              warehouseId: update.warehouseId 
-            }
+            variantId_warehouseId: {
+              variantId: update.variantId,
+              warehouseId: update.warehouseId,
+            },
           },
           update: { quantity: { increment: update.quantity } },
-          create: { 
-            variantId: update.variantId, 
-            warehouseId: update.warehouseId, 
-            quantity: Math.max(0, update.quantity) 
-          }
+          create: {
+            variantId: update.variantId,
+            warehouseId: update.warehouseId,
+            quantity: Math.max(0, update.quantity),
+          },
         });
 
         // Update Variant global stock
         const totalStock = await tx.inventory.aggregate({
           where: { variantId: update.variantId },
-          _sum: { quantity: true }
+          _sum: { quantity: true },
         });
 
         await tx.variant.update({
           where: { id: update.variantId },
-          data: { stock: totalStock._sum.quantity || 0 }
+          data: { stock: totalStock._sum.quantity || 0 },
         });
       }
 
@@ -197,8 +211,8 @@ export class LogisticsRepository {
         include: {
           items: true,
           origin: true,
-          destination: true
-        }
+          destination: true,
+        },
       });
     });
   }

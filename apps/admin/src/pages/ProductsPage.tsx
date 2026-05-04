@@ -6,7 +6,8 @@ import {
   List, 
   Search, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  AlertTriangle 
 } from 'lucide-react';
 import { Modal } from '../components/admin/Modal';
 import { MediaSelector } from '../components/admin/MediaSelector';
@@ -56,6 +57,9 @@ export const ProductsPage: React.FC = () => {
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [mediaTarget, setMediaTarget] = React.useState<'product' | 'variant'>('product');
   const [replacingImageIndex, setReplacingImageIndex] = React.useState<number | null>(null);
+  
+  // Custom delete confirmation state
+  const [deleteId, setDeleteId] = React.useState<string | null>(null);
 
   const handleMediaSelect = (url: string) => {
     if (mediaTarget === 'product') {
@@ -86,6 +90,13 @@ export const ProductsPage: React.FC = () => {
   const openVariantMedia = () => {
     setMediaTarget('variant');
     setMediaSelectorOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteId) {
+      await handleDelete(deleteId); // Use the handle function from hook
+      setDeleteId(null);
+    }
   };
 
   return (
@@ -147,13 +158,13 @@ export const ProductsPage: React.FC = () => {
             <ProductGridView 
               products={products} 
               onEdit={openEditModal} 
-              onDelete={handleDelete} 
+              onDelete={(id) => setDeleteId(id)} 
             />
           ) : (
             <ProductListView 
               products={products} 
               onEdit={openEditModal} 
-              onDelete={handleDelete} 
+              onDelete={(id) => setDeleteId(id)} 
             />
           )}
 
@@ -185,6 +196,22 @@ export const ProductsPage: React.FC = () => {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Product" size="sm">
+        <div className="space-y-6">
+          <div className="flex items-center gap-4 text-destructive">
+             <AlertTriangle size={32} />
+             <h4 className="text-sm font-bold uppercase tracking-widest">Confirm Permanent Removal</h4>
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">Are you absolutely sure you want to delete this product? This action cannot be undone, and all associated inventory variants will be wiped.</p>
+          <div className="flex gap-4 pt-4">
+            <button onClick={() => setDeleteId(null)} className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border border-border hover:border-primary transition-colors">Cancel</button>
+            <button onClick={confirmDelete} className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">Permanent Delete</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Product Modal */}
       <Modal 
         isOpen={modalOpen} 
         onClose={() => setModalOpen(false)} 
@@ -221,6 +248,7 @@ export const ProductsPage: React.FC = () => {
             submitting={submitting}
             editingProduct={editingProduct}
             onOpenMedia={openProductMedia}
+            collections={null}
           />
         ) : (
           <VariantManager 

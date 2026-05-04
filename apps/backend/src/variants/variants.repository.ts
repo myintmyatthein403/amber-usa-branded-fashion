@@ -9,11 +9,11 @@ export class VariantsRepository {
   async create(data: any): Promise<Variant> {
     const { warehouseId, ...variantData } = data;
     return this.prisma.$transaction(async (tx) => {
-      const variant = await tx.variant.create({ 
+      const variant = await tx.variant.create({
         data: {
           ...variantData,
-          stock: variantData.stock || 0
-        }
+          stock: variantData.stock || 0,
+        },
       });
 
       if (warehouseId && variant.stock > 0) {
@@ -21,8 +21,8 @@ export class VariantsRepository {
           data: {
             variantId: variant.id,
             warehouseId: warehouseId,
-            quantity: variant.stock
-          }
+            quantity: variant.stock,
+          },
         });
       }
 
@@ -32,21 +32,21 @@ export class VariantsRepository {
 
   async findAll(productId?: string): Promise<Variant[]> {
     if (productId) {
-      return this.prisma.variant.findMany({ 
+      return this.prisma.variant.findMany({
         where: { productId },
-        orderBy: { size: 'asc' }
+        orderBy: { size: 'asc' },
       });
     }
-    return this.prisma.variant.findMany({ 
+    return this.prisma.variant.findMany({
       include: { product: true },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async findById(id: string) {
-    return this.prisma.variant.findUnique({ 
+    return this.prisma.variant.findUnique({
       where: { id },
-      include: { inventory: true, product: true }
+      include: { inventory: true, product: true },
     });
   }
 
@@ -56,25 +56,30 @@ export class VariantsRepository {
       where: { id },
       data: {
         ...rest,
-        ...(stock !== undefined ? { stock } : {})
-      }
+        ...(stock !== undefined ? { stock } : {}),
+      },
     });
   }
 
-  async updateWithInventory(id: string, data: any, inventoryId: string, stock: number): Promise<Variant> {
+  async updateWithInventory(
+    id: string,
+    data: any,
+    inventoryId: string,
+    stock: number,
+  ): Promise<Variant> {
     const { ...rest } = data;
     return this.prisma.$transaction(async (tx) => {
       await tx.inventory.update({
         where: { id: inventoryId },
-        data: { quantity: stock }
+        data: { quantity: stock },
       });
 
-      return tx.variant.update({ 
-        where: { id }, 
+      return tx.variant.update({
+        where: { id },
         data: {
           ...rest,
-          stock
-        } 
+          stock,
+        },
       });
     });
   }

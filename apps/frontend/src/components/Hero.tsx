@@ -19,8 +19,12 @@ interface HeroData {
   imageSecondary: string;
 }
 
+interface ResponseData {
+  data: HeroData;
+}
+
 export default function Hero() {
-  const [data, setData] = useState<HeroData | null>(null);
+  const [data, setData] = useState<ResponseData | null>(null);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/hero/active`)
@@ -66,12 +70,12 @@ export default function Hero() {
             transition={{ duration: 0.8 }}
           >
             <span className="text-[#D4AF37] font-sans font-semibold tracking-[0.3em] uppercase text-[10px]">
-              {data.badge}
+              {data.data.badge}
             </span>
             <h1 className="mt-4 text-5xl md:text-8xl font-serif text-[#1A1A1A] leading-[1.1] md:leading-[0.9]">
-              {data.titlePartOne} <br />
-              <span className={data.titleItalic ? "italic text-[#D4AF37]" : "text-[#D4AF37]"}>
-                {data.titlePartTwo}
+              {data.data.titlePartOne} <br />
+              <span className={data.data.titleItalic ? "italic text-[#D4AF37]" : "text-[#D4AF37]"}>
+                {data.data.titlePartTwo}
               </span>
             </h1>
           </motion.div>
@@ -82,7 +86,7 @@ export default function Hero() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="text-[#1A1A1A]/70 max-w-md text-lg leading-relaxed font-sans"
           >
-            {data.description}
+            {data.data.description}
           </motion.p>
 
           <motion.div
@@ -91,14 +95,14 @@ export default function Hero() {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="flex flex-col sm:flex-row gap-4"
           >
-            <Link href={data.ctaPrimaryLink}>
+            <Link href={data?.data?.ctaPrimaryLink || '#'}>
               <button className="w-full sm:w-auto bg-[#1A1A1A] text-white px-8 py-4 uppercase tracking-widest text-xs font-semibold hover:bg-[#D4AF37] transition-all duration-300 transform hover:-translate-y-1">
-                {data.ctaPrimaryText}
+                {data.data.ctaPrimaryText}
               </button>
             </Link>
-            <Link href={data.ctaSecondaryLink}>
+            <Link href={data?.data?.ctaSecondaryLink || '#'}>
               <button className="w-full sm:w-auto border border-[#1A1A1A]/20 text-[#1A1A1A] px-8 py-4 uppercase tracking-widest text-xs font-semibold hover:border-[#D4AF37] transition-all duration-300 transform hover:-translate-y-1">
-                {data.ctaSecondaryText}
+                {data.data.ctaSecondaryText}
               </button>
             </Link>
           </motion.div>
@@ -106,30 +110,32 @@ export default function Hero() {
 
         {/* Right: Image Gallery/Composition */}
         <div className="relative h-[500px] md:h-[600px] flex items-center justify-center">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9, rotate: -5 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
-            className="relative w-[280px] md:w-[350px] h-[400px] md:h-[500px] shadow-2xl overflow-hidden rounded-sm"
-          >
-            <Image 
-              src={data.imageMain} 
-              alt="Hero Primary"
-              fill
-              className="object-cover"
-              priority
-            />
-          </motion.div>
+          {data.data.imageMain && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, rotate: -5 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ duration: 1.2, ease: "easeOut" }}
+              className="relative w-[280px] md:w-[350px] h-[400px] md:h-[500px] shadow-2xl overflow-hidden rounded-sm"
+            >
+              <Image 
+                src={data.data.imageMain} 
+                alt="Hero Primary"
+                fill
+                className="object-cover"
+                priority
+              />
+            </motion.div>
+          )}
 
-          {data.imageSecondary && (
+          {data.data.imageSecondary && (
             <motion.div 
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 1.2, delay: 0.3 }}
-              className="absolute -bottom-5 md:-bottom-10 -left-5 md:-left-10 w-[150px] md:[200px] h-[200px] md:h-[250px] shadow-xl overflow-hidden rounded-sm border-4 md:border-8 border-white z-20"
+              className="absolute -bottom-5 md:-bottom-10 -left-5 md:-left-10 w-[150px] md:w-[200px] h-[200px] md:h-[250px] shadow-xl overflow-hidden rounded-sm border-4 md:border-8 border-white z-20"
             >
               <Image 
-                src={data.imageSecondary} 
+                src={data.data.imageSecondary} 
                 alt="Hero Secondary"
                 fill
                 className="object-cover"

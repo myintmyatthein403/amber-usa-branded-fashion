@@ -9,11 +9,7 @@ import { useState, useEffect } from "react";
 import Price from "./Price";
 
 export default function CompareDrawer() {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [mounted, setMounted] = useState(typeof window !== 'undefined');
 
   const compareList = useStore((state) => state.compareList);
   const isCompareDrawerOpen = useStore((state) => state.isCompareDrawerOpen);

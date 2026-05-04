@@ -1,51 +1,47 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { HeroSection } from '@prisma/client';
+import { HeroRepository } from './hero.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class HeroService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly heroRepository: HeroRepository) {}
 
-  async create(data: any) {
-    if (data.isActive) {
-      await this.prisma.heroSection.updateMany({
-        where: { isActive: true },
-        data: { isActive: false },
-      });
+  async create(data: any): Promise<HeroSection> {
+    const sanitizedData = sanitizeData(data);
+    if (sanitizedData.isActive) {
+      await this.heroRepository.deactivateAll();
     }
-    return this.prisma.heroSection.create({ data });
+    return this.heroRepository.create(sanitizedData);
   }
 
-  async findAll() {
-    return this.prisma.heroSection.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(): Promise<HeroSection[]> {
+    return this.heroRepository.findAll();
   }
 
-  async findActive() {
-    return this.prisma.heroSection.findFirst({
-      where: { isActive: true },
-    });
+  async findActive(): Promise<HeroSection | null> {
+    return this.heroRepository.findActive();
   }
 
-  async update(id: string, data: any) {
-    if (data.isActive) {
-      await this.prisma.heroSection.updateMany({
-        where: { 
-          isActive: true,
-          NOT: { id }
-        },
-        data: { isActive: false },
-      });
+  async findOne(id: string): Promise<HeroSection> {
+    const hero = await this.heroRepository.findById(id);
+    if (!hero) {
+      throw new NotFoundException(`Hero section with ID ${id} not found`);
     }
-    return this.prisma.heroSection.update({
-      where: { id },
-      data,
-    });
+    return hero;
   }
 
-  async remove(id: string) {
-    return this.prisma.heroSection.delete({
-      where: { id },
-    });
+  async update(id: string, data: any): Promise<HeroSection> {
+    await this.findOne(id);
+    const sanitizedData = sanitizeData(data);
+    if (sanitizedData.isActive) {
+      await this.heroRepository.deactivateOthers(id);
+    }
+    return this.heroRepository.update(id, sanitizedData);
+  }
+
+  async remove(id: string): Promise<HeroSection> {
+    await this.findOne(id);
+    return this.heroRepository.delete(id);
   }
 }

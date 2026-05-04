@@ -15,21 +15,25 @@ interface CommunityPostData {
   likes: number;
 }
 
+interface ResponseData {
+  data: CommunityPostData[];
+}
+
 export default function ReviewCommunity() {
-  const [posts, setPosts] = useState<CommunityPostData[]>([]);
+  const [posts, setPosts] = useState<ResponseData | null>(null);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/community-posts/active`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          setPosts(data);
+          setPosts({ data });
         }
       })
       .catch(console.error);
   }, []);
 
-  if (posts.length === 0) return null;
+  if (!posts || posts.data.length === 0) return null;
 
   return (
     <section className="py-32 px-6 md:px-12 bg-[#FDFDFD]">
@@ -53,7 +57,7 @@ export default function ReviewCommunity() {
 
         {/* Community Grid (Masonry-like) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {posts.map((post, idx) => (
+          {posts?.data.map((post, idx) => (
             <motion.div
               key={post.id}
               initial={{ opacity: 0, y: 20 }}

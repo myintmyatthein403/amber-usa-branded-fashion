@@ -2,22 +2,23 @@ import React from 'react';
 import { Plus, Edit2, Trash2, BarChart3, Search, AlertCircle, ChevronLeft, Save, Image as ImageIcon, X, Link as LinkIcon } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Variant } from '../schema';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Variant } from '@amber/shared';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 interface VariantManagerProps {
-  newVariant: any;
-  setNewVariant: (variant: any) => void;
+  newVariant: Partial<Variant>;
+  setNewVariant: (variant: Partial<Variant>) => void;
   editingVariant: Variant | null;
   setEditingVariant: (variant: Variant | null) => void;
   addVariant: () => void;
   currentVariants: Variant[];
   handleEditVariant: (variant: Variant) => void;
   handleDeleteVariant: (id: string) => void;
-  warehouses: any[];
+  warehouses: any;
   setStep: (step: number) => void;
   onSave: () => void;
   submitting?: boolean;
@@ -40,11 +41,13 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
   onOpenMedia
 }) => {
   const [urlInput, setUrlInput] = React.useState('');
+  
+  const warehouseList = warehouses?.data || warehouses || [];
 
   const removeImage = (index: number) => {
     setNewVariant({
       ...newVariant,
-      images: newVariant.images.filter((_: any, i: number) => i !== index)
+      images: (newVariant.images || []).filter((_, i) => i !== index)
     });
   };
 
@@ -94,7 +97,7 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
           </div>
           
           <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-            {(newVariant.images || []).map((url: string, index: number) => (
+            {(newVariant.images || []).map((url, index) => (
               <div key={index} className="group relative aspect-square bg-background border border-border overflow-hidden rounded-sm">
                 <img src={url} alt={`Variant ${index}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                 <button 
@@ -120,36 +123,36 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <div className="space-y-2">
              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Unique SKU</label>
-             <input type="text" placeholder="AMB-SKU-001" value={newVariant.sku} onChange={(e) => setNewVariant({...newVariant, sku: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300" />
+             <input type="text" placeholder="AMB-SKU-001" value={newVariant.sku || ''} onChange={(e) => setNewVariant({...newVariant, sku: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
           <div className="space-y-2">
              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Barcode (UPC/EAN)</label>
-             <input type="text" placeholder="88012345..." value={newVariant.barcode} onChange={(e) => setNewVariant({...newVariant, barcode: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300" />
+             <input type="text" placeholder="88012345..." value={newVariant.barcode || ''} onChange={(e) => setNewVariant({...newVariant, barcode: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
           <div className="space-y-2">
              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Size</label>
-             <input type="text" placeholder="e.g. XL" value={newVariant.size} onChange={(e) => setNewVariant({...newVariant, size: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
+             <input type="text" placeholder="e.g. XL" value={newVariant.size || ''} onChange={(e) => setNewVariant({...newVariant, size: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
           <div className="space-y-2">
              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Color</label>
-             <input type="text" placeholder="e.g. Ivory" value={newVariant.color} onChange={(e) => setNewVariant({...newVariant, color: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
+             <input type="text" placeholder="e.g. Ivory" value={newVariant.color || ''} onChange={(e) => setNewVariant({...newVariant, color: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="space-y-2">
              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Stock Level</label>
-             <input type="number" value={newVariant.stock} onChange={(e) => setNewVariant({...newVariant, stock: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
+             <input type="number" value={newVariant.stock || 0} onChange={(e) => setNewVariant({...newVariant, stock: parseInt(e.target.value)})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
           {!editingVariant && (
             <div className="space-y-2">
                <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Warehouse Target</label>
                <select 
-                 value={newVariant.warehouseId} 
+                 value={newVariant.warehouseId || ''} 
                  onChange={(e) => setNewVariant({...newVariant, warehouseId: e.target.value})}
                  className="w-full h-10 border-b border-input bg-transparent px-0 text-[10px] font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors duration-300 rounded-none cursor-pointer"
                >
                   <option value="">Select Warehouse</option>
-                  {warehouses.map((w: any) => (
+                  {warehouseList.map((w: any) => (
                     <option key={w.id} value={w.id}>{w.name} ({w.location})</option>
                   ))}
                </select>
@@ -157,21 +160,21 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
           )}
           <div className="space-y-2">
              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Low Stock Alert</label>
-             <input type="number" value={newVariant.lowStockThreshold} onChange={(e) => setNewVariant({...newVariant, lowStockThreshold: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
+             <input type="number" value={newVariant.lowStockThreshold || 5} onChange={(e) => setNewVariant({...newVariant, lowStockThreshold: parseInt(e.target.value)})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
           <div className="space-y-2">
              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Weight (kg)</label>
-             <input type="number" step="0.01" value={newVariant.weight} onChange={(e) => setNewVariant({...newVariant, weight: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
+             <input type="number" step="0.01" value={newVariant.weight || 0} onChange={(e) => setNewVariant({...newVariant, weight: parseFloat(e.target.value)})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
         </div>
         <div className="flex justify-end gap-4">
           {editingVariant && (
             <button type="button" onClick={() => {
               setEditingVariant(null);
-              setNewVariant({ sku: '', barcode: '', size: '', color: '', stock: '0', lowStockThreshold: '5', price: '', compareAtPrice: '', weight: '0', images: [], warehouseId: '' });
+              setNewVariant({ sku: '', size: '', color: '', stock: '0', lowStockThreshold: '5', images: [] });
             }} className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground px-4">Cancel Edit</button>
           )}
-          <button type="button" onClick={addVariant} disabled={!newVariant.sku || !newVariant.size || (!editingVariant && parseInt(newVariant.stock) > 0 && !newVariant.warehouseId)} className="bg-foreground text-primary-foreground px-8 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-lg shadow-black/5">
+          <button type="button" onClick={addVariant} disabled={!newVariant.sku || !newVariant.size || (!editingVariant && (newVariant.stock || 0) > 0 && !newVariant.warehouseId)} className="bg-foreground text-primary-foreground px-8 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-lg shadow-black/5">
             {editingVariant ? 'Update Variant' : 'Confirm SKU Variant'}
           </button>
         </div>

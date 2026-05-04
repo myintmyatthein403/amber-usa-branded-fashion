@@ -29,7 +29,7 @@ export class AdsService {
   async update(id: string, data: any) {
     const ad = await this.adsRepository.findById(id);
     if (!ad) throw new NotFoundException(`Ad with ID ${id} not found`);
-    
+
     const sanitizedData = sanitizeData(data);
     return this.adsRepository.update(id, sanitizedData);
   }
@@ -37,7 +37,7 @@ export class AdsService {
   async remove(id: string) {
     const ad = await this.adsRepository.findById(id);
     if (!ad) throw new NotFoundException(`Ad with ID ${id} not found`);
-    
+
     return this.adsRepository.delete(id);
   }
 }

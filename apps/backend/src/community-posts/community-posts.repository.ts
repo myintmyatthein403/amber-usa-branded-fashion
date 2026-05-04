@@ -29,7 +29,10 @@ export class CommunityPostsRepository {
     });
   }
 
-  async update(id: string, data: Prisma.CommunityPostUpdateInput): Promise<CommunityPost> {
+  async update(
+    id: string,
+    data: Prisma.CommunityPostUpdateInput,
+  ): Promise<CommunityPost> {
     return this.prisma.communityPost.update({
       where: { id },
       data,

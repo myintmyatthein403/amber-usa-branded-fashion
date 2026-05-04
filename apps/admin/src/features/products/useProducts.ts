@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
-import { Product, Variant, Category, Brand, Sale, Meta } from './schema';
+import { Product, Variant, Category, Brand, Sale, Meta, Collection } from './schema';
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -25,6 +25,7 @@ export const useProducts = () => {
 
   const { data: categories } = useFetch<Category>(API_ROUTES.CATEGORIES.BASE);
   const { data: brands } = useFetch<Brand>(API_ROUTES.BRANDS.BASE);
+  const { data: collections } = useFetch<Collection>(API_ROUTES.COLLECTIONS.BASE);
   const { data: rawWarehouses } = useFetch<any>(API_ROUTES.LOGISTICS.WAREHOUSES);
   const { data: sales } = useFetch<Sale>(API_ROUTES.SALES.BASE);
   const { deleteItem } = useDelete(API_ROUTES.PRODUCTS.BASE);
@@ -82,7 +83,8 @@ export const useProducts = () => {
     preOrderNote: '',
     images: [] as string[],
     categoryId: '',
-    saleId: ''
+    saleId: '',
+    collectionIds: [] as string[]
   };
 
   const [productForm, setProductForm] = useState(initialProductForm);
@@ -171,15 +173,45 @@ export const useProducts = () => {
       
       const method = editingProduct ? 'PATCH' : 'POST';
       
+      // Explicitly pick only fields allowed by the schema to prevent 400 Bad Request
       const payload = {
-        ...productForm,
+        name: productForm.name,
+        slug: productForm.slug,
+        status: productForm.status || 'DRAFT',
+        brandId: productForm.brandId || undefined,
+        shortDescription: productForm.shortDescription || undefined,
+        description: productForm.description || undefined,
+        note: productForm.note || undefined,
+        tags: productForm.tags || [],
+        metaTitle: productForm.metaTitle || undefined,
+        metaDescription: productForm.metaDescription || undefined,
+        price: productForm.price?.toString(),
+        compareAtPrice: productForm.compareAtPrice?.toString() || undefined,
+        isUsdPrice: productForm.isUsdPrice ?? true,
+        isFeatured: productForm.isFeatured ?? false,
+        onSale: productForm.onSale ?? false,
+        isNewArrival: productForm.isNewArrival ?? false,
+        isBestSeller: productForm.isBestSeller ?? false,
+        isPreOrder: productForm.isPreOrder ?? false,
+        preOrderShippingDate: productForm.preOrderShippingDate || undefined,
+        preOrderNote: productForm.preOrderNote || undefined,
+        images: productForm.images || [],
+        categoryId: productForm.categoryId || undefined,
+        saleId: productForm.saleId || undefined,
+        collectionIds: productForm.collectionIds || [],
         variants: currentVariants.map(v => ({
-          ...v,
+          sku: v.sku,
+          barcode: v.barcode || undefined,
+          size: v.size,
+          color: v.color,
           stock: Number(v.stock),
-          lowStockThreshold: Number(v.lowStockThreshold),
+          lowStockThreshold: Number(v.lowStockThreshold || 5),
           price: v.price ? Number(v.price) : undefined,
           compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
-          weight: v.weight ? Number(v.weight) : undefined
+          weight: v.weight ? Number(v.weight) : undefined,
+          images: v.images || [],
+          isPreOrder: v.isPreOrder ?? false,
+          preOrderShippingDate: v.preOrderShippingDate || undefined
         }))
       };
 
@@ -246,7 +278,8 @@ export const useProducts = () => {
       preOrderNote: product.preOrderNote || '',
       images: product.images || [],
       categoryId: product.categoryId || '',
-      saleId: product.saleId || ''
+      saleId: product.saleId || '',
+      collectionIds: product.collections?.map(c => c.id) || []
     });
     setCurrentVariants(product.variants || []);
     setModalOpen(true);
@@ -269,6 +302,7 @@ export const useProducts = () => {
     setSearch,
     categories,
     brands,
+    collections,
     warehouses,
     sales,
     modalOpen,

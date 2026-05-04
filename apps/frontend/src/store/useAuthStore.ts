@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { Order } from '@amber/shared';
 
 interface User {
   id: string;
@@ -12,7 +13,7 @@ interface User {
   avatar: string | null;
   points: number;
   memberLevel: string;
-  orders?: any[];
+  orders?: Order[];
 }
 
 interface AuthState {

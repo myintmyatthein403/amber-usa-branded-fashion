@@ -31,9 +31,7 @@ export function useFetch<T>(endpoint: string, options: { immediate?: boolean } =
 export function useDelete(endpointBase: string) {
   const [deleting, setDeleting] = useState(false);
 
-  const deleteItem = async (id: number | string, confirmMessage = 'Are you sure you want to delete this?') => {
-    if (!confirm(confirmMessage)) return false;
-    
+  const deleteItem = async (id: number | string) => {
     setDeleting(true);
     try {
       await apiService(`${endpointBase}/${id}`, { method: 'DELETE' });

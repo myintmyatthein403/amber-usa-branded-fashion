@@ -33,7 +33,7 @@ export class CollectionsRepository {
           include: {
             brand: true,
             category: true,
-          }
+          },
         },
       },
     });
@@ -47,13 +47,16 @@ export class CollectionsRepository {
           include: {
             brand: true,
             category: true,
-          }
+          },
         },
       },
     });
   }
 
-  async update(id: string, data: Prisma.CollectionUpdateInput): Promise<Collection> {
+  async update(
+    id: string,
+    data: Prisma.CollectionUpdateInput,
+  ): Promise<Collection> {
     return this.prisma.collection.update({
       where: { id },
       data,

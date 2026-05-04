@@ -20,7 +20,10 @@ export class CategoriesRepository {
     return this.prisma.category.findUnique({ where: { id } });
   }
 
-  async update(id: string, data: Prisma.CategoryUpdateInput): Promise<Category> {
+  async update(
+    id: string,
+    data: Prisma.CategoryUpdateInput,
+  ): Promise<Category> {
     return this.prisma.category.update({
       where: { id },
       data,

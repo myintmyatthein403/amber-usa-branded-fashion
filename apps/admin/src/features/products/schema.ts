@@ -41,6 +41,7 @@ export const ProductSchema = z.object({
   images: z.array(z.string()).default([]),
   categoryId: z.string().optional(),
   saleId: z.string().optional(),
+  collectionIds: z.array(z.string()).default([]),
   variants: z.array(VariantSchema).default([]),
 });
 
@@ -50,11 +51,13 @@ export type Product = z.infer<typeof ProductSchema> & {
   brand?: { id: string; name: string; logo?: string };
   category?: { id: string; name: string };
   sale?: { id: string; name: string };
+  collections?: { id: string; name: string }[];
 };
 
 export type Category = { id: string; name: string };
 export type Brand = { id: string; name: string; logo?: string };
 export type Sale = { id: string; name: string };
+export type Collection = { id: string; name: string };
 
 export type Meta = {
   total: number;

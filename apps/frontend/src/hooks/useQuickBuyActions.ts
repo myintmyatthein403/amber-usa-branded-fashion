@@ -2,9 +2,21 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useStore } from "@/store/useStore";
+import { Product, Variant } from "@amber/shared";
+
+interface FormattedProduct {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice: number | null;
+  isUsdPrice: boolean;
+  image: string;
+  sizes: string[];
+  variants?: Variant[];
+}
 
 export function useQuickBuyActions() {
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<FormattedProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -16,14 +28,14 @@ export function useQuickBuyActions() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?isFeatured=true`);
         const data = await res.json();
         if (data.length > 0) {
-          const p = data[0];
+          const p = data[0] as Product;
           setProduct({
             ...p,
-            price: parseFloat(p.price),
-            originalPrice: p.compareAtPrice ? parseFloat(p.compareAtPrice) : null,
+            price: parseFloat(String(p.price)),
+            originalPrice: p.compareAtPrice ? parseFloat(String(p.compareAtPrice)) : null,
             isUsdPrice: p.isUsdPrice !== false,
             image: p.images?.[0] || "https://images.unsplash.com/photo-1556905055-8f358a7a4bb4?auto=format&fit=crop&q=80&w=800",
-            sizes: Array.from(new Set(p.variants?.map((v: any) => v.size) || []))
+            sizes: Array.from(new Set(p.variants?.map((v) => v.size) || []))
           });
         }
       } catch (error) {
@@ -38,7 +50,7 @@ export function useQuickBuyActions() {
   const activeImage = useMemo(() => {
     if (!product) return "";
     if (selectedSize) {
-      const variant = product.variants?.find((v: any) => v.size === selectedSize);
+      const variant = product.variants?.find((v) => v.size === selectedSize);
       if (variant?.images && variant.images.length > 0) {
         return variant.images[0];
       }
@@ -54,7 +66,7 @@ export function useQuickBuyActions() {
     }
     setIsAdding(true);
     
-    const selectedVariant = product.variants?.find((v: any) => v.size === selectedSize);
+    const selectedVariant = product.variants?.find((v) => v.size === selectedSize);
     
     addToCart(
       product, 

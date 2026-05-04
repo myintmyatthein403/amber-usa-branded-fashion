@@ -42,6 +42,7 @@ export const ProductSchema = z.object({
   categoryId: z.string().optional().nullable(),
   brandId: z.string().optional().nullable(),
   saleId: z.string().optional().nullable(),
+  collectionIds: z.array(z.string()).default([]),
   variants: z.array(VariantSchema).default([]),
 });
 
@@ -75,10 +76,9 @@ export const BrandSchema = z.object({
 
 export type Category = z.infer<typeof CategorySchema>;
 export type Brand = z.infer<typeof BrandSchema>;
-export type Sale = { id: string; name: string };
-
 export type ProductWithRelations = Product & {
   category?: Category | null;
   brand?: Brand | null;
-  sale?: Sale | null;
+  sale?: { id: string; name: string } | null;
+  collections?: { id: string; name: string }[] | null;
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@/store/useStore";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface PriceProps {
   amount: number | string;
@@ -10,14 +10,10 @@ interface PriceProps {
 }
 
 export default function Price({ amount, isUsdPrice = true, className }: PriceProps) {
-  const [mounted, setMounted] = useState(false);
+  const [mounted] = useState(typeof window !== "undefined");
   const currency = useStore((state) => state.currency);
   const formatPrice = useStore((state) => state.formatPrice);
   
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   if (!mounted) {
     // Fallback during hydration to avoid mismatch
     return <span className={className}>...</span>;

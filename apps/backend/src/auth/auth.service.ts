@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersRepository } from '../users/users.repository';
@@ -21,7 +25,7 @@ export class AuthService {
 
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.usersRepository.findByEmail(email);
-    if (user && user.password && await bcrypt.compare(pass, user.password)) {
+    if (user && user.password && (await bcrypt.compare(pass, user.password))) {
       const { password, ...result } = user;
       return result;
     }
@@ -55,9 +59,9 @@ export class AuthService {
 
       if (user) {
         user = await this.usersRepository.update(user.id, {
-          provider: 'google', 
+          provider: 'google',
           providerId,
-          avatar: user.avatar || avatar
+          avatar: user.avatar || avatar,
         });
       } else {
         user = await this.usersRepository.create({
@@ -67,7 +71,7 @@ export class AuthService {
           providerId,
           avatar,
           role: {
-            connect: { name: 'USER' }
+            connect: { name: 'USER' },
           },
         });
       }
@@ -79,8 +83,13 @@ export class AuthService {
   async login(user: any) {
     const fullUser = await this.usersRepository.findById(user.id);
     const permissions = (fullUser as any)?.role?.permissions || [];
-    const payload = { email: user.email, sub: user.id, role: user.roleName, permissions };
-    
+    const payload = {
+      email: user.email,
+      sub: user.id,
+      role: user.roleName,
+      permissions,
+    };
+
     return {
       access_token: this.jwtService.sign(payload),
       user: {
@@ -94,7 +103,9 @@ export class AuthService {
   }
 
   async register(registerDto: any) {
-    const existingUser = await this.usersRepository.findByEmail(registerDto.email);
+    const existingUser = await this.usersRepository.findByEmail(
+      registerDto.email,
+    );
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
@@ -105,7 +116,7 @@ export class AuthService {
       password: hashedPassword,
       name: registerDto.name,
       role: {
-        connect: { name: 'USER' }
+        connect: { name: 'USER' },
       },
     });
 

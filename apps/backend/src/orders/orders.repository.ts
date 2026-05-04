@@ -6,36 +6,45 @@ import { Order, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
 export class OrdersRepository {
   constructor(private prisma: PrismaService) {}
 
-  async create(orderData: any, warehouseId: string, itemsWithPreOrderInfo: any[], calculatedTotal: number): Promise<Order> {
+  async create(
+    orderData: any,
+    warehouseId: string,
+    itemsWithPreOrderInfo: any[],
+    calculatedTotal: number,
+  ): Promise<Order> {
     return this.prisma.$transaction(async (tx) => {
       // Stock updates for non-preorder items
       for (const item of itemsWithPreOrderInfo) {
         if (item.variantId && !item.isPreOrder) {
           if (warehouseId) {
             const updatedInventory = await tx.inventory.updateMany({
-              where: { 
-                variantId: item.variantId, 
+              where: {
+                variantId: item.variantId,
                 warehouseId,
-                quantity: { gte: item.quantity }
+                quantity: { gte: item.quantity },
               },
-              data: { quantity: { decrement: item.quantity } }
+              data: { quantity: { decrement: item.quantity } },
             });
 
             if (updatedInventory.count === 0) {
-              throw new BadRequestException(`Insufficient stock for item: ${item.name} in selected warehouse.`);
+              throw new BadRequestException(
+                `Insufficient stock for item: ${item.name} in selected warehouse.`,
+              );
             }
           }
 
           const updatedVariant = await tx.variant.updateMany({
-            where: { 
+            where: {
               id: item.variantId,
-              stock: { gte: item.quantity }
+              stock: { gte: item.quantity },
             },
-            data: { stock: { decrement: item.quantity } }
+            data: { stock: { decrement: item.quantity } },
           });
 
           if (updatedVariant.count === 0) {
-            throw new BadRequestException(`Insufficient total stock for item: ${item.name}.`);
+            throw new BadRequestException(
+              `Insufficient total stock for item: ${item.name}.`,
+            );
           }
         }
       }
@@ -48,7 +57,7 @@ export class OrdersRepository {
           const timestamp = Date.now().toString().slice(-4);
           const random = Math.floor(1000 + Math.random() * 9000);
           const orderNumber = `AMB-${new Date().getFullYear()}-${timestamp}-${random}`;
-          
+
           order = await tx.order.create({
             data: {
               orderNumber,
@@ -60,9 +69,9 @@ export class OrdersRepository {
               shippingAddress: `${orderData.firstName} ${orderData.lastName}, ${orderData.address}, ${orderData.city}. Phone: ${orderData.phone}`,
               userId: orderData.userId,
               warehouseId,
-              hasPreOrderItems: itemsWithPreOrderInfo.some(i => i.isPreOrder),
+              hasPreOrderItems: itemsWithPreOrderInfo.some((i) => i.isPreOrder),
               items: {
-                create: itemsWithPreOrderInfo.map(item => ({
+                create: itemsWithPreOrderInfo.map((item) => ({
                   productId: item.productId,
                   variantId: item.variantId,
                   name: item.name,
@@ -78,7 +87,7 @@ export class OrdersRepository {
             },
             include: {
               items: true,
-            }
+            },
           });
           return order;
         } catch (error) {
@@ -103,13 +112,18 @@ export class OrdersRepository {
             id: true,
             email: true,
             name: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
   }
 
-  async findMany(where: Prisma.OrderWhereInput, skip?: number, take?: number, orderBy?: any): Promise<[Order[], number]> {
+  async findMany(
+    where: Prisma.OrderWhereInput,
+    skip?: number,
+    take?: number,
+    orderBy?: any,
+  ): Promise<[Order[], number]> {
     return Promise.all([
       this.prisma.order.findMany({
         where,
@@ -119,8 +133,8 @@ export class OrdersRepository {
             select: {
               name: true,
               email: true,
-            }
-          }
+            },
+          },
         },
         orderBy,
         skip,
@@ -138,7 +152,7 @@ export class OrdersRepository {
       },
       orderBy: {
         createdAt: 'desc',
-      }
+      },
     });
   }
 
@@ -149,14 +163,20 @@ export class OrdersRepository {
     });
   }
 
-  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<Order> {
+  async updatePaymentStatus(
+    id: string,
+    paymentStatus: PaymentStatus,
+  ): Promise<Order> {
     return this.prisma.order.update({
       where: { id },
       data: { paymentStatus },
     });
   }
 
-  async updateStripeInfo(id: string, stripePaymentIntentId: string): Promise<Order> {
+  async updateStripeInfo(
+    id: string,
+    stripePaymentIntentId: string,
+  ): Promise<Order> {
     return this.prisma.order.update({
       where: { id },
       data: { stripePaymentIntentId },
@@ -180,7 +200,7 @@ export class OrdersRepository {
   async restock(orderId: string): Promise<void> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true }
+      include: { items: true },
     });
 
     if (!order || order.restocked) return;
@@ -190,27 +210,43 @@ export class OrdersRepository {
         if (item.variantId && !item.isPreOrder) {
           if (order.warehouseId) {
             await tx.inventory.update({
-              where: { 
-                variantId_warehouseId: { 
-                  variantId: item.variantId, 
-                  warehouseId: order.warehouseId 
-                } 
+              where: {
+                variantId_warehouseId: {
+                  variantId: item.variantId,
+                  warehouseId: order.warehouseId,
+                },
               },
-              data: { quantity: { increment: item.quantity } }
+              data: { quantity: { increment: item.quantity } },
             });
           }
 
           await tx.variant.update({
             where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } }
+            data: { stock: { increment: item.quantity } },
           });
         }
       }
 
       await tx.order.update({
         where: { id: orderId },
-        data: { restocked: true }
+        data: { restocked: true },
       });
+    });
+  }
+
+  async findByOrderNumber(orderNumber: string): Promise<Order | null> {
+    return this.prisma.order.findUnique({
+      where: { orderNumber },
+      include: {
+        items: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
     });
   }
 
@@ -229,10 +265,10 @@ export class OrdersRepository {
   // Helper methods for validation in service
   async findWarehouseWithStock(variantId: string, quantity: number) {
     return this.prisma.inventory.findFirst({
-      where: { 
+      where: {
         variantId,
-        quantity: { gte: quantity }
-      }
+        quantity: { gte: quantity },
+      },
     });
   }
 
@@ -247,13 +283,13 @@ export class OrdersRepository {
   async findVariantForOrder(id: string) {
     return this.prisma.variant.findUnique({
       where: { id },
-      include: { product: true }
+      include: { product: true },
     });
   }
 
   async findProductForOrder(id: string) {
     return this.prisma.product.findUnique({
-      where: { id }
+      where: { id },
     });
   }
 }

@@ -100,12 +100,16 @@ function App() {
 
   const hasAccess = (tab: string): boolean => {
     if (!user) return false;
-    if (user.role === 'SUPERADMIN') return true;
+    
+    // Normalize user object structure
+    const userData = user?.data?.user || user?.data || user;
+    
+    if (userData.role === 'SUPERADMIN') return true;
     
     const required = TAB_PERMISSIONS[tab];
     if (!required) return true; // Public tabs like dashboard
     
-    const userPerms = user.permissions || user.role?.permissions || [];
+    const userPerms = userData.permissions || [];
     return required.some(p => userPerms.includes(p));
   };
 

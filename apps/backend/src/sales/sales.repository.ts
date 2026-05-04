@@ -21,7 +21,7 @@ export class SalesRepository {
             name: true,
             price: true,
             images: true,
-          }
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -45,7 +45,7 @@ export class SalesRepository {
           {
             startDate: { lte: now },
             endDate: null,
-          }
+          },
         ],
       },
       include: {
@@ -79,11 +79,15 @@ export class SalesRepository {
   async resetProductsInSale(saleId: string) {
     return this.prisma.product.updateMany({
       where: { saleId },
-      data: { saleId: null, onSale: false }
+      data: { saleId: null, onSale: false },
     });
   }
 
-  async updateProductsSaleAssociation(productIds: string[], saleId: string | null, onSale: boolean) {
+  async updateProductsSaleAssociation(
+    productIds: string[],
+    saleId: string | null,
+    onSale: boolean,
+  ) {
     if (productIds.length === 0) return;
     return this.prisma.product.updateMany({
       where: { id: { in: productIds } },
@@ -91,7 +95,11 @@ export class SalesRepository {
     });
   }
 
-  async updateProductSale(productId: string, saleId: string | null, onSale: boolean) {
+  async updateProductSale(
+    productId: string,
+    saleId: string | null,
+    onSale: boolean,
+  ) {
     return this.prisma.product.update({
       where: { id: productId },
       data: { saleId, onSale },
