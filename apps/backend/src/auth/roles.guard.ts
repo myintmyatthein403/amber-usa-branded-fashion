@@ -2,7 +2,6 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator';
 import { PERMISSIONS_KEY } from './permissions.decorator';
-import { JwtService } from '@nestjs/jwt';
 
 interface JWTPayload {
   sub: string;
@@ -15,13 +14,7 @@ interface JWTPayload {
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  private roleCache = new Map<string, { roleName: string; permissions: string[]; expiresAt: number }>();
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-  constructor(
-    private reflector: Reflector,
-    private jwtService: JwtService,
-  ) {}
+  constructor(private reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [context.getHandler(), context.getClass()]);
