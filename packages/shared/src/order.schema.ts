@@ -3,6 +3,9 @@ import { z } from 'zod';
 export const OrderStatusSchema = z.enum(['PENDING', 'PROCESSING', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'REFUNDED']);
 export const PaymentStatusSchema = z.enum(['PENDING', 'PAID', 'FAILED', 'REFUNDED']);
 
+export const OrderStatus = OrderStatusSchema;
+export const PaymentStatus = PaymentStatusSchema;
+
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 
