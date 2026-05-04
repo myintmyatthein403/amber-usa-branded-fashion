@@ -3,17 +3,19 @@ import { Sale, Prisma } from '@prisma/client';
 import { SalesRepository } from './sales.repository';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 
+type SaleInput = Prisma.SaleCreateInput;
+type SaleUpdateInput = Prisma.SaleUpdateInput;
+
 @Injectable()
 export class SalesService {
   constructor(private readonly salesRepository: SalesRepository) {}
 
-  async createSale(data: any): Promise<Sale> {
+  async createSale(data: SaleInput): Promise<Sale> {
     const sanitizedData = sanitizeData(data);
-    const { productIds, ...saleData } = sanitizedData;
+    const productIds = (sanitizedData as Record<string, unknown>).productIds as string[] | undefined;
+    const saleData = sanitizeData(data) as Prisma.SaleCreateInput;
 
-    const sale = await this.salesRepository.create(
-      saleData as Prisma.SaleCreateInput,
-    );
+    const sale = await this.salesRepository.create(saleData);
 
     if (productIds && productIds.length > 0) {
       await this.syncProducts(sale.id, productIds);
@@ -36,18 +38,16 @@ export class SalesService {
     return sale;
   }
 
-  async updateSale(id: string, data: any): Promise<Sale> {
+  async updateSale(id: string, data: SaleUpdateInput): Promise<Sale> {
     const saleToUpdate = await this.salesRepository.findById(id);
     if (!saleToUpdate)
       throw new NotFoundException(`Sale with ID ${id} not found`);
 
     const sanitizedData = sanitizeData(data);
-    const { productIds, ...saleData } = sanitizedData;
+    const productIds = (sanitizedData as Record<string, unknown>).productIds as string[] | undefined;
+    const saleData = sanitizeData(data) as Prisma.SaleUpdateInput;
 
-    const sale = await this.salesRepository.update(
-      id,
-      saleData as Prisma.SaleUpdateInput,
-    );
+    const sale = await this.salesRepository.update(id, saleData);
 
     if (productIds !== undefined) {
       await this.syncProducts(id, productIds);
@@ -60,17 +60,14 @@ export class SalesService {
     const sale = await this.salesRepository.findById(id);
     if (!sale) throw new NotFoundException(`Sale with ID ${id} not found`);
 
-    // Before deleting, reset product onSale status
     await this.salesRepository.resetProductsInSale(id);
 
     return this.salesRepository.delete(id);
   }
 
   async syncProducts(saleId: string, productIds: string[]) {
-    // 1. Remove sale association from all products currently in this sale
     await this.salesRepository.resetProductsInSale(saleId);
 
-    // 2. Add sale association to new products
     if (productIds.length > 0) {
       await this.salesRepository.updateProductsSaleAssociation(
         productIds,

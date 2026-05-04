@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
-import { Prisma, Role } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -20,7 +20,7 @@ export class ReviewsController {
 
   @Post()
   create(@Body() createReviewDto: Prisma.ReviewCreateInput) {
-    return this.reviewsService.createReview(createReviewDto);
+    return this.reviewsService.createReview(createReviewDto as unknown as Parameters<typeof this.reviewsService.createReview>[0]);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,7 +42,7 @@ export class ReviewsController {
     @Param('id') id: string,
     @Body() updateReviewDto: Prisma.ReviewUpdateInput,
   ) {
-    return this.reviewsService.updateReview(id, updateReviewDto);
+    return this.reviewsService.updateReview(id, updateReviewDto as unknown as Parameters<typeof this.reviewsService.updateReview>[1]);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

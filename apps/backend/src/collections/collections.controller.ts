@@ -7,12 +7,14 @@ import {
   Param,
   Delete,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common';
 import { CollectionsService } from './collections.service';
-import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { CollectionSchema } from '@amber/shared';
 
 @Controller('collections')
 export class CollectionsController {
@@ -21,6 +23,7 @@ export class CollectionsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
+  @UsePipes(new ZodValidationPipe(CollectionSchema))
   create(@Body() data: any) {
     return this.collectionsService.create(data);
   }
@@ -38,6 +41,7 @@ export class CollectionsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
+  @UsePipes(new ZodValidationPipe(CollectionSchema.partial()))
   update(@Param('id') id: string, @Body() data: any) {
     return this.collectionsService.update(id, data);
   }

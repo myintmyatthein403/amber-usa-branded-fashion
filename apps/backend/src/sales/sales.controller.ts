@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SalesService } from './sales.service';
-import { Prisma, Role } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -22,7 +22,7 @@ export class SalesController {
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
   create(@Body() createSaleDto: Prisma.SaleCreateInput) {
-    return this.salesService.createSale(createSaleDto);
+    return this.salesService.createSale(createSaleDto as unknown as Parameters<typeof this.salesService.createSale>[0]);
   }
 
   @Get()
@@ -47,7 +47,7 @@ export class SalesController {
     @Param('id') id: string,
     @Body() updateSaleDto: Prisma.SaleUpdateInput,
   ) {
-    return this.salesService.updateSale(id, updateSaleDto);
+    return this.salesService.updateSale(id, updateSaleDto as unknown as Parameters<typeof this.salesService.updateSale>[1]);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

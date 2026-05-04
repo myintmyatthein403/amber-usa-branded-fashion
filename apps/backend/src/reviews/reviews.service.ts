@@ -3,16 +3,19 @@ import { Review, Prisma } from '@prisma/client';
 import { ReviewsRepository } from './reviews.repository';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 
+type ReviewInput = Prisma.ReviewCreateInput;
+type ReviewUpdateInput = Prisma.ReviewUpdateInput;
+
 @Injectable()
 export class ReviewsService {
   constructor(private readonly reviewsRepository: ReviewsRepository) {}
 
-  async createReview(data: any): Promise<Review> {
+  async createReview(data: ReviewInput): Promise<Review> {
     const sanitizedData = sanitizeData(data);
     return this.reviewsRepository.create({
       ...sanitizedData,
-      isApproved: false, // Force moderation
-    } as Prisma.ReviewCreateInput);
+      isApproved: false,
+    });
   }
 
   async getAllReviews(): Promise<Review[]> {
@@ -23,14 +26,14 @@ export class ReviewsService {
     return this.reviewsRepository.findApprovedByProduct(productId);
   }
 
-  async updateReview(id: string, data: any): Promise<Review> {
+  async updateReview(id: string, data: ReviewUpdateInput): Promise<Review> {
     const review = await this.reviewsRepository.findById(id);
     if (!review) throw new NotFoundException(`Review with ID ${id} not found`);
 
     const sanitizedData = sanitizeData(data);
     return this.reviewsRepository.update(
       id,
-      sanitizedData as Prisma.ReviewUpdateInput,
+      sanitizedData,
     );
   }
 

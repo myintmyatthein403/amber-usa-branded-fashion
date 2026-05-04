@@ -9,10 +9,13 @@ import {
   UseGuards,
   Request,
   Patch,
+  UsePipes,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { LoginSchema, RegisterSchema, UserSchema } from '@amber/shared';
 
 @Controller('auth')
 export class AuthController {
@@ -37,6 +40,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @UsePipes(new ZodValidationPipe(RegisterSchema))
   async register(@Body() registerDto: any) {
     return this.authService.register(registerDto);
   }
@@ -49,6 +53,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
+  @UsePipes(new ZodValidationPipe(UserSchema.partial()))
   async updateProfile(@Request() req: any, @Body() profileData: any) {
     return this.authService.updateProfile(req.user.userId, profileData);
   }

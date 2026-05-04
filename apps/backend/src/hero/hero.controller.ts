@@ -7,12 +7,14 @@ import {
   Param,
   Delete,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common';
 import { HeroService } from './hero.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { HeroSectionSchema } from '@amber/shared';
 
 @Controller('hero')
 export class HeroController {
@@ -21,6 +23,7 @@ export class HeroController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
+  @UsePipes(new ZodValidationPipe(HeroSectionSchema))
   create(@Body() data: any) {
     return this.heroService.create(data);
   }
@@ -40,6 +43,7 @@ export class HeroController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
+  @UsePipes(new ZodValidationPipe(HeroSectionSchema.partial()))
   update(@Param('id') id: string, @Body() data: any) {
     return this.heroService.update(id, data);
   }

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Testimonial } from '@prisma/client';
 import { TestimonialsRepository } from './testimonials.repository';
 import { sanitizeData } from '../common/utils/data-sanitizer';
+import { Testimonial as TestimonialInput } from '@amber/shared';
 
 @Injectable()
 export class TestimonialsService {
@@ -9,7 +10,7 @@ export class TestimonialsService {
     private readonly testimonialsRepository: TestimonialsRepository,
   ) {}
 
-  async create(data: any): Promise<Testimonial> {
+  async create(data: TestimonialInput): Promise<Testimonial> {
     const sanitizedData = sanitizeData(data);
     return this.testimonialsRepository.create(sanitizedData);
   }
@@ -30,7 +31,7 @@ export class TestimonialsService {
     return testimonial;
   }
 
-  async update(id: string, data: any): Promise<Testimonial> {
+  async update(id: string, data: TestimonialInput): Promise<Testimonial> {
     await this.findOne(id);
     const sanitizedData = sanitizeData(data);
     return this.testimonialsRepository.update(id, sanitizedData);

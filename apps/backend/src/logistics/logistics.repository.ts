@@ -1,47 +1,60 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  Warehouse,
-  Inventory,
-  CargoShipment,
-  CargoStatus,
-  Prisma,
-} from '@prisma/client';
+import { CargoShipment, Warehouse, Inventory, Prisma } from '@prisma/client';
 
 @Injectable()
 export class LogisticsRepository {
   constructor(private prisma: PrismaService) {}
 
-  // --- Warehouse ---
   async findAllWarehouses() {
     return this.prisma.warehouse.findMany({
-      include: {
-        _count: {
-          select: { inventory: true },
-        },
-      },
+      orderBy: { name: 'asc' },
     });
   }
 
-  async createWarehouse(data: Prisma.WarehouseCreateInput): Promise<Warehouse> {
-    return this.prisma.warehouse.create({ data });
+  async findWarehouseById(id: string) {
+    return this.prisma.warehouse.findUnique({
+      where: { id },
+    });
   }
 
-  async findWarehouseById(id: string): Promise<Warehouse | null> {
-    return this.prisma.warehouse.findUnique({ where: { id } });
+  async createWarehouse(data: Record<string, unknown>): Promise<Warehouse> {
+    return this.prisma.warehouse.create({
+      data: data as unknown as Prisma.WarehouseUncheckedCreateInput,
+    });
   }
 
-  // --- Inventory ---
-  async findAllInventoryWithDetails() {
+  async updateWarehouse(
+    id: string,
+    data: Record<string, unknown>,
+  ): Promise<Warehouse> {
+    return this.prisma.warehouse.update({
+      where: { id },
+      data: data as unknown as Prisma.WarehouseUncheckedUpdateInput,
+    });
+  }
+
+  async deleteWarehouse(id: string): Promise<Warehouse> {
+    return this.prisma.warehouse.delete({
+      where: { id },
+    });
+  }
+
+  async findAllInventory() {
     return this.prisma.inventory.findMany({
       include: {
         warehouse: true,
         variant: { include: { product: true } },
       },
-      orderBy: [
-        { variant: { productId: 'asc' } },
-        { warehouse: { location: 'asc' } },
-      ],
+    });
+  }
+
+  async findInventoryByWarehouse(warehouseId: string) {
+    return this.prisma.inventory.findMany({
+      where: { warehouseId },
+      include: {
+        variant: { include: { product: true } },
+      },
     });
   }
 
@@ -52,14 +65,42 @@ export class LogisticsRepository {
     });
   }
 
-  async findInventoryByWarehouse(warehouseId: string) {
+  async createInventory(data: {
+    variantId: string;
+    warehouseId: string;
+    quantity: number;
+  }): Promise<Inventory> {
+    return this.prisma.inventory.create({
+      data,
+    });
+  }
+
+  async updateInventory(
+    id: string,
+    data: { quantity: number },
+  ): Promise<Inventory> {
+    return this.prisma.inventory.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async deleteInventory(id: string): Promise<Inventory> {
+    return this.prisma.inventory.delete({
+      where: { id },
+    });
+  }
+
+  async findAllInventoryWithDetails() {
     return this.prisma.inventory.findMany({
-      where: { warehouseId },
       include: {
-        variant: {
-          include: { product: true },
-        },
+        warehouse: true,
+        variant: { include: { product: true } },
       },
+      orderBy: [
+        { variant: { productId: 'asc' } },
+        { warehouse: { location: 'asc' } },
+      ],
     });
   }
 
@@ -85,7 +126,6 @@ export class LogisticsRepository {
         create: { variantId, warehouseId, quantity },
       });
 
-      // Update global stock summary in Variant model
       const totalStock = await tx.inventory.aggregate({
         where: { variantId },
         _sum: { quantity: true },
@@ -101,7 +141,16 @@ export class LogisticsRepository {
   }
 
   // --- Cargo ---
-  async createCargoShipment(data: any): Promise<CargoShipment> {
+  async createCargoShipment(data: {
+    shipmentNumber: string;
+    originId: string;
+    destinationId: string;
+    carrier?: string;
+    trackingNumber?: string;
+    departureDate?: string;
+    notes?: string;
+    items: { variantId: string; quantity: number }[];
+  }): Promise<CargoShipment> {
     return this.prisma.cargoShipment.create({
       data: {
         shipmentNumber: data.shipmentNumber,
@@ -109,9 +158,10 @@ export class LogisticsRepository {
         destinationId: data.destinationId,
         carrier: data.carrier,
         trackingNumber: data.trackingNumber,
+        departureDate: data.departureDate,
         notes: data.notes,
         items: {
-          create: data.items.map((item: any) => ({
+          create: data.items.map((item) => ({
             variantId: item.variantId,
             quantity: item.quantity,
           })),
@@ -175,7 +225,6 @@ export class LogisticsRepository {
     }>,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      // 1. Update Inventory
       for (const update of inventoryUpdates) {
         await tx.inventory.upsert({
           where: {
@@ -192,7 +241,6 @@ export class LogisticsRepository {
           },
         });
 
-        // Update Variant global stock
         const totalStock = await tx.inventory.aggregate({
           where: { variantId: update.variantId },
           _sum: { quantity: true },
@@ -204,7 +252,6 @@ export class LogisticsRepository {
         });
       }
 
-      // 2. Update Cargo Shipment
       return tx.cargoShipment.update({
         where: { id },
         data: cargoData,

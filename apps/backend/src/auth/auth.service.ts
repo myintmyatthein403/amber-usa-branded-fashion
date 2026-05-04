@@ -6,8 +6,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersRepository } from '../users/users.repository';
+import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
+import { RegisterInput, LoginInput, User as UserInput } from '@amber/shared';
 
 @Injectable()
 export class AuthService {
@@ -23,7 +25,7 @@ export class AuthService {
     );
   }
 
-  async validateUser(email: string, pass: string): Promise<any> {
+  async validateUser(email: string, pass: string): Promise<Omit<User, 'password'> | null> {
     const user = await this.usersRepository.findByEmail(email);
     if (user && user.password && (await bcrypt.compare(pass, user.password))) {
       const { password, ...result } = user;

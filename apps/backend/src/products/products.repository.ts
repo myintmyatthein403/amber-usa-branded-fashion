@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Product, Prisma, Variant } from '@prisma/client';
+import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
 
 @Injectable()
 export class ProductsRepository {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: any): Promise<Product> {
-    const { variants, collectionIds, ...productData } = data;
+  async create(data: CreateProductDto): Promise<Product> {
+    const { variants, collectionIds, ...productData } = data as CreateProductDto & { variants?: unknown[]; collectionIds?: string[] };
 
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
@@ -21,13 +22,13 @@ export class ProductsRepository {
         },
       });
 
-      if (variants && variants.length > 0) {
+      if (variants && (variants as unknown[]).length > 0) {
         const defaultWarehouse =
           (await tx.warehouse.findFirst({
             where: { location: 'USA' },
           })) || (await tx.warehouse.findFirst());
 
-        for (const v of variants) {
+        for (const v of variants as CreateProductDto['variants']) {
           const variant = await tx.variant.create({
             data: {
               sku: v.sku,
@@ -127,8 +128,8 @@ export class ProductsRepository {
     });
   }
 
-  async update(id: string, data: any): Promise<Product> {
-    const { variants, collectionIds, ...productData } = data;
+  async update(id: string, data: UpdateProductDto): Promise<Product> {
+    const { variants, collectionIds, ...productData } = data as UpdateProductDto & { variants?: unknown[]; collectionIds?: string[] };
 
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.update({
@@ -150,7 +151,7 @@ export class ProductsRepository {
         });
         const existingIds = existingVariants.map((v) => v.id);
 
-        const incomingIds = variants.map((v: any) => v.id).filter(Boolean);
+        const incomingIds = (variants as unknown[]).map((v: any) => v.id).filter(Boolean);
         let idsToDelete = existingIds.filter(
           (eid) => !incomingIds.includes(eid),
         );
@@ -172,7 +173,7 @@ export class ProductsRepository {
           });
         }
 
-        for (const v of variants) {
+        for (const v of variants as CreateProductDto['variants']) {
           const variantData = {
             sku: v.sku,
             barcode: v.barcode,

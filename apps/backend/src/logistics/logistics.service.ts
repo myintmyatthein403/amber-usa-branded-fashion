@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { LogisticsRepository } from './logistics.repository';
-import { CargoStatus, Prisma } from '@prisma/client';
+import { CargoStatus, Prisma, Warehouse } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipmentStatusChangedEvent } from '../common/events/domain.events';
 import { sanitizeData } from '../common/utils/data-sanitizer';
@@ -24,13 +24,8 @@ export class LogisticsService {
     return this.logisticsRepository.findAllWarehouses();
   }
 
-  async createWarehouse(data: {
-    name: string;
-    location: string;
-    address?: string;
-  }) {
-    const sanitizedData = sanitizeData(data) as Prisma.WarehouseCreateInput;
-    return this.logisticsRepository.createWarehouse(sanitizedData);
+  async createWarehouse(data: Record<string, unknown>) {
+    return this.logisticsRepository.createWarehouse(data as unknown as Warehouse);
   }
 
   // --- Inventory Management ---

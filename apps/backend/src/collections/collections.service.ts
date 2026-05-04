@@ -2,12 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CollectionsRepository } from './collections.repository';
 import { sanitizeData } from '../common/utils/data-sanitizer';
+import { Collection } from '@amber/shared';
+
+interface CollectionInput extends Omit<Collection, 'id'> {
+  productIds?: string[];
+}
 
 @Injectable()
 export class CollectionsService {
   constructor(private readonly collectionsRepository: CollectionsRepository) {}
 
-  async create(data: any) {
+  async create(data: CollectionInput) {
     const sanitizedData = sanitizeData(data);
     const { productIds, ...rest } = sanitizedData;
 
@@ -41,7 +46,7 @@ export class CollectionsService {
     return collection;
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: CollectionInput) {
     const collection = await this.collectionsRepository.findById(id);
     if (!collection)
       throw new NotFoundException(`Collection with ID ${id} not found`);

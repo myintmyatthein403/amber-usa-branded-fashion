@@ -2,12 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { HeroSection } from '@prisma/client';
 import { HeroRepository } from './hero.repository';
 import { sanitizeData } from '../common/utils/data-sanitizer';
+import { HeroSection as HeroSectionInput } from '@amber/shared';
 
 @Injectable()
 export class HeroService {
   constructor(private readonly heroRepository: HeroRepository) {}
 
-  async create(data: any): Promise<HeroSection> {
+  async create(data: HeroSectionInput): Promise<HeroSection> {
     const sanitizedData = sanitizeData(data);
     if (sanitizedData.isActive) {
       await this.heroRepository.deactivateAll();
@@ -31,7 +32,7 @@ export class HeroService {
     return hero;
   }
 
-  async update(id: string, data: any): Promise<HeroSection> {
+  async update(id: string, data: HeroSectionInput): Promise<HeroSection> {
     await this.findOne(id);
     const sanitizedData = sanitizeData(data);
     if (sanitizedData.isActive) {

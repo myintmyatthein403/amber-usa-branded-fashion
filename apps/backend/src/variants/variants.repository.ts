@@ -1,19 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Variant, Prisma } from '@prisma/client';
+import { CreateVariantDto, UpdateVariantDto } from './dto/variant.dto';
 
 @Injectable()
 export class VariantsRepository {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: any): Promise<Variant> {
-    const { warehouseId, ...variantData } = data;
+  async create(data: CreateVariantDto): Promise<Variant> {
+    const { warehouseId, ...variantData } = data as CreateVariantDto & { warehouseId?: string };
     return this.prisma.$transaction(async (tx) => {
       const variant = await tx.variant.create({
         data: {
           ...variantData,
           stock: variantData.stock || 0,
-        },
+        } as Prisma.VariantUncheckedCreateInput,
       });
 
       if (warehouseId && variant.stock > 0) {
@@ -50,24 +51,23 @@ export class VariantsRepository {
     });
   }
 
-  async update(id: string, data: any): Promise<Variant> {
-    const { stock, ...rest } = data;
+  async update(id: string, data: UpdateVariantDto): Promise<Variant> {
+    const { stock, ...rest } = data as UpdateVariantDto & { stock?: number };
     return this.prisma.variant.update({
       where: { id },
       data: {
         ...rest,
         ...(stock !== undefined ? { stock } : {}),
-      },
+      } as Prisma.VariantUncheckedUpdateInput,
     });
   }
 
   async updateWithInventory(
     id: string,
-    data: any,
+    data: Partial<UpdateVariantDto>,
     inventoryId: string,
     stock: number,
   ): Promise<Variant> {
-    const { ...rest } = data;
     return this.prisma.$transaction(async (tx) => {
       await tx.inventory.update({
         where: { id: inventoryId },
@@ -77,9 +77,9 @@ export class VariantsRepository {
       return tx.variant.update({
         where: { id },
         data: {
-          ...rest,
+          ...data,
           stock,
-        },
+        } as Prisma.VariantUncheckedUpdateInput,
       });
     });
   }
