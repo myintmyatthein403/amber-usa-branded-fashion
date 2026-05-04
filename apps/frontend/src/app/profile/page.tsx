@@ -12,6 +12,16 @@ import Price from "@/components/Price";
 import { useAuthStore } from "@/store/useAuthStore";
 import { signOut } from "next-auth/react";
 
+interface ProfileOrder {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  status: string;
+  totalAmount: number;
+  currency: string;
+  items: { id: string; name: string; price: number; image: string; size?: string; quantity: number; isUsd: boolean }[];
+}
+
 export default function ProfilePage() {
   const { user, token, isAuthenticated, logout, updateUser } = useAuthStore();
   const setLoggingOut = useAuthStore((state) => state.setLoggingOut);
@@ -294,7 +304,7 @@ export default function ProfilePage() {
                       {!user?.orders || user.orders.length === 0 ? (
                         <p className="text-sm text-[#1A1A1A]/40 italic">No orders found.</p>
                       ) : (
-                        user.orders.map((order: any) => (
+                        (user.orders as unknown as ProfileOrder[]).map((order) => (
                           <div key={order.id} className="p-6 border border-[#1A1A1A]/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-[#D4AF37] transition-all group">
                             <div className="space-y-1">
                               <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Order Number</p>
@@ -302,7 +312,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="space-y-1">
                               <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Date</p>
-                              <p className="text-sm font-medium">{new Date(order.date).toLocaleDateString()}</p>
+                              <p className="text-sm font-medium">{new Date(order.createdAt).toLocaleDateString()}</p>
                             </div>
                             <div className="space-y-1">
                               <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Status</p>
@@ -356,7 +366,7 @@ export default function ProfilePage() {
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1A1A1A]/5 pb-8">
                       <div className="space-y-2">
                         <h3 className="text-3xl font-serif">Order {selectedOrder.orderNumber}</h3>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Placed on {new Date(selectedOrder.date).toLocaleDateString()}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Placed on {new Date(selectedOrder.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div className="flex gap-4">
                         {selectedOrder.status === "COMPLETED" && (
@@ -379,7 +389,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-8">
-                      {selectedOrder.items?.map((item: any) => (
+                      {selectedOrder.items?.map((item: ProfileOrder["items"][number]) => (
                         <div key={item.id} className="flex space-x-6 items-center">
                           <div className="relative w-20 aspect-[3/4] bg-[#F5F0E1] overflow-hidden rounded-sm">
                             <Image src={item.image} alt={item.name} fill className="object-cover" />

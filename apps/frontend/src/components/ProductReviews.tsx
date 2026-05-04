@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Star, ThumbsUp, MessageSquare, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
+import type { ApiReview } from "@amber/shared";
 
 const MOCK_REVIEWS = [
   {
@@ -26,7 +27,7 @@ const MOCK_REVIEWS = [
   }
 ];
 
-export default function ProductReviews({ reviews = [] }: { reviews?: any[] }) {
+export default function ProductReviews({ reviews = [] }: { reviews?: ApiReview[] }) {
   const [activeTab, setActiveTab] = useState("all");
   const displayReviews = reviews.length > 0 ? reviews : MOCK_REVIEWS;
 

@@ -7,6 +7,19 @@ import { Search, Package, Truck, CheckCircle2, Clock, MapPin, ArrowRight, Shield
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 
+interface TimelineItem {
+  status: string;
+  date: string;
+  completed: boolean;
+}
+
+interface TrackingInfo {
+  status: string;
+  currentLocation: string;
+  estimatedDelivery: string;
+  timeline: TimelineItem[];
+}
+
 function TrackingContent() {
   const searchParams = useSearchParams();
   const [trackingInfo, setTrackingInfo] = useState<any>(null);
@@ -24,7 +37,7 @@ function TrackingContent() {
     });
   };
 
-  const getTimeline = (order: any) => {
+  const getTimeline = (order: { createdAt: string; updatedAt: string; status: string; paymentStatus: string }) => {
     const timeline = [
       { status: "Order Placed", date: formatTimelineDate(order.createdAt), completed: true },
     ];
@@ -182,7 +195,7 @@ function TrackingContent() {
             <div className="bg-[#F5F0E1]/30 p-12 md:p-20 relative overflow-hidden">
               <div className="absolute inset-0 acheik-pattern opacity-10" />
               <div className="relative z-10 space-y-12 max-w-md mx-auto">
-                {trackingInfo.timeline.map((item: any, idx: number) => (
+                {trackingInfo.timeline.map((item: TimelineItem, idx: number) => (
                   <div key={idx} className="flex space-x-8 relative group">
                     {/* Vertical Line */}
                     {idx !== trackingInfo.timeline.length - 1 && (

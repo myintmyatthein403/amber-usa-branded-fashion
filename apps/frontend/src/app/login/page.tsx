@@ -97,8 +97,9 @@ export default function LoginPage() {
         setIsLogin(true);
         setError("Account created successfully. Please login.");
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Something went wrong";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

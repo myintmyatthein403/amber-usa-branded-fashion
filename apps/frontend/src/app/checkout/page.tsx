@@ -14,6 +14,12 @@ import StripeWrapper from "@/components/stripe/StripeWrapper";
 import StripePaymentForm from "@/components/stripe/StripePaymentForm";
 import { useRouter } from "next/navigation";
 
+interface StockValidationResult {
+  productId: string;
+  variantId?: string;
+  inStock: boolean;
+}
+
 interface DeliveryMethod {
   id: string;
   name: string;
@@ -252,10 +258,10 @@ export default function CheckoutPage() {
       if (!response.ok) throw new Error('Failed to validate stock');
       
       const results = await response.json();
-      const outOfStockItems = results.filter((r: any) => !r.inStock);
+      const outOfStockItems = results.filter((r: StockValidationResult) => !r.inStock);
       
       if (outOfStockItems.length > 0) {
-        const itemNames = outOfStockItems.map((r: any) => {
+        const itemNames = outOfStockItems.map((r: StockValidationResult) => {
           const item = cartItems.find(i => i.id === r.productId || i.variantId === r.variantId);
           return item ? item.name : 'Unknown item';
         }).join(', ');

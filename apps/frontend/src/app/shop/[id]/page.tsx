@@ -13,12 +13,13 @@ import ProductReviews from "@/components/ProductReviews";
 import { useStore } from "@/store/useStore";
 import DOMPurify from 'dompurify';
 import Price from "@/components/Price";
+import type { ApiProduct, ApiVariant, ApiReview } from "@amber/shared";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const id = params.id as string;
   
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<ApiProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function ProductDetailPage() {
 
     // 2. If a variant is selected, show variant image
     if (selectedSize || selectedColor) {
-      const variant = product.variants?.find((v: any) => {
+      const variant = product.variants?.find((v: ApiVariant) => {
         const matchesSize = selectedSize ? v.size === selectedSize : true;
         const matchesColor = selectedColor ? v.color === selectedColor : true;
         return matchesSize && matchesColor;
@@ -59,25 +60,9 @@ export default function ProductDetailPage() {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products/${id}`);
         if (!res.ok) throw new Error("Product not found");
-        const data = await res.json();
+        const data = await res.json() as ApiProduct;
         
-        const mappedProduct = {
-          ...data,
-          price: parseFloat(data.price),
-          originalPrice: data.compareAtPrice ? parseFloat(data.compareAtPrice) : null,
-          isUsdPrice: data.isUsdPrice !== false,
-          category: data.category?.name || "Uncategorized",
-          image: data.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
-          inStock: data.variants?.some((v: any) => v.stock > 0) ?? true,
-          isPreOrder: data.isPreOrder,
-          preOrderShippingDate: data.preOrderShippingDate,
-          preOrderNote: data.preOrderNote,
-          sizes: Array.from(new Set(data.variants?.map((v: any) => v.size) || [])),
-          colors: Array.from(new Set(data.variants?.map((v: any) => v.color) || [])),
-          details: data.detail ? data.detail.split('\n').filter((l: string) => l.trim()) : ["Imported from USA", "100% Authentic Guarantee", "Premium materials", "Original brand packaging"]
-        };
-        
-        setProduct(mappedProduct);
+        setProduct(data);
         if (typeof window !== 'undefined') {
           const defaultDesc = "Indulge in the elegance of authentic global fashion. Each piece is sourced directly from USA outlets to guarantee quality and authenticity.";
           setSanitizedDescription(DOMPurify.sanitize(data.description || defaultDesc));
@@ -102,7 +87,7 @@ export default function ProductDetailPage() {
     const images = [...(product.images || [])];
     
     // Add images from variants if they are not already in the main list
-    product.variants?.forEach((v: any) => {
+    product.variants?.forEach((v: ApiVariant) => {
       v.images?.forEach((img: string) => {
         if (!images.includes(img)) {
           images.push(img);
@@ -125,7 +110,7 @@ export default function ProductDetailPage() {
     setAddingId(product.id);
     
     // Find the actual variant ID based on selected size/color
-    const selectedVariant = product.variants?.find((v: any) => {
+    const selectedVariant = product.variants?.find((v: ApiVariant) => {
       const matchesSize = selectedSize ? v.size === selectedSize : true;
       const matchesColor = selectedColor ? v.color === selectedColor : true;
       return matchesSize && matchesColor;
@@ -274,7 +259,7 @@ export default function ProductDetailPage() {
                     </div>
                     <span className="text-[10px] text-[#1A1A1A]/40 font-bold tracking-widest uppercase">
                       {product.reviews?.length > 0 
-                        ? `${(product.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / product.reviews.length).toFixed(1)} (${product.reviews.length})` 
+                        ? `${(product.reviews.reduce((acc: number, r: ApiReview) => acc + r.rating, 0) / product.reviews.length).toFixed(1)} (${product.reviews.length})` 
                         : "No reviews yet"}
                     </span>
                   </div>

@@ -11,6 +11,23 @@ import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Percent, Loader
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
 import Price from "@/components/Price";
+import { Product } from "@amber/shared";
+
+interface ShopProduct {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice: number | null;
+  isUsdPrice: boolean;
+  category: string;
+  brand: string;
+  collections: string[];
+  image: string;
+  inStock: boolean;
+  sizes: string[];
+  colors: string[];
+  onSale?: boolean;
+}
 
 const SORT_OPTIONS = [
   { label: "Latest", value: "latest" },
@@ -34,7 +51,7 @@ function ShopContent() {
   const exchangeRate = useStore((state) => state.exchangeRate);
   
   const [addingId, setAddingId] = useState<string | null>(null);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedBrand, setSelectedBrand] = useState("All");
@@ -81,18 +98,18 @@ function ShopContent() {
     const result = await res.json();
     const data = result?.data || result || [];
 
-    const mappedProducts = data.map((p: any) => ({
+    const mappedProducts = data.map((p: { collections?: { name: string }[]; variants?: { stock: number; size?: string; color?: string }[]; category?: { name: string }; brand?: { name: string }; images?: string[] } & Record<string, unknown>) => ({
       ...p,
-      price: parseFloat(p.price),
-      originalPrice: p.compareAtPrice ? parseFloat(p.compareAtPrice) : null,
+      price: parseFloat(String(p.price)),
+      originalPrice: p.compareAtPrice ? parseFloat(String(p.compareAtPrice)) : null,
       isUsdPrice: p.isUsdPrice !== false,
       category: p.category?.name || "Uncategorized",
       brand: p.brand?.name || "Unbranded",
-      collections: p.collections?.map((c: any) => c.name) || [],
+      collections: p.collections?.map((c) => c.name) || [],
       image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
-      inStock: p.variants?.some((v: any) => v.stock > 0) ?? true,
-      sizes: Array.from(new Set(p.variants?.flatMap((v: any) => v.size ? [v.size] : []) || [])),
-      colors: Array.from(new Set(p.variants?.flatMap((v: any) => v.color ? [v.color] : []) || []))
+      inStock: p.variants?.some((v) => v.stock > 0) ?? true,
+      sizes: Array.from(new Set(p.variants?.flatMap((v) => v.size ? [v.size] : []) || [])),
+      colors: Array.from(new Set(p.variants?.flatMap((v) => v.color ? [v.color] : []) || []))
     }));
 
     setProducts(mappedProducts);
@@ -175,11 +192,11 @@ function ShopContent() {
   }, [filteredProducts, currentPage]);
 
 
-  const handleAddToCart = (e: React.MouseEvent, product: any) => {
+  const handleAddToCart = (e: React.MouseEvent, product: ShopProduct) => {
     e.stopPropagation();
     e.preventDefault();
     setAddingId(product.id);
-    addToCart(product);
+    addToCart(product as unknown as Product);
     setTimeout(() => setAddingId(null), 800);
   };
 
@@ -553,13 +570,13 @@ function ShopContent() {
                                 <span>{addingId === product.id ? "Added" : "Add to Bag"}</span>
                               </button>
                               <button 
-                                onClick={() => setQuickViewProduct(product)}
+                                onClick={() => setQuickViewProduct(product as unknown as Product)}
                                 className="w-12 h-12 bg-white text-[#1A1A1A] flex items-center justify-center hover:bg-[#D4AF37] hover:text-white transition-colors"
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
                               <button 
-                                onClick={() => addToCompare(product)}
+                                onClick={() => addToCompare(product as unknown as Product)}
                                 className={cn(
                                   "w-12 h-12 flex items-center justify-center transition-colors",
                                   compareList.find(p => p.id === product.id) ? "bg-[#D4AF37] text-white" : "bg-white text-[#1A1A1A] hover:bg-[#D4AF37] hover:text-white"
