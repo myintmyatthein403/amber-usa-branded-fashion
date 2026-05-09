@@ -31,8 +31,6 @@ export class ProductsController {
     return this.productsService.createProduct(createProductDto);
   }
 
-  @UseGuards(OptionalJwtAuthGuard, RolesGuard)
-  @Permissions(Permission.PRODUCTS_READ)
   @Get()
   async findAll(@Query() query: ProductQueryDto) {
     return this.productsService.getAllProducts({
@@ -48,8 +46,6 @@ export class ProductsController {
     });
   }
 
-  @UseGuards(OptionalJwtAuthGuard, RolesGuard)
-  @Permissions(Permission.PRODUCTS_READ)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.productsService.getProductById(id);

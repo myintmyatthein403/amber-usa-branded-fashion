@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { ProductBaseSchema, VariantBaseSchema, CategoryBaseSchema, BrandBaseSchema, ProductFiltersBaseSchema } from './product.base';
 
-export const VariantSchema = VariantBaseSchema.extend({
-  isPreOrder: z.boolean().default(false),
-  preOrderShippingDate: z.string().optional(),
-}).refine(
+const PreOrderFields = z.object({
+  isPreOrder: z.boolean().optional().default(false),
+  preOrderShippingDate: z.string().optional().nullable(),
+});
+
+export const VariantSchema = VariantBaseSchema.merge(PreOrderFields).refine(
   (data) => {
     if (data.isPreOrder && !data.preOrderShippingDate) {
       return false;
@@ -30,7 +32,7 @@ export const VariantSchema = VariantBaseSchema.extend({
 
 export const ProductSchema = ProductBaseSchema.extend({
   isPreOrder: z.boolean().default(false),
-  preOrderShippingDate: z.string().optional(),
+  preOrderShippingDate: z.string().optional().nullable(),
   variants: z.array(VariantSchema).default([]),
   category: z.object({
     id: z.string(),

@@ -53,14 +53,21 @@ export class OrdersController {
   @ApiResponse({ status: 201, description: 'Order successfully created.' })
   createOrder(@Req() req: AuthenticatedRequest, @Body() data: CreateOrderDto) {
     const userId = req.user?.userId || '';
+    const parts = data.shippingAddress.split(',').map(s => s.trim());
+    const nameParts = parts[0]?.split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    const address = parts[1] || '';
+    const city = parts[2] || '';
+    const phone = parts[3] || '';
     const orderData = {
       userId,
       email: '',
-      firstName: '',
-      lastName: '',
-      address: data.shippingAddress,
-      city: '',
-      phone: '',
+      firstName,
+      lastName,
+      address,
+      city,
+      phone,
       shippingMethod: '',
       paymentMethod: data.paymentMethod,
       totalAmount: data.totalAmount,

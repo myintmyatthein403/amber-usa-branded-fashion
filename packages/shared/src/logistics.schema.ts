@@ -45,9 +45,14 @@ export const VariantSchema = z.object({
   lowStockThreshold: z.number().min(0).default(5),
   weight: z.number().min(0).default(0),
   productId: z.string().uuid().optional(),
+  product: z.object({
+    id: z.string(),
+    name: z.string(),
+    images: z.array(z.string()),
+  }).optional(),
 });
 
-export type Variant = z.infer<typeof VariantSchema> & { id: string; product?: { id: string; name: string; images: string[] } };
+export type Variant = z.infer<typeof VariantSchema>;
 
 export interface CargoShipment {
   id: string;

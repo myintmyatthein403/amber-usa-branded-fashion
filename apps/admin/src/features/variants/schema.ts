@@ -14,6 +14,12 @@ export const VariantSchema = z.object({
   images: z.array(z.string()).default([]),
   isPreOrder: z.boolean().default(false),
   preOrderShippingDate: z.string().optional().nullable(),
+  warehouseId: z.string().uuid().optional(),
+  product: z.object({
+    id: z.string(),
+    name: z.string(),
+    images: z.array(z.string()),
+  }).optional(),
 });
 
 export type Variant = z.infer<typeof VariantSchema>;

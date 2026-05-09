@@ -88,7 +88,6 @@ export class ProductsService {
 
   async updateProduct(id: string, data: UpdateProductDto): Promise<Product> {
     const sanitizedData = sanitizeData(data);
-    console.log('DEBUG: Sanitized payload for product update:', JSON.stringify(sanitizedData, null, 2));
     return this.productsRepository.update(id, sanitizedData);
   }
 

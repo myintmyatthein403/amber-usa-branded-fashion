@@ -34,6 +34,7 @@ export default function CheckoutPage() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isCreatingIntent, setIsCreatingIntent] = useState(false);
   const [stockError, setStockError] = useState<string | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [isValidatingStock, setIsValidatingStock] = useState(false);
 
   const cartItems = useStore((state) => state.cartItems);
@@ -159,7 +160,8 @@ export default function CheckoutPage() {
         method: "POST",
         headers,
         body: JSON.stringify({
-          ...formData,
+          shippingAddress: `${formData.firstName} ${formData.lastName}, ${formData.address}, ${formData.city}, ${formData.phone || ''}`.trim(),
+          paymentMethod: "stripe",
           totalAmount: total,
           currency: currency,
           items: cartItems.map((item) => ({
@@ -203,7 +205,8 @@ export default function CheckoutPage() {
       }
 
       const data = await response.json();
-      setClientSecret(data.clientSecret);
+      const clientSecret = data.data?.clientSecret || data.clientSecret;
+      setClientSecret(clientSecret);
     } catch (error) {
       console.error("Error creating payment intent:", error);
       setPaymentError("Failed to initialize payment. Please try again.");
@@ -245,7 +248,8 @@ export default function CheckoutPage() {
       if (!response.ok) throw new Error("Failed to validate stock");
 
       const results = await response.json();
-      const outOfStockItems = results.filter((r: StockValidationResult) => !r.inStock);
+      const validatedResults = results.data || results;
+      const outOfStockItems = validatedResults.filter((r: StockValidationResult) => !r.inStock);
 
       if (outOfStockItems.length > 0) {
         const itemNames = outOfStockItems
@@ -299,6 +303,7 @@ export default function CheckoutPage() {
           headers,
           body: JSON.stringify({
             ...formData,
+            shippingAddress: `${formData.firstName} ${formData.lastName}, ${formData.address}, ${formData.city}, ${formData.phone || ''}`.trim(),
             totalAmount: total,
             currency: currency,
             items: cartItems.map((item) => ({
@@ -318,14 +323,20 @@ export default function CheckoutPage() {
           const orderResult = await orderResponse.json();
           const order = orderResult?.data || orderResult;
           setCurrentOrderId(order.id);
+          clearCart();
+          setIsCompleted(true);
+        } else {
+          const errorData = await orderResponse.json();
+          setOrderError(errorData.message || "Failed to create order. Please try again.");
         }
       } catch (error) {
         console.error("Failed to create order:", error);
+        setOrderError("Failed to create order. Please try again.");
       }
+    } else {
+      clearCart();
+      setIsCompleted(true);
     }
-
-    setIsCompleted(true);
-    clearCart();
   };
 
   const updateFormData = (updates: Partial<CheckoutFormData>) => {
@@ -501,6 +512,12 @@ export default function CheckoutPage() {
                     onComplete={handleComplete}
                   />
                 ) : null}
+
+                {orderError && (
+                  <div className="mt-4 p-4 bg-red-50 border border-red-200 text-red-600 text-sm">
+                    {orderError}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

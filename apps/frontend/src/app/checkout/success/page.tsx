@@ -32,11 +32,12 @@ export default function CheckoutSuccessPage() {
         });
         
         const data = await res.json();
+        const response = data.data || data;
         
-        if (data.success && data.status === 'PAID') {
+        if (response.success && response.status === 'PAID') {
           setStatus("success");
           clearCart();
-        } else if (data.status === 'FAILED') {
+        } else if (response.status === 'FAILED') {
           setStatus("error");
         } else {
           // If still PENDING, we could retry or just show loading/error

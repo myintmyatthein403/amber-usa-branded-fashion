@@ -5,7 +5,7 @@ import { PERMISSIONS_KEY } from './permissions.decorator';
 import { Permission, hasPermission } from '@amber/shared';
 
 interface JWTPayload {
-  sub: string;
+  userId: string;
   email: string;
   role?: string;
   permissions?: string[];
@@ -24,7 +24,7 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const { user } = request as { user?: JWTPayload };
 
-    if (!user?.sub) {
+    if (!user?.userId) {
       throw new UnauthorizedException('Authentication required');
     }
 

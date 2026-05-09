@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { InventorySchema, WarehouseSchema, VariantSchema } from '@amber/shared';
-import type { Inventory, Warehouse, Variant } from '@amber/shared';
+import { InventorySchema, WarehouseSchema, VariantSchema, type LogisticVariant as Variant } from '@amber/shared';
+import type { Inventory, Warehouse } from '@amber/shared';
 
 export { InventorySchema, WarehouseSchema, VariantSchema };
 export type { Inventory, Warehouse, Variant };

@@ -1,7 +1,7 @@
 import { Package, Truck, MapPin, ShieldCheck, CheckCircle2, Clock, ExternalLink } from 'lucide-react';
 import { z } from 'zod';
-import { CargoStatusSchema, VariantSchema, WarehouseSchema } from '@amber/shared';
-import type { CargoStatus, Variant, Warehouse, CargoShipment } from '@amber/shared';
+import { CargoStatusSchema, VariantSchema, WarehouseSchema, type LogisticVariant as Variant } from '@amber/shared';
+import type { CargoStatus, Warehouse, CargoShipment } from '@amber/shared';
 
 export { CargoStatusSchema, VariantSchema, WarehouseSchema };
 export type { CargoStatus, Variant, Warehouse, CargoShipment };

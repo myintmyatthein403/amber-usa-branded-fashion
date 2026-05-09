@@ -3,7 +3,7 @@ import { Plus, Edit2, Trash2, BarChart3, Search, AlertCircle, ChevronLeft, Save,
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Variant, Warehouse } from '@amber/shared';
+import type { LogisticVariant as Variant, Warehouse } from '@amber/shared';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
