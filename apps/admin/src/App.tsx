@@ -31,6 +31,7 @@ import { MediaPage } from './pages/MediaPage';
 import { useAdminUIStore } from './store/useAdminUIStore';
 import type { User } from '@amber/shared';
 import { apiService } from './services/api.service';
+import { extractRoleString } from './lib/utils';
 import { API_ROUTES } from './config/constants';
 import { 
   Users, 
@@ -102,18 +103,13 @@ function App() {
     const hasAccess = (tab: string): boolean => {
     if (!user) return false;
     
-    // Normalize user object structure
-    const userData = user;
-    
-    // Handle role (might be roleName in API response)
-    const userRole = userData.role || userData.roleName;
+    const userRole = extractRoleString(user);
     if (userRole === 'SUPERADMIN') return true;
     
     const required = TAB_PERMISSIONS[tab];
-    if (!required) return true; // Public tabs like dashboard
+    if (!required) return true;
     
-    // Handle permissions (might not be present in API response)
-    const userPerms = userData.permissions || [];
+    const userPerms = user?.permissions || [];
     return required.some(p => userPerms.includes(p));
   };
 

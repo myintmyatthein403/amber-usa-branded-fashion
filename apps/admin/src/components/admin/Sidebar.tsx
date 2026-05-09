@@ -27,6 +27,7 @@ import { useAdminUIStore } from '../../store/useAdminUIStore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
+import { extractRoleString } from '../../lib/utils';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -122,10 +123,8 @@ const sidebarConfig: SidebarItem[] = [
 export const Sidebar: React.FC = () => {
   const { isSidebarOpen, toggleSidebar, activeTab, setActiveTab, logout, user, pendingOrdersCount } = useAdminUIStore();
   
-   // Navigate the response structure to find the user profile
-   const userData = user;
-   const userRole = userData?.role || userData?.roleName;
-   const userPermissions = userData?.permissions || [];
+   const userRole = extractRoleString(user);
+   const userPermissions = user?.permissions || [];
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
   const checkAccess = (item: { id: string, roles?: string[], permissions?: string[] }) => {

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { User } from '@amber/shared';
+import { extractRoleString } from '../lib/utils';
 
 interface AdminUIState {
   isSidebarOpen: boolean;
@@ -18,15 +19,19 @@ interface AdminUIState {
   logout: () => void;
 }
 
+function normalizeUserRole(user: User): User {
+  const roleStr = extractRoleString(user);
+  return { ...user, role: roleStr };
+}
+
 export const useAdminUIStore = create<AdminUIState>((set) => {
   let initialUser = null;
   try {
     const storedUser = localStorage.getItem('admin-user');
     if (storedUser) {
       initialUser = JSON.parse(storedUser);
-      // Ensure 'role' is present if 'roleName' exists (compatibility check)
-      if (initialUser && !initialUser.role && initialUser.roleName) {
-        initialUser.role = initialUser.roleName;
+      if (initialUser) {
+        initialUser = normalizeUserRole(initialUser);
       }
     }
   } catch (e) {
@@ -48,21 +53,15 @@ export const useAdminUIStore = create<AdminUIState>((set) => {
       set({ activeTab: tab });
     },
     setAuth: (user, token) => {
-      const userToStore = { ...user };
-      if (!userToStore.role && userToStore.roleName) {
-        userToStore.role = userToStore.roleName;
-      }
-      localStorage.setItem('admin-user', JSON.stringify(userToStore));
+      const normalizedUser = normalizeUserRole(user);
+      localStorage.setItem('admin-user', JSON.stringify(normalizedUser));
       localStorage.setItem('admin-token', token);
-      set({ user: userToStore, token, isAuthenticated: true });
+      set({ user: normalizedUser, token, isAuthenticated: true });
     },
     updateUser: (user) => {
-      const userToStore = { ...user };
-      if (!userToStore.role && userToStore.roleName) {
-        userToStore.role = userToStore.roleName;
-      }
-      localStorage.setItem('admin-user', JSON.stringify(userToStore));
-      set({ user: userToStore });
+      const normalizedUser = normalizeUserRole(user);
+      localStorage.setItem('admin-user', JSON.stringify(normalizedUser));
+      set({ user: normalizedUser });
     },
     setPendingOrdersCount: (count) => set({ pendingOrdersCount: count }),
     logout: () => {

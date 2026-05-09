@@ -131,11 +131,11 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
-    const { password, ...result } = user;
+    const { password, role, ...result } = user as any;
     return {
       ...result,
       role: user.roleName,
-      permissions: (user as any).role?.permissions || [],
+      permissions: role?.permissions || [],
     };
   }
 

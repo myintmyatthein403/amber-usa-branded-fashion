@@ -30,8 +30,12 @@ export class UsersService {
   async findOne(id: string) {
     const user = await this.usersRepository.findByIdWithFullDetails(id);
     if (!user) throw new NotFoundException('User not found');
-    const { password, ...result } = user;
-    return result;
+    const { password, role, ...result } = user as any;
+    return {
+      ...result,
+      role: user.roleName,
+      permissions: role?.permissions || [],
+    };
   }
 
   async create(data: CreateUserDto, currentUser: JwtPayload) {
