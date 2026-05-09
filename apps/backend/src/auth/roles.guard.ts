@@ -2,6 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Forbi
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator';
 import { PERMISSIONS_KEY } from './permissions.decorator';
+import { Permission, hasPermission } from '@amber/shared';
 
 interface JWTPayload {
   sub: string;
@@ -18,7 +19,7 @@ export class RolesGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [context.getHandler(), context.getClass()]);
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
+    const requiredPermissions = this.reflector.getAllAndOverride<string[] | Permission[]>(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
 
     const request = context.switchToHttp().getRequest();
     const { user } = request as { user?: JWTPayload };
@@ -43,8 +44,11 @@ export class RolesGuard implements CanActivate {
 
     if (requiredPermissions) {
       const userPermissions = permissions || [];
-      const hasPermission = requiredPermissions.every((perm) => userPermissions.includes(perm));
-      if (!hasPermission) {
+      const hasAllPermissions = requiredPermissions.every((perm) => {
+        const permString = typeof perm === 'string' ? perm : perm;
+        return hasPermission(userPermissions, permString as Permission);
+      });
+      if (!hasAllPermissions) {
         throw new UnauthorizedException('Insufficient permissions');
       }
     }

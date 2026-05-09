@@ -46,11 +46,11 @@ export const GiftCardForm: React.FC<GiftCardFormProps> = ({
             placeholder="XXXX-XXXX-XXXX-XXXX"
           />
         </div>
-
+        
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground flex items-center gap-2">
-              <DollarSign size={12}/> Initial Balance
+              <DollarSign size={12}/> Balance
             </label>
             <input
               type="number"
@@ -58,28 +58,12 @@ export const GiftCardForm: React.FC<GiftCardFormProps> = ({
               value={formData.initialBalance}
               onChange={(e) => {
                 const val = Number(e.target.value);
-                setFormData({ ...formData, initialBalance: val, currentBalance: editingGiftCard ? formData.currentBalance : val });
+                setFormData({ ...formData, initialBalance: val });
               }}
               className="w-full h-10 border border-border bg-transparent px-4 text-sm focus:border-primary focus:outline-none transition-colors"
               placeholder="0.00"
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground flex items-center gap-2">
-              <DollarSign size={12}/> Current Balance
-            </label>
-            <input
-              type="number"
-              required
-              value={formData.currentBalance}
-              onChange={(e) => setFormData({ ...formData, currentBalance: Number(e.target.value) })}
-              className="w-full h-10 border border-border bg-transparent px-4 text-sm focus:border-primary focus:outline-none transition-colors"
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground flex items-center gap-2">
               <Calendar size={14}/> Expiry Date
@@ -91,22 +75,23 @@ export const GiftCardForm: React.FC<GiftCardFormProps> = ({
               className="w-full h-10 border border-border bg-transparent px-4 text-sm focus:border-primary focus:outline-none transition-colors"
             />
           </div>
-          <div className="flex items-end pb-2">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="isActive"
-                checked={formData.isActive}
-                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <label htmlFor="isActive" className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground cursor-pointer">
-                Card Valid & Active
-              </label>
-            </div>
+        </div>
+        
+        <div className="flex items-end pb-2">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="isActive"
+              checked={formData.isActive}
+              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <label htmlFor="isActive" className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground cursor-pointer">
+              Card Valid & Active
+            </label>
           </div>
         </div>
-
+        
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground flex items-center gap-2">
             <FileText size={14}/> Internal Note
@@ -119,7 +104,7 @@ export const GiftCardForm: React.FC<GiftCardFormProps> = ({
           />
         </div>
       </div>
-
+      
       <div className="flex justify-end gap-4 pt-6 border-t border-border">
         <button
           type="button"

@@ -49,8 +49,8 @@ export const CategoriesPage: React.FC = () => {
         title={editingCategory ? 'Modify Category' : 'New Category Definition'}
       >
         <CategoryForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleSubmit}
           onCancel={() => setModalOpen(false)}
           submitting={submitting}

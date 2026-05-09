@@ -106,9 +106,9 @@ export const CargoManifestForm: React.FC<CargoManifestFormProps> = ({
                  className="w-full h-10 bg-white border border-border px-3 text-xs focus:border-primary focus:outline-none"
                >
                  <option value="">Select Variant</option>
-                 {variants?.map((v: Variant) => (
-                   <option key={v.id} value={v.id}>{v.product.name} - {v.size} / {v.color} ({v.sku})</option>
-                 ))}
+                  {variants?.map((v: Variant) => (
+                    <option key={v.id} value={v.id}>{v.product?.name ?? 'Unknown Product'} - {v.size} / {v.color} ({v.sku})</option>
+                  ))}
                </select>
             </div>
             <div className="w-24 space-y-2">

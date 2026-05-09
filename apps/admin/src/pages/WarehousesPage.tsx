@@ -61,8 +61,8 @@ export const WarehousesPage: React.FC = () => {
         size="md"
       >
         <WarehouseForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleCreate}
           submitting={submitting}
         />

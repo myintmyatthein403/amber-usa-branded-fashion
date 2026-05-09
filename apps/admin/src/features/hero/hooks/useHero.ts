@@ -30,25 +30,25 @@ export const useHero = () => {
 
   const [formData, setFormData] = useState<CreateHeroInput>(initialFormData);
 
-  const uploadFile = async (file: File): Promise<string | null> => {
-    const data = new FormData();
-    data.append('file', file);
-    setUploading(true);
-    try {
-      const response = await apiService(API_ROUTES.UPLOAD, {
-        method: 'POST',
-        body: data,
-        isMultipart: true
-      });
-      // Cloudinary returns absolute URL, so check before prepending
-      return response.url.startsWith('http') ? response.url : `${import.meta.env.VITE_API_URL}${response.url}`;
-    } catch (error) {
-      console.error('Upload error:', error);
-      return null;
-    } finally {
-      setUploading(false);
-    }
-  };
+   const uploadFile = async (file: File): Promise<string | null> => {
+     const data = new FormData();
+     data.append('file', file);
+     setUploading(true);
+     try {
+       const response = await apiService<FormData, { url: string }>(API_ROUTES.UPLOAD, {
+         method: 'POST',
+         body: data,
+         isMultipart: true
+       });
+       // Cloudinary returns absolute URL, so check before prepending
+       return response.url.startsWith('http') ? response.url : `${import.meta.env.VITE_API_URL}${response.url}`;
+     } catch (error) {
+       console.error('Upload error:', error);
+       return null;
+     } finally {
+       setUploading(false);
+     }
+   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'imageMain' | 'imageSecondary') => {
     if (e.target.files && e.target.files[0]) {

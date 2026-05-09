@@ -1,14 +1,32 @@
 import { z } from 'zod';
 import {
   ProductSchema,
+  ProductBaseSchema,
   VariantSchema,
+  VariantBaseSchema,
   CategorySchema,
   BrandSchema,
   ProductFiltersSchema,
 } from '@amber/shared';
 
 export const CreateProductDto = ProductSchema;
-export const UpdateProductDto = ProductSchema.partial();
+
+const ProductUpdateBase = ProductBaseSchema.extend({
+  isPreOrder: z.boolean().optional(),
+  preOrderShippingDate: z.string().optional(),
+  variants: z.array(VariantBaseSchema).default([]),
+  category: z.object({
+    id: z.string(),
+    name: z.string(),
+  }).optional().nullable(),
+  brand: z.object({
+    id: z.string(),
+    name: z.string(),
+    logo: z.string().optional().nullable(),
+  }).optional().nullable(),
+});
+
+export const UpdateProductDto = ProductUpdateBase.partial();
 export const ProductFilterDto = ProductFiltersSchema;
 
 export type CreateProductDto = z.infer<typeof CreateProductDto>;
@@ -16,7 +34,7 @@ export type UpdateProductDto = z.infer<typeof UpdateProductDto>;
 export type ProductFilterDto = z.infer<typeof ProductFilterDto>;
 
 export const CreateVariantDto = VariantSchema;
-export const UpdateVariantDto = VariantSchema.partial();
+export const UpdateVariantDto = VariantBaseSchema.partial();
 
 export type CreateVariantDto = z.infer<typeof CreateVariantDto>;
 export type UpdateVariantDto = z.infer<typeof UpdateVariantDto>;

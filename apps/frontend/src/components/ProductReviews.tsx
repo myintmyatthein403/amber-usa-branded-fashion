@@ -82,10 +82,10 @@ export default function ProductReviews({ reviews = [] }: { reviews?: ApiReview[]
             >
               <div className="space-y-4">
                 <div className="flex flex-col">
-                  <span className="text-sm font-bold text-[#1A1A1A]">{review.user}</span>
-                  <span className="text-[10px] text-[#1A1A1A]/40 font-bold uppercase tracking-widest">{review.date}</span>
+                  <span className="text-sm font-bold text-[#1A1A1A]">{(review as any).userName || (review as any).user}</span>
+                  <span className="text-[10px] text-[#1A1A1A]/40 font-bold uppercase tracking-widest">{(review as any).createdAt || (review as any).date}</span>
                 </div>
-                {review.verified && (
+                {(review as any).verified && (
                   <div className="flex items-center space-x-2 text-green-600">
                     <ShieldCheck className="w-3 h-3" />
                     <span className="text-[8px] font-bold uppercase tracking-widest">Verified Buyer</span>
@@ -105,7 +105,7 @@ export default function ProductReviews({ reviews = [] }: { reviews?: ApiReview[]
                 <div className="flex items-center space-x-6">
                   <button className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40 hover:text-[#D4AF37] transition-colors">
                     <ThumbsUp className="w-3 h-3" />
-                    <span>Helpful ({review.likes})</span>
+                    <span>Helpful ({(review as any).likes})</span>
                   </button>
                   <button className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40 hover:text-[#D4AF37] transition-colors">
                     <MessageSquare className="w-3 h-3" />

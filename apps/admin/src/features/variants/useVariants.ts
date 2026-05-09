@@ -14,9 +14,13 @@ export const useVariants = () => {
   
   const initialFormData = {
     productId: '',
+    sku: '',
+    images: [] as string[],
+    isPreOrder: false,
     size: '',
     color: '',
-    stock: '0',
+    stock: 0,
+    lowStockThreshold: 5,
     warehouseId: ''
   };
 
@@ -24,8 +28,8 @@ export const useVariants = () => {
 
   const fetchVariants = async () => {
     try {
-      const data = await apiService(API_ROUTES.VARIANTS.BASE);
-      setVariants(data);
+      const data = await apiService<unknown, any[]>(API_ROUTES.VARIANTS.BASE);
+      setVariants(data || []);
     } catch (error) {
       console.error('Failed to fetch variants:', error);
     } finally {
@@ -35,8 +39,8 @@ export const useVariants = () => {
 
   const fetchProducts = async () => {
     try {
-      const data = await apiService(API_ROUTES.PRODUCTS.BASE);
-      setProducts(data);
+      const data = await apiService<unknown, any[]>(API_ROUTES.PRODUCTS.BASE);
+      setProducts(data || []);
     } catch (error) {
       console.error('Failed to fetch products:', error);
     }
@@ -44,8 +48,8 @@ export const useVariants = () => {
 
   const fetchWarehouses = async () => {
     try {
-      const data = await apiService(API_ROUTES.LOGISTICS.WAREHOUSES);
-      setWarehouses(data);
+      const data = await apiService<unknown, any[]>(API_ROUTES.LOGISTICS.WAREHOUSES);
+      setWarehouses(data || []);
     } catch (error) {
       console.error('Failed to fetch warehouses:', error);
     }
@@ -61,7 +65,7 @@ export const useVariants = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const url = editingVariant 
+      const url = editingVariant?.id 
         ? API_ROUTES.VARIANTS.BY_ID(editingVariant.id)
         : API_ROUTES.VARIANTS.BASE;
 
@@ -69,10 +73,7 @@ export const useVariants = () => {
 
       await apiService(url, {
         method,
-        body: {
-          ...formData,
-          stock: parseInt(formData.stock)
-        },
+        body: formData,
       });
 
       setModalOpen(false);
@@ -108,14 +109,18 @@ export const useVariants = () => {
     setModalOpen(true);
   };
 
-  const openEditModal = (variant: Variant) => {
+  const openEditModal = (variant: any) => {
     setEditingVariant(variant);
     setFormData({ 
-      productId: variant.productId.toString(),
-      size: variant.size,
-      color: variant.color,
-      stock: variant.stock.toString(),
-      warehouseId: ''
+      productId: String(variant.productId || ''),
+      sku: variant.sku || '',
+      images: variant.images || [],
+      isPreOrder: variant.isPreOrder || false,
+      size: variant.size || '',
+      color: variant.color || '',
+      stock: variant.stock || 0,
+      lowStockThreshold: variant.lowStockThreshold || 5,
+      warehouseId: variant.warehouseId || ''
     });
     setModalOpen(true);
   };

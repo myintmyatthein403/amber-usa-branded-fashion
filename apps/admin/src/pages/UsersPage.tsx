@@ -45,8 +45,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ mode }) => {
       >
         <UserForm 
           mode={mode}
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           submitting={submitting}
           editingUser={editingUser}
           roles={roles}

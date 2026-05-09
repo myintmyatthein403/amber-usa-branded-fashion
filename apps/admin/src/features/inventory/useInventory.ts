@@ -2,10 +2,10 @@ import { useState, useMemo, useCallback } from 'react';
 import { useFetch } from '../../hooks/useCrud';
 import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
-import { InventoryItem, GroupedInventory, Warehouse } from './schema';
+import { GroupedInventory, Warehouse } from './schema';
 
 export const useInventory = () => {
-  const { data: rawInventory, loading, refresh } = useFetch<InventoryItem>(API_ROUTES.LOGISTICS.INVENTORY);
+  const { data: rawInventory, loading, refresh } = useFetch<any>(API_ROUTES.LOGISTICS.INVENTORY);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [filterLocation, setFilterLocation] = useState<string>('ALL');
@@ -22,20 +22,23 @@ export const useInventory = () => {
 
     const groups: Record<string, GroupedInventory> = {};
 
-    rawInventory.forEach(item => {
-      if (!groups[item.variantId]) {
-        groups[item.variantId] = {
-          variant: item.variant,
-          stocks: {},
-          total: 0
-        };
-      }
-      groups[item.variantId].stocks[item.warehouse.id] = item.quantity;
-      groups[item.variantId].total += item.quantity;
-    });
+     rawInventory.forEach((item: any) => {
+       const product = item.variant?.product;
+       if (!groups[item.variantId]) {
+         groups[item.variantId] = {
+           variant: item.variant,
+           product: product || { id: '', name: '', images: [] },
+           stocks: {},
+           totalStock: 0
+         };
+       }
+       groups[item.variantId].stocks[item.warehouse.id] = item.quantity;
+       groups[item.variantId].totalStock += item.quantity;
+     });
 
     return Object.values(groups).filter(group => {
-      const matchesSearch = group.variant.product.name.toLowerCase().includes(search.toLowerCase()) || 
+      const prodName = group.product?.name || '';
+      const matchesSearch = prodName.toLowerCase().includes(search.toLowerCase()) || 
                            group.variant.sku.toLowerCase().includes(search.toLowerCase());
       
       if (filterLocation === 'ALL') return matchesSearch;

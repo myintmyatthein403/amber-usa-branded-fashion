@@ -58,8 +58,8 @@ export const VariantsPage: React.FC = () => {
         size="lg"
       >
         <VariantForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           products={products}
           warehouses={warehouses}
           onSubmit={handleSubmit}

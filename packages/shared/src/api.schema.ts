@@ -38,6 +38,8 @@ export const ApiProductSchema = z.object({
   metaDescription: z.string().nullable(),
   tags: z.array(z.string()),
   images: z.array(z.string()),
+  sizes: z.array(z.string()).default([]),
+  colors: z.array(z.string()).default([]),
   categoryId: z.string().nullable(),
   brandId: z.string().nullable(),
   saleId: z.string().nullable(),

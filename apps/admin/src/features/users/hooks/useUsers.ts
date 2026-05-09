@@ -34,7 +34,7 @@ export const useUsers = (mode: 'customers' | 'staff') => {
         const payload = { ...formData };
         if (!payload.password) delete payload.password;
         
-        await apiService(API_ROUTES.USERS.BY_ID(editingUser.id), {
+        await apiService(API_ROUTES.USERS.BY_ID(editingUser.id!), {
           method: 'PATCH',
           body: payload,
         });
@@ -69,8 +69,8 @@ export const useUsers = (mode: 'customers' | 'staff') => {
       email: user.email,
       username: user.username || '',
       password: '',
-      roleName: user.role,
-      points: user.points,
+      roleName: user.role || user.roleName || '',
+      points: (user as any).points || 0,
       memberLevel: user.memberLevel,
       status: user.status,
     });
@@ -88,8 +88,9 @@ export const useUsers = (mode: 'customers' | 'staff') => {
 
   const filteredUsers = useMemo(() => {
     return (users || []).filter(user => {
-      if (mode === 'customers') return user.role === 'USER';
-      if (mode === 'staff') return user.role === 'ADMIN' || user.role === 'SUPERADMIN';
+      const userRole = user.role || user.roleName;
+      if (mode === 'customers') return userRole === 'USER';
+      if (mode === 'staff') return userRole === 'ADMIN' || userRole === 'SUPERADMIN';
       return true;
     });
   }, [users, mode]);

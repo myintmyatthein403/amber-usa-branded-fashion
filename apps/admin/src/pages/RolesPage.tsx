@@ -51,8 +51,8 @@ export const RolesPage: React.FC = () => {
         title={editingRole ? "Modify Role Configuration" : "Define New System Role"}
       >
         <RoleForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           submitting={submitting}
           editingRole={editingRole}
           onSubmit={handleSubmit}

@@ -31,7 +31,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   editingProduct,
   onOpenMedia
 }) => {
-  const handleFieldChange = <K extends keyof Product>(field: K, value: Product[K]) => {
+  const handleFieldChange = (field: string, value: unknown) => {
     setProductForm({ ...productForm, [field]: value });
   };
 
@@ -61,14 +61,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         onChange={handleFieldChange} 
       />
 
-      <ClassificationSection 
+<ClassificationSection 
         brandId={productForm.brandId || undefined} 
         categoryId={productForm.categoryId || undefined} 
         collectionIds={productForm.collectionIds || []}
         status={productForm.status} 
-        brands={brands} 
-        categories={categories} 
-        collections={collections}
+        brands={brands || []} 
+        categories={categories || []}
+        collections={collections || []}
         onChange={handleFieldChange} 
       />
 

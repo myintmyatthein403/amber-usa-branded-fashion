@@ -58,8 +58,8 @@ export const TestimonialsPage: React.FC = () => {
         size="lg"
       >
         <TestimonialForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleSubmit}
           submitting={submitting}
           editingTestimonial={editingTestimonial}

@@ -29,6 +29,7 @@ import { CargoPage } from './pages/CargoPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { MediaPage } from './pages/MediaPage';
 import { useAdminUIStore } from './store/useAdminUIStore';
+import type { User } from '@amber/shared';
 import { apiService } from './services/api.service';
 import { API_ROUTES } from './config/constants';
 import { 
@@ -98,17 +99,20 @@ function App() {
     }
   }, [pendingOrdersCount]);
 
-  const hasAccess = (tab: string): boolean => {
+    const hasAccess = (tab: string): boolean => {
     if (!user) return false;
     
     // Normalize user object structure
-    const userData = user?.data?.user || user?.data || user;
+    const userData = user;
     
-    if (userData.role === 'SUPERADMIN') return true;
+    // Handle role (might be roleName in API response)
+    const userRole = userData.role || userData.roleName;
+    if (userRole === 'SUPERADMIN') return true;
     
     const required = TAB_PERMISSIONS[tab];
     if (!required) return true; // Public tabs like dashboard
     
+    // Handle permissions (might not be present in API response)
     const userPerms = userData.permissions || [];
     return required.some(p => userPerms.includes(p));
   };
@@ -121,18 +125,18 @@ function App() {
         return;
       }
 
-      try {
-        const profile = await apiService(API_ROUTES.AUTH.PROFILE);
-        updateUser(profile);
-        
-        // Only fetch pending count if user is admin/superadmin (Finding 5)
-        if (profile && ['ADMIN', 'SUPERADMIN'].includes(profile.role)) {
-          const pendingCount = await apiService(API_ROUTES.ORDERS.PENDING_COUNT);
-          setPendingOrdersCount(pendingCount);
-        } else {
-          setPendingOrdersCount(0);
-        }
-      } catch (error) {
+       try {
+         const profile = await apiService<null, User>(API_ROUTES.AUTH.PROFILE);
+         updateUser(profile);
+         
+         // Only fetch pending count if user is admin/superadmin (Finding 5)
+         if (profile && profile.role && ['ADMIN', 'SUPERADMIN'].includes(profile.role)) {
+           const pendingCount = await apiService<null, { count: number }>(API_ROUTES.ORDERS.PENDING_COUNT);
+           setPendingOrdersCount(pendingCount.count);
+         } else {
+           setPendingOrdersCount(0);
+         }
+       } catch (error) {
         console.error('Failed to sync backend data:', error);
         if ((error as any).message?.includes('401')) {
           logout();

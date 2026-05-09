@@ -64,8 +64,8 @@ export const GiftCardSectionPage: React.FC = () => {
         title={editingSection ? 'Refine Gift Card Design' : 'Initialize Gift Card Section'}
       >
         <GiftCardSectionForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleSubmit}
           submitting={submitting}
           editingSection={editingSection}

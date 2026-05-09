@@ -39,9 +39,9 @@ export const useProducts = () => {
       });
       if (debouncedSearch) params.append('search', debouncedSearch);
 
-      const response = await apiService(`${API_ROUTES.PRODUCTS.BASE}?${params.toString()}`);
-      setProducts(response.data);
-      setMeta(response.meta);
+      const response = await apiService<unknown, { data: Product[]; meta: Meta }>(`${API_ROUTES.PRODUCTS.BASE}?${params.toString()}`);
+      setProducts(response.data || []);
+      setMeta(response.meta || null);
     } catch (error) {
       console.error('Failed to fetch products:', error);
     } finally {
@@ -167,7 +167,7 @@ export const useProducts = () => {
   const handleProductSubmit = async () => {
     setSubmitting(true);
     try {
-      const endpoint = editingProduct 
+      const endpoint = editingProduct?.id 
         ? API_ROUTES.PRODUCTS.BY_ID(editingProduct.id) 
         : API_ROUTES.PRODUCTS.BASE;
       
@@ -266,8 +266,8 @@ export const useProducts = () => {
       tags: product.tags || [],
       metaTitle: product.metaTitle || '',
       metaDescription: product.metaDescription || '',
-      price: product.price,
-      compareAtPrice: product.compareAtPrice || '',
+      price: String(product.price),
+      compareAtPrice: String(product.compareAtPrice || ''),
       isUsdPrice: product.isUsdPrice,
       isFeatured: product.isFeatured,
       onSale: product.onSale,
@@ -279,7 +279,7 @@ export const useProducts = () => {
       images: product.images || [],
       categoryId: product.categoryId || '',
       saleId: product.saleId || '',
-      collectionIds: product.collections?.map(c => c.id) || []
+      collectionIds: (product as any).collectionIds || []
     });
     setCurrentVariants(product.variants || []);
     setModalOpen(true);

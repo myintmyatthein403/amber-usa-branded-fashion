@@ -21,15 +21,15 @@ export const useSettings = () => {
   const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiService(API_ROUTES.SETTINGS);
+      const data = await apiService<unknown, Settings>(API_ROUTES.SETTINGS);
       setSettings(data);
       setFormData({
-        privacyPolicy: data.privacyPolicy || '',
-        termsConditions: data.termsConditions || '',
-        usdToMmkRate: data.usdToMmkRate?.toString() || '3500',
-        stripePublishableKey: data.stripePublishableKey || '',
-        stripeSecretKey: data.stripeSecretKey || '',
-        stripeWebhookSecret: data.stripeWebhookSecret || '',
+        privacyPolicy: data?.privacyPolicy || '',
+        termsConditions: data?.termsConditions || '',
+        usdToMmkRate: String(data?.usdToMmkRate || '3500'),
+        stripePublishableKey: data?.stripePublishableKey || '',
+        stripeSecretKey: data?.stripeSecretKey || '',
+        stripeWebhookSecret: data?.stripeWebhookSecret || '',
       });
     } catch (error) {
       console.error('Failed to fetch settings:', error);

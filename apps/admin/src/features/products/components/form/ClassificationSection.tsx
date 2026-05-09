@@ -31,9 +31,9 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({
     onChange('collectionIds', newIds);
   };
 
-  const brandList = normalize(brands);
-  const categoryList = normalize(categories);
-  const collectionList = normalize(collections);
+  const brandList = brands || [];
+  const categoryList = categories || [];
+  const collectionList = collections || [];
 
   return (
     <div className="space-y-12">

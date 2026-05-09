@@ -32,11 +32,12 @@ export const useSaleSection = () => {
     data.append('file', file);
     setUploading(true);
     try {
-      const response = await apiService(API_ROUTES.UPLOAD, {
+      const response = await apiService<FormData, { url: string }>(API_ROUTES.UPLOAD, {
         method: 'POST',
         body: data,
         isMultipart: true
       });
+      if (!response?.url) return null;
       return `${import.meta.env.VITE_API_URL}${response.url}`;
     } catch (error) {
       console.error('Upload error:', error);

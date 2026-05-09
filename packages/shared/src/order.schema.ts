@@ -3,9 +3,6 @@ import { z } from 'zod';
 export const OrderStatusSchema = z.enum(['PENDING', 'PROCESSING', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'REFUNDED']);
 export const PaymentStatusSchema = z.enum(['PENDING', 'PAID', 'FAILED', 'REFUNDED']);
 
-export const OrderStatus = OrderStatusSchema;
-export const PaymentStatus = PaymentStatusSchema;
-
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 
@@ -23,18 +20,48 @@ export const OrderItemSchema = z.object({
   expectedShippingDate: z.string().optional(),
 });
 
+export type OrderItem = z.infer<typeof OrderItemSchema>;
+
 export const OrderSchema = z.object({
   id: z.string().uuid().optional(),
   orderNumber: z.string().optional(),
-  status: z.enum(['PENDING', 'PROCESSING', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'REFUNDED']).default('PENDING'),
-  paymentStatus: z.enum(['PENDING', 'PAID', 'FAILED', 'REFUNDED']).default('PENDING'),
+  status: OrderStatusSchema.default('PENDING'),
+  paymentStatus: PaymentStatusSchema.default('PENDING'),
   totalAmount: z.number().min(0, 'Total amount must be positive'),
   currency: z.string().default('USD'),
   paymentMethod: z.string().min(1, 'Payment method is required'),
   shippingAddress: z.string().min(1, 'Shipping address is required'),
   userId: z.string().uuid().optional().nullable(),
+  user: z.object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    email: z.string().optional(),
+    phone: z.string().optional(),
+  }).optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
   items: z.array(OrderItemSchema).min(1, 'Order must have at least one item'),
 });
 
-export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type Order = z.infer<typeof OrderSchema>;
+
+export interface OrderWithRelations extends Order {
+  id: string;
+  orderNumber?: string;
+  date?: string;
+  user?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Meta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

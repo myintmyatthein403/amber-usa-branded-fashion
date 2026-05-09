@@ -25,24 +25,24 @@ export const useCommunity = () => {
 
   const [formData, setFormData] = useState(initialFormData);
 
-  const uploadFile = async (file: File): Promise<string | null> => {
-    const data = new FormData();
-    data.append('file', file);
-    setUploading(true);
-    try {
-      const response = await apiService(API_ROUTES.UPLOAD, {
-        method: 'POST',
-        body: data,
-        isMultipart: true
-      });
-      return `${import.meta.env.VITE_API_URL}${response.url}`;
-    } catch (error) {
-      console.error('Upload error:', error);
-      return null;
-    } finally {
-      setUploading(false);
-    }
-  };
+   const uploadFile = async (file: File): Promise<string | null> => {
+     const data = new FormData();
+     data.append('file', file);
+     setUploading(true);
+     try {
+       const response = await apiService<FormData, { url: string }>(API_ROUTES.UPLOAD, {
+         method: 'POST',
+         body: data,
+         isMultipart: true
+       });
+       return `${import.meta.env.VITE_API_URL}${response.url}`;
+     } catch (error) {
+       console.error('Upload error:', error);
+       return null;
+     } finally {
+       setUploading(false);
+     }
+   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

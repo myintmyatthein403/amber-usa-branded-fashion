@@ -50,11 +50,11 @@ export const DeliveryMethodsPage: React.FC = () => {
         title={editingMethod ? `Edit Method: ${editingMethod.name}` : 'New Delivery Protocol'}
       >
         <DeliveryMethodForm 
-          form={form}
-          setForm={setForm}
+          form={form as any}
+          setForm={setForm as any}
           onSubmit={handleSubmit}
           submitting={submitting}
-          editingMethod={editingMethod}
+          editingMethod={editingMethod as any}
           onCancel={() => setModalOpen(false)}
         />
       </Modal>

@@ -102,11 +102,11 @@ export const useStore = create<AppState>()(
             variantId, 
             isPreOrder, 
             expectedShippingDate,
-            color: color || product.color,
+            color: color || (product as any).color,
             price: price !== undefined ? price : Number(product.price),
             image: image || product.images[0],
             isUsdPrice: product.isUsdPrice,
-            onSale: product.onSale
+            onSale: product.onSale || (product as any).onSale
           };
           newItems = [...cartItems, cartItem];
         }

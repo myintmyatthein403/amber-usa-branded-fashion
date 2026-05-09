@@ -49,20 +49,20 @@ export const ProductListView: React.FC<ProductListViewProps> = ({ products, onEd
                 <td className="p-4">
                   <div className="flex flex-col">
                     <span className="text-xs font-bold text-foreground line-clamp-1">{product.name}</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">#{product.id.split('-')[0].toUpperCase()}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">#{product.id?.split('-')[0].toUpperCase() || 'N/A'}</span>
                   </div>
                 </td>
                 <td className="p-4">
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{product.category?.name || 'Uncategorized'}</span>
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{product.categoryId || 'Uncategorized'}</span>
                 </td>
                 <td className="p-4 text-right">
                   <div className="flex flex-col items-end">
                     <span className="text-xs font-mono font-bold text-foreground">
-                      {product.isUsdPrice ? '$' : 'Ks'}{parseFloat(product.price).toLocaleString()}
+                      {product.isUsdPrice ? '$' : 'Ks'}{String(product.price || 0)}
                     </span>
-                    {product.compareAtPrice && parseFloat(product.compareAtPrice) > 0 && (
+                    {(product.compareAtPrice || product.compareAtPrice === 0) && parseFloat(String(product.compareAtPrice)) > 0 && (
                       <span className="text-[10px] font-mono text-muted-foreground line-through opacity-50">
-                        {product.isUsdPrice ? '$' : 'Ks'}{parseFloat(product.compareAtPrice).toLocaleString()}
+                        {product.isUsdPrice ? '$' : 'Ks'}{String(product.compareAtPrice || 0)}
                       </span>
                     )}
                   </div>
@@ -93,7 +93,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({ products, onEd
                       <Edit2 size={16} />
                     </button>
                     <button 
-                      onClick={() => onDelete(product.id)}
+                      onClick={() => product.id && onDelete(product.id)}
                       className="p-2 text-muted-foreground hover:text-destructive transition-colors duration-300"
                       title="Delete Product"
                     >

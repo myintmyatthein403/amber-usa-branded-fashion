@@ -96,8 +96,8 @@ export const ReviewsPage: React.FC = () => {
         size="lg"
       >
         <ReviewForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           products={products}
           onSubmit={handleSubmit}
           submitting={submitting}

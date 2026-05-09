@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useStore } from "@/store/useStore";
-import { Product, Variant } from "@amber/shared";
+import { Product } from "@amber/shared";
 
 interface FormattedProduct {
   id: string;
@@ -12,7 +12,9 @@ interface FormattedProduct {
   isUsdPrice: boolean;
   image: string;
   sizes: string[];
-  variants?: Variant[];
+  onSale?: boolean;
+  shortDescription?: string | null;
+  variants?: any[];
 }
 
 export function useQuickBuyActions() {
@@ -30,12 +32,14 @@ export function useQuickBuyActions() {
         if (data.length > 0) {
           const p = data[0] as Product;
           setProduct({
-            ...p,
+            id: p.id || '',
+            name: p.name,
             price: parseFloat(String(p.price)),
             originalPrice: p.compareAtPrice ? parseFloat(String(p.compareAtPrice)) : null,
             isUsdPrice: p.isUsdPrice !== false,
             image: p.images?.[0] || "https://images.unsplash.com/photo-1556905055-8f358a7a4bb4?auto=format&fit=crop&q=80&w=800",
-            sizes: Array.from(new Set(p.variants?.map((v) => v.size) || []))
+            sizes: Array.from(new Set(p.variants?.map((v) => v.size) || [])),
+            variants: p.variants
           });
         }
       } catch (error) {
@@ -69,7 +73,7 @@ export function useQuickBuyActions() {
     const selectedVariant = product.variants?.find((v) => v.size === selectedSize);
     
     addToCart(
-      product, 
+      product as any, 
       selectedSize || undefined, 
       selectedVariant?.id,
       undefined,

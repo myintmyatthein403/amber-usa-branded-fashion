@@ -17,7 +17,7 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
   const fetchMedia = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiService(API_ROUTES.MEDIA.BASE);
+      const data = await apiService<unknown, MediaItem[]>(API_ROUTES.MEDIA.BASE);
       setMedia(data);
     } catch (error) {
       console.error('Failed to fetch media:', error);
@@ -38,7 +38,7 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
     formData.append('file', e.target.files[0]);
 
     try {
-      const newItem = await apiService(API_ROUTES.MEDIA.UPLOAD, {
+      const newItem = await apiService<FormData, MediaItem>(API_ROUTES.MEDIA.UPLOAD, {
         method: 'POST',
         body: formData,
         isMultipart: true

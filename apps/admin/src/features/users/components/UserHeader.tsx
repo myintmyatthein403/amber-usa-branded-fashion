@@ -9,7 +9,7 @@ interface UserHeaderProps {
 
 export const UserHeader: React.FC<UserHeaderProps> = ({ mode, onAdd }) => {
   const { user } = useAdminUIStore();
-  const isSuperAdmin = user?.role?.name === 'SUPERADMIN' || user?.roleName === 'SUPERADMIN';
+  const isSuperAdmin = user?.role === 'SUPERADMIN' || user?.roleName === 'SUPERADMIN';
 
   return (
     <div className="flex items-end justify-between">

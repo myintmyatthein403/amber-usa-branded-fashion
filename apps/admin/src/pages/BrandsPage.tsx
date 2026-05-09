@@ -53,12 +53,12 @@ export const BrandsPage: React.FC = () => {
         title={editingBrand ? 'Modify Brand Identity' : 'Initialize Brand Profile'}
       >
         <BrandForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleSubmit}
           onCancel={() => setModalOpen(false)}
           submitting={submitting}
-          editingBrand={editingBrand}
+          editingBrand={editingBrand as any}
           onMediaSelectorOpen={() => setMediaSelectorOpen(true)}
         />
       </Modal>

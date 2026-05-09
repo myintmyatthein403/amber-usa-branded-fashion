@@ -83,8 +83,8 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                   <td className="p-4">
                     <input 
                       type="checkbox" 
-                      checked={selectedIds.includes(order.id)}
-                      onChange={() => onSelect(order.id)}
+                      checked={selectedIds.includes(order.id!)}
+                      onChange={() => onSelect(order.id!)}
                       className="w-4 h-4 accent-primary cursor-pointer"
                     />
                   </td>
@@ -92,7 +92,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                     <span className="text-xs font-mono font-bold text-foreground">#{order.orderNumber}</span>
                   </td>
                   <td className="p-4">
-                    <span className="text-[10px] font-medium text-muted-foreground">{format(new Date(order.createdAt), 'MMM dd, yyyy HH:mm')}</span>
+                    <span className="text-[10px] font-medium text-muted-foreground">{order.createdAt ? format(new Date(order.createdAt), 'MMM dd, yyyy HH:mm') : 'N/A'}</span>
                   </td>
                   <td className="p-4">
                     <div className="flex flex-col">
@@ -125,7 +125,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                         <Eye size={16} />
                       </button>
                       <button 
-                        onClick={() => onDelete(order.id)}
+                        onClick={() => order.id && onDelete(order.id)}
                         className="p-2 text-muted-foreground hover:text-destructive transition-colors duration-300"
                         title="Delete Order"
                       >

@@ -60,8 +60,8 @@ export const SalesPage: React.FC = () => {
         size="lg"
       >
         <SaleForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           productSearch={productSearch}
           setProductSearch={setProductSearch}
           filteredProducts={filteredProducts}

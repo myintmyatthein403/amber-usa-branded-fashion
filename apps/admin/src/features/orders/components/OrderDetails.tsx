@@ -49,7 +49,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
             </div>
           </div>
           <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-            <Clock size={12} /> Placed on {format(new Date(order.createdAt), 'MMMM dd, yyyy at HH:mm')}
+            <Clock size={12} /> Placed on {order.createdAt ? format(new Date(order.createdAt), 'MMMM dd, yyyy at HH:mm') : 'N/A'}
           </p>
         </div>
         
@@ -60,7 +60,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
               <button
                 key={key}
                 disabled={updatingStatus || order.status === key}
-                onClick={() => onUpdateStatus(order.id, key as OrderStatus)}
+                onClick={() => order.id && onUpdateStatus(order.id, key as OrderStatus)}
                 className={cn(
                   "flex items-center gap-2 px-3 py-2 text-[9px] font-bold uppercase tracking-widest border transition-all duration-300",
                   order.status === key 

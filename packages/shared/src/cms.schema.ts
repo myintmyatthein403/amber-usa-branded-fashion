@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { WarehouseSchema, WarehouseLocationSchema, CargoStatusSchema } from './logistics.schema';
 
 export const TestimonialSchema = z.object({
   id: z.string().uuid().optional(),
@@ -175,27 +176,6 @@ export type Sale = z.infer<typeof SaleSchema> & {
 };
 export type CreateSaleInput = z.infer<typeof SaleSchema>;
 
-export const WarehouseLocationSchema = z.enum(['USA', 'MYANMAR']);
-
-export const WarehouseSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().min(1, 'Warehouse name is required'),
-  location: WarehouseLocationSchema.default('USA'),
-  address: z.string().optional(),
-});
-
-export type Warehouse = z.infer<typeof WarehouseSchema> & { id: string };
-
-export const CargoStatusSchema = z.enum([
-  'PREPARING',
-  'DEPARTED',
-  'IN_TRANSIT',
-  'ARRIVED_MYANMAR',
-  'CUSTOMS_CLEARANCE',
-  'READY_FOR_DISTRIBUTION',
-  'COMPLETED',
-]);
-
 export const CargoItemInputSchema = z.object({
   variantId: z.string().uuid(),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
@@ -293,7 +273,7 @@ export const PermissionItemSchema = z.object({
   label: z.string(),
 });
 
-export const PermissionGroupSchema = z.object({
+export const PermissionGroupUISchema = z.object({
   category: z.string(),
   items: z.array(PermissionItemSchema),
 });
@@ -305,13 +285,14 @@ export const RoleSchema = z.object({
   permissions: z.array(z.string()),
   color: z.string().default('text-primary'),
   isImmutable: z.boolean().default(false),
+  _count: z.object({ users: z.number() }).optional(),
 });
 
 export type Role = z.infer<typeof RoleSchema> & { id: string };
-export type PermissionGroup = z.infer<typeof PermissionGroupSchema>;
+export type PermissionGroupUI = z.infer<typeof PermissionGroupUISchema>;
 export type PermissionItem = z.infer<typeof PermissionItemSchema>;
 
-export const AVAILABLE_PERMISSIONS: PermissionGroup[] = [
+export const AVAILABLE_PERMISSIONS: z.infer<typeof PermissionGroupUISchema>[] = [
   {
     category: 'Catalog Management',
     items: [

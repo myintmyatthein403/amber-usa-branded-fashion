@@ -52,14 +52,14 @@ export const DeliveryMethodForm: React.FC<DeliveryMethodFormProps> = ({
               <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors">USD Base</span>
             </label>
           </div>
-          <input 
-            type="number" 
-            required 
-            value={form.price} 
-            onChange={(e) => setForm({ ...form, price: e.target.value })} 
-            className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" 
-            placeholder="0.00" 
-          />
+           <input 
+             type="number" 
+             required 
+             value={form.price} 
+             onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} 
+             className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" 
+             placeholder="0.00" 
+           />
         </div>
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Estimated Delivery Time</label>
@@ -76,13 +76,13 @@ export const DeliveryMethodForm: React.FC<DeliveryMethodFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Free Shipping Threshold</label>
-          <input 
-            type="number" 
-            value={form.freeOverAmount} 
-            onChange={(e) => setForm({ ...form, freeOverAmount: e.target.value })} 
-            className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" 
-            placeholder="0.00 (Optional)" 
-          />
+           <input 
+             type="number" 
+             value={form.freeOverAmount} 
+             onChange={(e) => setForm({ ...form, freeOverAmount: parseFloat(e.target.value) || undefined })} 
+             className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" 
+             placeholder="0.00 (Optional)" 
+           />
           <p className="text-[9px] text-muted-foreground/60 italic uppercase tracking-widest">Delivery fee becomes zero if subtotal exceeds this amount.</p>
         </div>
         <div className="flex flex-col gap-4 pt-4">

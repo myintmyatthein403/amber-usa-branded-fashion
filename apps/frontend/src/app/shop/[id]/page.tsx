@@ -52,7 +52,7 @@ export default function ProductDetailPage() {
     }
     
     // 3. Fallback to default product image
-    return product.image;
+    return product.images[0];
   }, [product, selectedSize, selectedColor, userSelectedImage]);
 
   useEffect(() => {
@@ -99,6 +99,7 @@ export default function ProductDetailPage() {
   }, [product]);
 
   const handleAddToCart = () => {
+    if (!product) return;
     if (!selectedSize && product.sizes?.length > 0) {
       alert("Please select a size");
       return;
@@ -117,11 +118,11 @@ export default function ProductDetailPage() {
     });
     
     addToCart(
-      product, 
+      product as any, 
       selectedSize || undefined, 
       selectedVariant?.id, 
       product.isPreOrder, 
-      product.preOrderShippingDate,
+      product.preOrderShippingDate || undefined,
       selectedColor || undefined,
       selectedVariant?.price ? Number(selectedVariant.price) : undefined,
       selectedVariant?.images?.[0] || undefined
@@ -184,7 +185,7 @@ export default function ProductDetailPage() {
               className="relative aspect-[4/5] bg-[#F5F0E1] overflow-hidden rounded-sm w-full"
             >
               <Image
-                src={activeImage || product.image}
+                src={activeImage || product.images[0]}
                 alt={product.name}
                 fill
                 className="object-cover transition-all duration-700"
@@ -192,7 +193,7 @@ export default function ProductDetailPage() {
               />
               {product.onSale && (
                 <div className="absolute top-8 right-8 bg-red-500 text-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] shadow-xl rounded-full">
-                  -{Math.round((1 - product.price / (product.originalPrice || product.price)) * 100)}% Off
+                  -{Math.round((1 - Number(product.price) / Number(product.compareAtPrice || product.price)) * 100)}% Off
                 </div>
               )}
             </motion.div>
@@ -228,13 +229,13 @@ export default function ProductDetailPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-[#D4AF37] text-[10px] uppercase font-bold tracking-[0.4em] mb-2 block">
-                      {product.category}
+                      {product.category?.name}
                     </span>
                     <h1 className="text-4xl md:text-5xl font-serif text-[#1A1A1A]">{product.name}</h1>
                   </div>
                   <div className="flex space-x-2">
                     <button 
-                      onClick={() => addToCompare(product)}
+                      onClick={() => addToCompare(product as any)}
                       className="p-3 border border-[#1A1A1A]/5 rounded-full hover:bg-white hover:shadow-md transition-all text-[#1A1A1A]/40 hover:text-[#D4AF37]"
                     >
                       <Scale className="w-5 h-5" />
@@ -247,8 +248,8 @@ export default function ProductDetailPage() {
                 
                 <div className="flex items-center space-x-6">
                   <Price amount={product.price} isUsdPrice={product.isUsdPrice} className="text-3xl text-[#D4AF37] font-bold" />
-                  {product.onSale && product.originalPrice && (
-                    <Price amount={product.originalPrice} isUsdPrice={product.isUsdPrice} className="text-lg text-[#1A1A1A]/30 font-bold line-through" />
+                  {product.onSale && product.compareAtPrice && (
+                    <Price amount={product.compareAtPrice} isUsdPrice={product.isUsdPrice} className="text-lg text-[#1A1A1A]/30 font-bold line-through" />
                   )}
                   <div className="w-px h-4 bg-[#1A1A1A]/10" />
                   <div className="flex items-center space-x-2">
@@ -258,8 +259,8 @@ export default function ProductDetailPage() {
                       ))}
                     </div>
                     <span className="text-[10px] text-[#1A1A1A]/40 font-bold tracking-widest uppercase">
-                      {product.reviews?.length > 0 
-                        ? `${(product.reviews.reduce((acc: number, r: ApiReview) => acc + r.rating, 0) / product.reviews.length).toFixed(1)} (${product.reviews.length})` 
+{(product as any).reviews?.length > 0 
+                         ? `${((product as any).reviews.reduce((acc: number, r: ApiReview) => acc + r.rating, 0) / (product as any).reviews.length).toFixed(1)} (${(product as any).reviews.length})`
                         : "No reviews yet"}
                     </span>
                   </div>
@@ -291,7 +292,7 @@ export default function ProductDetailPage() {
                     )}
                     {activeTab === "details" && (
                       <ul className="space-y-2">
-                        {product.details.map((item: string, i: number) => (
+                        {(product.detail || '').split('\n').filter(Boolean).map((item: string, i: number) => (
                           <li key={i} className="flex items-center space-x-3">
                             <div className="w-1 h-1 bg-[#D4AF37] rounded-full" />
                             <span>{item}</span>
@@ -384,7 +385,7 @@ export default function ProductDetailPage() {
 
                 <div className="flex gap-4">
                   <button
-                    disabled={(!product.inStock && !product.isPreOrder) || addingId === product.id}
+                    disabled={(!(product as any).variants?.length && !product.isPreOrder) || addingId === product.id}
                     onClick={handleAddToCart}
                     className={cn(
                       "flex-1 py-5 uppercase tracking-[0.2em] text-xs font-bold transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center space-x-4 shadow-xl disabled:opacity-50",
@@ -397,7 +398,7 @@ export default function ProductDetailPage() {
                         ? "Added to Bag" 
                         : product.isPreOrder 
                           ? "Pre-Order Now" 
-                          : (!product.inStock ? "Out of Stock" : "Add to Shopping Bag")}
+                          : (!(product as any).variants?.length ? "Out of Stock" : "Add to Shopping Bag")}
                     </span>
                   </button>
                   <button className="w-16 h-16 border border-[#1A1A1A]/10 flex items-center justify-center text-[#1A1A1A]/40 hover:text-red-500 hover:border-red-500 transition-all group">
@@ -433,7 +434,7 @@ export default function ProductDetailPage() {
       </section>
 
       {/* Customer Reviews Section */}
-      <ProductReviews reviews={product.reviews || []} />
+      <ProductReviews reviews={product.reviews as any || []} />
 
       {/* Recommended Products */}
       <ProductGrid title="You May Also Love" />

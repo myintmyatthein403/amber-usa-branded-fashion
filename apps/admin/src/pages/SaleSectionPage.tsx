@@ -60,8 +60,8 @@ export const SaleSectionPage: React.FC = () => {
         size="lg"
       >
         <SaleSectionForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleSubmit}
           onFileChange={handleFileChange}
           submitting={submitting}

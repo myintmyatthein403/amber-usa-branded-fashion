@@ -42,6 +42,7 @@ export const ProductFormDataSchema = z.object({
 export type ProductFormData = z.infer<typeof ProductFormDataSchema>;
 
 export const VariantFormDataSchema = z.object({
+  id: z.string().optional(),
   sku: z.string().min(1, 'SKU is required'),
   barcode: z.string().optional(),
   size: z.string().min(1, 'Size is required'),
@@ -52,6 +53,9 @@ export const VariantFormDataSchema = z.object({
   weight: z.union([z.string(), z.number()]).optional(),
   images: z.array(z.string()).default([]),
   isPreOrder: z.boolean().default(false),
+  warehouseId: z.string().optional(),
+  productId: z.string().optional(),
+  lowStockThreshold: z.number().min(0).default(5),
 });
 
 export type VariantFormData = z.infer<typeof VariantFormDataSchema>;
@@ -94,6 +98,7 @@ export type CouponFormData = z.infer<typeof CouponFormDataSchema>;
 export const GiftCardFormDataSchema = z.object({
   code: z.string().min(1, 'Code is required'),
   initialBalance: z.number().min(0),
+  currentBalance: z.number().min(0).optional(),
   expiryDate: z.string().optional(),
   isActive: z.boolean().default(true),
   note: z.string().optional(),
@@ -243,8 +248,8 @@ export const FooterSectionFormDataSchema = z.object({
   companyName: z.string().min(1, 'Company Name is required'),
   companySubtitle: z.string().min(1, 'Company Subtitle is required'),
   companyDescription: z.string().min(1, 'Company Description is required'),
-  instagramUrl: z.string().url('Invalid URL for Instagram').optional().or(z.literal('')),
-  facebookUrl: z.string().url('Invalid URL for Facebook').optional().or(z.literal('')),
+  instagramUrl: z.string().url('Invalid Instagram URL').optional().or(z.literal('')),
+  facebookUrl: z.string().url('Invalid Facebook URL').optional().or(z.literal('')),
   contactAddress: z.string().optional(),
   contactPhone: z.string().optional(),
   contactEmail: z.string().email('Invalid Email Address').optional().or(z.literal('')),
@@ -261,6 +266,8 @@ export const CommunityPostFormDataSchema = z.object({
   image: z.string().min(1, 'Image is required'),
   stars: z.number().min(1).max(5).default(5),
   isActive: z.boolean().default(true),
+  id: z.string().optional(),
+  likes: z.number().optional(),
 });
 
 export type CommunityPostFormData = z.infer<typeof CommunityPostFormDataSchema>;

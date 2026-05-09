@@ -1,51 +1,33 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { SaleSectionRepository } from './sale-section.repository';
 
 @Injectable()
 export class SaleSectionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private repository: SaleSectionRepository) {}
 
   async create(data: any) {
-    if (data.isActive) {
-      await this.prisma.saleSection.updateMany({
-        where: { isActive: true },
-        data: { isActive: false },
-      });
-    }
-    return this.prisma.saleSection.create({ data });
+    return this.repository.create(data);
   }
 
   async findAll() {
-    return this.prisma.saleSection.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.repository.findAll();
   }
 
   async findActive() {
-    return this.prisma.saleSection.findFirst({
-      where: { isActive: true },
-    });
+    return this.repository.findActive();
+  }
+
+  async findOne(id: string) {
+    const section = await this.repository.findById(id);
+    if (!section) throw new NotFoundException(`Sale section ${id} not found`);
+    return section;
   }
 
   async update(id: string, data: any) {
-    if (data.isActive) {
-      await this.prisma.saleSection.updateMany({
-        where: {
-          isActive: true,
-          NOT: { id },
-        },
-        data: { isActive: false },
-      });
-    }
-    return this.prisma.saleSection.update({
-      where: { id },
-      data,
-    });
+    return this.repository.update(id, data);
   }
 
   async remove(id: string) {
-    return this.prisma.saleSection.delete({
-      where: { id },
-    });
+    return this.repository.delete(id);
   }
 }

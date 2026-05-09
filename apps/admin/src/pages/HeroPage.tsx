@@ -43,8 +43,8 @@ export const HeroPage: React.FC = () => {
         title={editingHero ? 'Refine Experience Design' : 'Initialize Hero Section'}
       >
         <HeroForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           submitting={submitting}
           uploading={uploading}
           editingHero={editingHero}

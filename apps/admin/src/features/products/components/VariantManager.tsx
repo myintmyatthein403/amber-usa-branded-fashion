@@ -171,7 +171,7 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
           {editingVariant && (
             <button type="button" onClick={() => {
               setEditingVariant(null);
-              setNewVariant({ sku: '', size: '', color: '', stock: '0', lowStockThreshold: '5', images: [] });
+              setNewVariant({ sku: '', size: '', color: '', stock: 0, lowStockThreshold: 5, images: [] });
             }} className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground px-4">Cancel Edit</button>
           )}
           <button type="button" onClick={addVariant} disabled={!newVariant.sku || !newVariant.size || (!editingVariant && (newVariant.stock || 0) > 0 && !newVariant.warehouseId)} className="bg-foreground text-primary-foreground px-8 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-lg shadow-black/5">

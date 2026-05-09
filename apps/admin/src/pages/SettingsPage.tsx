@@ -41,7 +41,7 @@ export const SettingsPage: React.FC = () => {
         />
 
         <StripeSettings 
-          formData={formData}
+          formData={formData as any}
           onUpdate={updateField}
         />
 

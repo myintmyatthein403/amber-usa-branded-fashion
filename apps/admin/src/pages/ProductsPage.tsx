@@ -28,7 +28,7 @@ export const ProductsPage: React.FC = () => {
     setSearch,
     categories,
     brands,
-    warehouses,
+    warehouseList,
     sales,
     modalOpen,
     setModalOpen,
@@ -236,31 +236,31 @@ export const ProductsPage: React.FC = () => {
 
         {step === 1 ? (
           <ProductForm 
-            productForm={productForm}
-            setProductForm={setProductForm}
-            categories={categories}
-            brands={brands}
-            sales={sales}
+            productForm={productForm as any}
+            setProductForm={setProductForm as any}
+            categories={categories as any}
+            brands={brands as any}
+            sales={sales as any}
             onSubmit={(e) => {
               e.preventDefault();
               handleProductSubmit();
             }}
             submitting={submitting}
-            editingProduct={editingProduct}
+            editingProduct={editingProduct as any}
             onOpenMedia={openProductMedia}
             collections={null}
           />
         ) : (
           <VariantManager 
-            newVariant={newVariant}
-            setNewVariant={setNewVariant}
-            editingVariant={editingVariant}
-            setEditingVariant={setEditingVariant}
+            newVariant={newVariant as any}
+            setNewVariant={setNewVariant as any}
+            editingVariant={editingVariant as any}
+            setEditingVariant={setEditingVariant as any}
             addVariant={addVariant}
-            currentVariants={currentVariants}
+            currentVariants={currentVariants as any}
             handleEditVariant={handleEditVariant}
             handleDeleteVariant={handleDeleteVariant}
-            warehouses={warehouses}
+            warehouses={warehouseList as any}
             setStep={setStep}
             onSave={handleProductSubmit}
             submitting={submitting}

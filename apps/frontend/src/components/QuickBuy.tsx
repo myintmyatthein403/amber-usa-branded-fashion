@@ -56,9 +56,6 @@ export default function QuickBuy() {
               </h2>
               <div className="flex items-center space-x-6">
                 <Price amount={product.price} isUsdPrice={product.isUsdPrice} className="text-3xl text-[#D4AF37] font-bold" />
-                {product.onSale && product.originalPrice && (
-                  <Price amount={product.originalPrice} isUsdPrice={product.isUsdPrice} className="text-lg text-[#1A1A1A]/30 font-bold line-through" />
-                )}
               </div>
             </div>
 

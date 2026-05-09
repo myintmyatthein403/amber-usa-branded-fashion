@@ -1,24 +1,33 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnApplicationBootstrap, Logger } from '@nestjs/common';
 import { SettingsRepository } from './settings.repository';
 import DOMPurify from 'isomorphic-dompurify';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
-export class SettingsService implements OnModuleInit {
+export class SettingsService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(SettingsService.name);
+
   constructor(private readonly settingsRepository: SettingsRepository) {}
 
-  async onModuleInit() {
-    // Ensure global settings exist
-    const settings = await this.settingsRepository.findById('global');
+  async onApplicationBootstrap() {
+    try {
+      const settings = await this.settingsRepository.findById('global');
 
-    if (!settings) {
-      await this.settingsRepository.create({
-        id: 'global',
-        stripePublishableKey: null,
-        stripeSecretKey: null,
-        stripeWebhookSecret: null,
-        usdToMmkRate: 3500.0,
-      });
+      if (!settings) {
+        await this.settingsRepository.create({
+          id: 'global',
+          stripePublishableKey: null,
+          stripeSecretKey: null,
+          stripeWebhookSecret: null,
+          usdToMmkRate: 3500.0,
+        });
+        this.logger.log('Created global settings');
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to initialize global settings: ${error.message}`,
+        error.stack,
+      );
     }
   }
 

@@ -40,10 +40,10 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
         try {
           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
           const data: Product[] = await res.json();
-          const filtered: SearchResult[] = data.filter((p) => 
+          const filtered: SearchResult[] = (data as unknown as any[]).filter((p) => 
             p.name.toLowerCase().includes(query.toLowerCase()) || 
-            (p.brand?.name || "").toLowerCase().includes(query.toLowerCase()) ||
-            (p.category?.name || "").toLowerCase().includes(query.toLowerCase())
+            ((p as any).brand?.name || "").toLowerCase().includes(query.toLowerCase()) ||
+            ((p as any).category?.name || "").toLowerCase().includes(query.toLowerCase())
           ).map((p) => ({
             ...p,
             image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",

@@ -64,8 +64,8 @@ export const CommunityPostsPage: React.FC = () => {
         title={editingPost ? 'Refine Post' : 'Initialize Community Post'}
       >
         <CommunityPostForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleSubmit}
           onFileChange={handleFileChange}
           submitting={submitting}

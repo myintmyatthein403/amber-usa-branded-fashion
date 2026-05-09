@@ -75,7 +75,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products, onEdit, on
             <div className="p-6 space-y-4">
               <div className="flex justify-between items-start gap-4">
                 <div>
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">{product.category?.name || 'Uncategorized'}</span>
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">{product.categoryId || 'Uncategorized'}</span>
                   <h3 className="text-xl font-serif text-foreground mt-1 line-clamp-1">{product.name}</h3>
                 </div>
                 <div className="text-right">

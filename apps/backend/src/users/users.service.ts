@@ -42,12 +42,18 @@ export class UsersService {
       throw new ForbiddenException('Only Superadmins can create staff members');
     }
 
-    const sanitizedData = sanitizeData(data);
+    const sanitizedData = sanitizeData(data) as Record<string, unknown>;
+    if (sanitizedData.role === null || sanitizedData.role === undefined) {
+      delete sanitizedData.role;
+    } else if (typeof sanitizedData.role === 'string') {
+      sanitizedData.roleName = sanitizedData.role;
+      delete sanitizedData.role;
+    }
     if (sanitizedData.password) {
-      sanitizedData.password = await bcrypt.hash(sanitizedData.password, 10);
+      sanitizedData.password = await bcrypt.hash(sanitizedData.password as string, 10);
     }
 
-    const user = await this.usersRepository.create(sanitizedData);
+    const user = await this.usersRepository.create(sanitizedData as any);
     const { password: _, ...result } = user;
     return result;
   }
@@ -87,12 +93,18 @@ export class UsersService {
       }
     }
 
-    const sanitizedData = sanitizeData(data);
+    const sanitizedData = sanitizeData(data) as Record<string, unknown>;
+    if (sanitizedData.role === null || sanitizedData.role === undefined) {
+      delete sanitizedData.role;
+    } else if (typeof sanitizedData.role === 'string') {
+      sanitizedData.roleName = sanitizedData.role;
+      delete sanitizedData.role;
+    }
     if (sanitizedData.password) {
-      sanitizedData.password = await bcrypt.hash(sanitizedData.password, 10);
+      sanitizedData.password = await bcrypt.hash(sanitizedData.password as string, 10);
     }
 
-    const updatedUser = await this.usersRepository.update(id, sanitizedData);
+    const updatedUser = await this.usersRepository.update(id, sanitizedData as any);
     const { password: _, ...result } = updatedUser;
     return result;
   }

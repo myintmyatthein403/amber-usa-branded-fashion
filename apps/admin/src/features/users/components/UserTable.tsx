@@ -54,8 +54,8 @@ export const UserTable: React.FC<UserTableProps> = ({
                 </td>
                 <td className="px-10 py-6">
                   <div className="flex items-center gap-2">
-                    <Shield size={12} className={user.role !== 'USER' ? 'text-primary' : 'text-muted-foreground/30'} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{user.role}</span>
+                    <Shield size={12} className={user.role && user.role !== 'USER' ? 'text-primary' : 'text-muted-foreground/30'} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{user.role || user.roleName || 'USER'}</span>
                   </div>
                 </td>
                 <td className="px-10 py-6">
@@ -65,7 +65,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                         <Star size={10} className="text-primary fill-primary" />
                         <span className="text-[10px] font-bold uppercase tracking-widest">{user.memberLevel}</span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground">{user.points} Points</span>
+                      <span className="text-[10px] text-muted-foreground">{(user as any).points || 0} Points</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
@@ -85,7 +85,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                       <Edit2 size={18} />
                     </button>
                     <button 
-                      onClick={() => onDelete(user.id)}
+                      onClick={() => user.id && onDelete(user.id)}
                       className="p-2.5 text-muted-foreground hover:text-destructive transition-colors duration-300"
                     >
                       <Trash2 size={18} />

@@ -29,7 +29,7 @@ export const WarehouseForm: React.FC<WarehouseFormProps> = ({
              <button
                key={loc}
                type="button"
-               onClick={() => setFormData({ ...formData, location: loc })}
+               onClick={() => setFormData({ ...formData, location: loc as 'USA' | 'MYANMAR' })}
                className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border transition-all duration-300 ${formData.location === loc ? 'bg-foreground text-primary-foreground border-foreground' : 'bg-transparent text-muted-foreground border-border hover:border-primary'}`}
              >
                {loc}

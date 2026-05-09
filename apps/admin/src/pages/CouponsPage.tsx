@@ -49,8 +49,8 @@ export const CouponsPage: React.FC = () => {
         title={editingCoupon ? 'Modify Promotion Parameters' : 'Initialize New Promotion'}
       >
         <CouponForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleSubmit}
           submitting={submitting}
           editingCoupon={editingCoupon}

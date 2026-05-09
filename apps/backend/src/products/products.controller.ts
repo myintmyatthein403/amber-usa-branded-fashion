@@ -16,15 +16,15 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { ProductSchema } from '@amber/shared';
-import { CreateProductDto, ProductQueryDto, StockValidationItemDto } from './dto/product.dto';
+import { ProductSchema, Permission } from '@amber/shared';
+import { CreateProductDto, UpdateProductDto, ProductQueryDto, StockValidationItemDto } from './dto/product.dto';
 
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Permissions('products:write')
+  @Permissions(Permission.PRODUCTS_WRITE)
   @Post()
   @UsePipes(new ZodValidationPipe(ProductSchema))
   create(@Body() createProductDto: CreateProductDto) {
@@ -32,7 +32,7 @@ export class ProductsController {
   }
 
   @UseGuards(OptionalJwtAuthGuard, RolesGuard)
-  @Permissions('products:read')
+  @Permissions(Permission.PRODUCTS_READ)
   @Get()
   async findAll(@Query() query: ProductQueryDto) {
     return this.productsService.getAllProducts({
@@ -49,7 +49,7 @@ export class ProductsController {
   }
 
   @UseGuards(OptionalJwtAuthGuard, RolesGuard)
-  @Permissions('products:read')
+  @Permissions(Permission.PRODUCTS_READ)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.productsService.getProductById(id);
@@ -61,15 +61,15 @@ export class ProductsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Permissions('products:write')
+  @Permissions(Permission.PRODUCTS_WRITE)
   @Patch(':id')
-  @UsePipes(new ZodValidationPipe(ProductSchema.partial()))
-  update(@Param('id') id: string, @Body() updateProductDto: CreateProductDto) {
+  @UsePipes(new ZodValidationPipe(UpdateProductDto))
+  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
     return this.productsService.updateProduct(id, updateProductDto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Permissions('products:write')
+  @Permissions(Permission.PRODUCTS_WRITE)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.productsService.deleteProduct(id);

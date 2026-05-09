@@ -34,7 +34,7 @@ export const VariantTable: React.FC<VariantTableProps> = ({ variants, onEdit, on
                   <div className="p-2 bg-[#F0F0F0] text-[#0F0F0F] group-hover:bg-[#C9A962] group-hover:text-white transition-colors">
                     <Package size={16} />
                   </div>
-                  <span className="text-sm font-bold text-[#0F0F0F]">{variant.product?.name || 'Unlinked Product'}</span>
+                  <span className="text-sm font-bold text-[#0F0F0F]">{(variant as any).product?.name || (variant as any).productName || 'Unlinked Product'}</span>
                 </div>
               </td>
               <td className="p-4">
@@ -53,7 +53,7 @@ export const VariantTable: React.FC<VariantTableProps> = ({ variants, onEdit, on
               <td className="p-4 text-right">
                 <div className="flex items-center justify-end gap-2">
                   <button onClick={() => onEdit(variant)} className="p-2 text-[#666] hover:text-[#0F0F0F] transition-colors"><Edit2 size={16} /></button>
-                  <button onClick={() => onDelete(variant.id)} className="p-2 text-[#666] hover:text-rose-600 transition-colors"><Trash2 size={16} /></button>
+                  <button onClick={() => variant.id && onDelete(variant.id)} className="p-2 text-[#666] hover:text-rose-600 transition-colors"><Trash2 size={16} /></button>
                 </div>
               </td>
             </tr>

@@ -266,7 +266,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                   <div className="space-y-4 pt-4">
                     <button
                       onClick={handleAddToCart}
-                      disabled={!product.variants?.some(v => v.stock > 0) && !product.inStock || isAdding}
+                      disabled={!product.variants?.some(v => v.stock > 0) || isAdding}
                       className={cn(
                         "group relative w-full h-16 uppercase tracking-[0.25em] text-[13px] font-bold transition-all duration-500 overflow-hidden rounded-none",
                         isAdding ? "bg-[#C9A962] text-white" : "bg-[#0F0F0F] text-white hover:bg-[#C9A962]"

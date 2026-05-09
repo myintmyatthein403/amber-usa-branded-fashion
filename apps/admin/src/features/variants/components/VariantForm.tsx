@@ -46,7 +46,7 @@ export const VariantForm: React.FC<VariantFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#666]">Current Stock Count</label>
-          <input type="number" required value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full h-12 border-b border-[#E5E5E5] bg-transparent px-0 py-2 text-lg font-mono font-bold focus:border-[#C9A962] focus:outline-none transition-colors duration-300 rounded-none" />
+          <input type="number" required value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })} className="w-full h-12 border-b border-[#E5E5E5] bg-transparent px-0 py-2 text-lg font-mono font-bold focus:border-[#C9A962] focus:outline-none transition-colors duration-300 rounded-none" />
         </div>
         {!editingVariant && (
           <div className="space-y-2">

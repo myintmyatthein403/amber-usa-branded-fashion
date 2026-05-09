@@ -7,12 +7,12 @@ import { Role, CreateRoleInput } from '../schema';
 export const useRoles = () => {
   const { data: rawData, loading, refresh } = useFetch<Role>(API_ROUTES.ROLES.BASE);
   
-  // Debug: Inspect what data we're getting
+  // Debug: Inspect what we're getting
   useEffect(() => {
-    console.log("DEBUG: rawData from useFetch<Role>:", rawData);
+    console.log("DEBUG: rawData from useFetch:", rawData);
   }, [rawData]);
 
-  const roles = Array.isArray(rawData) ? rawData : (rawData?.data ? (Array.isArray(rawData.data) ? rawData.data : []) : []);
+  const roles = Array.isArray(rawData) ? rawData : [];
 
   const { deleteItem } = useDelete(API_ROUTES.ROLES.BASE);
   

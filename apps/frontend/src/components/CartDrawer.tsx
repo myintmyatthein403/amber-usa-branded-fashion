@@ -99,7 +99,7 @@ export default function CartDrawer() {
                         <div className="flex justify-between items-start">
                           <h4 className="text-sm font-serif font-bold text-[#1A1A1A] line-clamp-1">{item.name}</h4>
                           <button 
-                            onClick={() => removeItem(item.id, item.size, item.variantId)}
+                            onClick={() => removeItem(String(item.id), item.size, item.variantId)}
                             className="text-[#1A1A1A]/20 hover:text-red-500 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -130,14 +130,14 @@ export default function CartDrawer() {
                       <div className="flex items-center space-x-4">
                         <div className="flex items-center border border-[#1A1A1A]/10 rounded-full px-2 py-1">
                           <button 
-                            onClick={() => changeQuantity(item.id, item.size, -1, item.variantId)}
+                            onClick={() => changeQuantity(String(item.id), item.size, -1, item.variantId)}
                             className="p-1 hover:text-[#D4AF37] transition-colors"
                           >
                             <Minus className="w-3 h-3" />
                           </button>
                           <span className="text-xs font-bold w-8 text-center">{item.quantity}</span>
                           <button 
-                            onClick={() => changeQuantity(item.id, item.size, 1, item.variantId)}
+                            onClick={() => changeQuantity(String(item.id), item.size, 1, item.variantId)}
                             className="p-1 hover:text-[#D4AF37] transition-colors"
                           >
                             <Plus className="w-3 h-3" />

@@ -122,10 +122,10 @@ const sidebarConfig: SidebarItem[] = [
 export const Sidebar: React.FC = () => {
   const { isSidebarOpen, toggleSidebar, activeTab, setActiveTab, logout, user, pendingOrdersCount } = useAdminUIStore();
   
-  // Navigate the response structure to find the user profile
-  const userData = user?.data || user;
-  const userRole = userData?.role;
-  const userPermissions = userData?.permissions || [];
+   // Navigate the response structure to find the user profile
+   const userData = user;
+   const userRole = userData?.role || userData?.roleName;
+   const userPermissions = userData?.permissions || [];
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
   const checkAccess = (item: { id: string, roles?: string[], permissions?: string[] }) => {

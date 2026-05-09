@@ -52,8 +52,8 @@ export const CollectionsPage: React.FC = () => {
         title={editingCollection ? 'Modify Collection' : 'Create Collection'}
       >
         <CollectionForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onSubmit={handleSubmit}
           onFileChange={handleFileChange}
           submitting={submitting}

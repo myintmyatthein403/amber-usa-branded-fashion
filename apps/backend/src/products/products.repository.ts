@@ -8,18 +8,25 @@ export class ProductsRepository {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateProductDto): Promise<Product> {
-    const { variants, collectionIds, ...productData } = data as CreateProductDto & { variants?: unknown[]; collectionIds?: string[] };
+    const { variants, collectionIds, categoryId, brandId, saleId, ...productData } = data as CreateProductDto & { variants?: unknown[]; collectionIds?: string[] };
+
+    const sanitizedData: Record<string, unknown> = { ...productData };
+    if (categoryId != null) sanitizedData.categoryId = categoryId;
+    if (brandId != null) sanitizedData.brandId = brandId;
+    if (saleId != null) sanitizedData.saleId = saleId;
+
+    const { category, brand, variants: _v, collections: _c, ...createData } = sanitizedData as Record<string, unknown>;
 
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
         data: {
-          ...productData,
+          ...createData,
           collections: collectionIds
             ? {
                 connect: collectionIds.map((id: string) => ({ id })),
               }
             : undefined,
-        },
+        } as any,
       });
 
       if (variants && (variants as unknown[]).length > 0) {
@@ -129,19 +136,26 @@ export class ProductsRepository {
   }
 
   async update(id: string, data: UpdateProductDto): Promise<Product> {
-    const { variants, collectionIds, ...productData } = data as UpdateProductDto & { variants?: unknown[]; collectionIds?: string[] };
+    const { variants, collectionIds, categoryId, brandId, saleId, ...productData } = data as UpdateProductDto & { variants?: unknown[]; collectionIds?: string[] };
+
+    const sanitizedData: Record<string, unknown> = { ...productData };
+    if (categoryId !== undefined) sanitizedData.categoryId = categoryId || null;
+    if (brandId !== undefined) sanitizedData.brandId = brandId || null;
+    if (saleId !== undefined) sanitizedData.saleId = saleId || null;
+
+    const { category, brand, variants: _v, ...updateData } = sanitizedData as Record<string, unknown>;
 
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.update({
         where: { id },
         data: {
-          ...productData,
+          ...updateData,
           collections: collectionIds
             ? {
                 set: collectionIds.map((id: string) => ({ id })),
               }
             : undefined,
-        },
+        } as any,
       });
 
       if (variants) {

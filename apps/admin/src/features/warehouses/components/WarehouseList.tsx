@@ -50,7 +50,7 @@ export const WarehouseList: React.FC<WarehouseListProps> = ({ warehouses, onOpen
               <div className="pt-6 border-t border-border flex items-center justify-between">
                  <div className="space-y-1">
                     <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Managed Stock</div>
-                    <div className="text-xl font-mono font-bold text-foreground">{w._count?.inventory || 0} <span className="text-[10px] text-muted-foreground font-normal">SKUs</span></div>
+                    <div className="text-xl font-mono font-bold text-foreground">{(w as any)._count?.inventory || 0} <span className="text-[10px] text-muted-foreground font-normal">SKUs</span></div>
                  </div>
                  <button 
                    onClick={() => onOpenInventory(w)}

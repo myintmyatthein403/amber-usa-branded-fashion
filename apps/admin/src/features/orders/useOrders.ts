@@ -37,9 +37,9 @@ export const useOrders = () => {
       if (statusFilter) params.append('status', statusFilter);
       if (paymentStatusFilter) params.append('paymentStatus', paymentStatusFilter);
 
-      const response = await apiService(`${API_ROUTES.ORDERS.BASE}?${params.toString()}`);
-      setOrders(response.data);
-      setMeta(response.meta);
+      const response = await apiService<unknown, { data: Order[]; meta: Meta }>(`${API_ROUTES.ORDERS.BASE}?${params.toString()}`);
+      setOrders(response.data || []);
+      setMeta(response.meta || null);
       setSelectedIds([]);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
@@ -104,7 +104,7 @@ export const useOrders = () => {
     if (selectedIds.length === orders.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(orders.map(o => o.id));
+      setSelectedIds(orders.map(o => o.id!).filter((id): id is string => !!id));
     }
   };
 
