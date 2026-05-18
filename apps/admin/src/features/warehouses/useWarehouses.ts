@@ -16,7 +16,7 @@ type ViewMode = 'grid' | 'list';
 export const useWarehouses = () => {
   const { data: warehouses, loading, refresh } = useFetch<Warehouse>(API_ROUTES.LOGISTICS.WAREHOUSES);
   const [modalOpen, setModalOpen] = useState(false);
-  const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
+  const [inventoryWarehouseId, setInventoryWarehouseId] = useState<string | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [warehouseInventory, setWarehouseInventory] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
@@ -85,10 +85,17 @@ export const useWarehouses = () => {
 
   const openInventory = async (warehouse: any) => {
     setSelectedWarehouse(warehouse);
-    setInventoryModalOpen(true);
+    setInventoryWarehouseId(warehouse.id);
+    window.history.pushState(null, '', `/warehouses/${warehouse.id}`);
     setInventorySearch('');
     setInventoryPagination(prev => ({ ...prev, page: 1 }));
     await fetchInventory(warehouse.id, 1, '');
+  };
+
+  const closeInventory = () => {
+    setInventoryWarehouseId(null);
+    setSelectedWarehouse(null);
+    window.history.pushState(null, '', '/warehouses');
   };
 
   const handleInventoryPageChange = (page: number) => {
@@ -114,8 +121,7 @@ export const useWarehouses = () => {
     loading,
     modalOpen,
     setModalOpen,
-    inventoryModalOpen,
-    setInventoryModalOpen,
+    inventoryWarehouseId,
     selectedWarehouse,
     warehouseInventory,
     loadingInventory,
@@ -129,6 +135,7 @@ export const useWarehouses = () => {
     setFormData,
     handleCreate,
     openInventory,
+    closeInventory,
     handleInventoryPageChange,
     refresh
   };

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Plus, Loader2, ArrowLeft } from 'lucide-react';
 import { Modal } from '../components/admin/Modal';
 import { useWarehouses } from '../features/warehouses/useWarehouses';
 import { WarehouseList } from '../features/warehouses/components/WarehouseList';
@@ -12,8 +12,7 @@ export const WarehousesPage: React.FC = () => {
     loading,
     modalOpen,
     setModalOpen,
-    inventoryModalOpen,
-    setInventoryModalOpen,
+    inventoryWarehouseId,
     selectedWarehouse,
     warehouseInventory,
     loadingInventory,
@@ -27,22 +26,51 @@ export const WarehousesPage: React.FC = () => {
     setFormData,
     handleCreate,
     openInventory,
-    handleInventoryPageChange
+    closeInventory,
+    handleInventoryPageChange,
+    refresh
   } = useWarehouses();
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    const match = path.match(/^\/warehouses\/([^/]+)$/);
+    if (match && match[1] && warehouses) {
+      const warehouse = warehouses.find(w => w.id === match[1]);
+      if (warehouse && !inventoryWarehouseId) {
+        openInventory(warehouse);
+      }
+    }
+  }, [warehouses]);
+
+  const isInventoryView = !!inventoryWarehouseId;
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="flex items-end justify-between">
         <div className="space-y-1.5">
-          <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">Logistics Hub</span>
-          <h2 className="text-4xl font-serif text-foreground tracking-tight">Warehouses</h2>
+          {isInventoryView ? (
+            <button 
+              onClick={closeInventory}
+              className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
+            >
+              <ArrowLeft size={16} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Back to Warehouses</span>
+            </button>
+          ) : (
+            <>
+              <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">Logistics Hub</span>
+              <h2 className="text-4xl font-serif text-foreground tracking-tight">Warehouses</h2>
+            </>
+          )}
         </div>
-        <button 
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-3 bg-primary text-primary-foreground px-8 py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary/90 transition-all duration-300 shadow-xl"
-        >
-          <Plus size={14} /> Establish New Node
-        </button>
+        {!isInventoryView && (
+          <button 
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-3 bg-primary text-primary-foreground px-8 py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary/90 transition-all duration-300 shadow-xl"
+          >
+            <Plus size={14} /> Establish New Node
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -50,6 +78,18 @@ export const WarehousesPage: React.FC = () => {
           <Loader2 className="animate-spin text-primary" size={40} />
           <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Scanning Infrastructure...</p>
         </div>
+      ) : isInventoryView ? (
+        <WarehouseInventory 
+          warehouse={selectedWarehouse}
+          inventorySearch={inventorySearch}
+          setInventorySearch={setInventorySearch}
+          inventory={warehouseInventory}
+          loadingInventory={loadingInventory}
+          pagination={inventoryPagination}
+          onPageChange={handleInventoryPageChange}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+        />
       ) : (
         <WarehouseList 
           warehouses={warehouses}
@@ -69,26 +109,6 @@ export const WarehousesPage: React.FC = () => {
           setFormData={setFormData as any}
           onSubmit={handleCreate}
           submitting={submitting}
-        />
-      </Modal>
-
-      {/* Inventory View Modal */}
-      <Modal 
-        isOpen={inventoryModalOpen} 
-        onClose={() => setInventoryModalOpen(false)} 
-        title="Node Inventory Audit"
-        size="xl"
-      >
-        <WarehouseInventory 
-          warehouse={selectedWarehouse}
-          inventorySearch={inventorySearch}
-          setInventorySearch={setInventorySearch}
-          inventory={warehouseInventory}
-          loadingInventory={loadingInventory}
-          pagination={inventoryPagination}
-          onPageChange={handleInventoryPageChange}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
         />
       </Modal>
     </div>
