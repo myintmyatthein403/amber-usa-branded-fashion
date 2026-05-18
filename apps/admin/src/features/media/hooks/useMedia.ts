@@ -17,8 +17,8 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
   const fetchMedia = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiService<unknown, MediaItem[]>(API_ROUTES.MEDIA.BASE);
-      setMedia(data);
+      const response = await apiService<unknown, { data: MediaItem[] }>(API_ROUTES.MEDIA.BASE);
+      setMedia(response.data);
     } catch (error) {
       console.error('Failed to fetch media:', error);
     } finally {
@@ -38,11 +38,12 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
     formData.append('file', e.target.files[0]);
 
     try {
-      const newItem = await apiService<FormData, MediaItem>(API_ROUTES.MEDIA.UPLOAD, {
+      const response = await apiService<FormData, { data: MediaItem }>(API_ROUTES.MEDIA.UPLOAD, {
         method: 'POST',
         body: formData,
         isMultipart: true
       });
+      const newItem = response.data;
       setMedia(prev => [newItem, ...prev]);
       if (selectionMode && onSelect) {
         onSelect(newItem.url);
@@ -56,8 +57,6 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Delete this media permanently?')) return;
-
     try {
       await apiService(API_ROUTES.MEDIA.BY_ID(id), { method: 'DELETE' });
       setMedia(prev => prev.filter(item => item.id !== id));

@@ -2,16 +2,16 @@ import { useState } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
-import { SaleSection } from './schema';
+import { SaleSection, SaleSectionWithUrl } from './schema';
 
 export const useSaleSection = () => {
-  const { data: sections, loading, refresh } = useFetch<SaleSection>(API_ROUTES.SALE_SECTION.BASE);
+  const { data: sections, loading, refresh } = useFetch<SaleSectionWithUrl>(API_ROUTES.SALE_SECTION.BASE);
   const { deleteItem } = useDelete(API_ROUTES.SALE_SECTION.BASE);
   
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [editingSection, setEditingSection] = useState<SaleSection | null>(null);
+  const [editingSection, setEditingSection] = useState<SaleSectionWithUrl | null>(null);
   
   const initialFormData = {
     badge: 'Limited Time Event',
@@ -22,6 +22,7 @@ export const useSaleSection = () => {
     ctaText: 'Shop the Sale',
     ctaLink: '/shop',
     imageMain: '',
+    imageUrl: '',
     isActive: false
   };
 
@@ -86,7 +87,7 @@ export const useSaleSection = () => {
     }
   };
 
-  const handleToggleActive = async (section: SaleSection) => {
+  const handleToggleActive = async (section: SaleSectionWithUrl) => {
     try {
       await apiService(API_ROUTES.SALE_SECTION.BY_ID(section.id), {
         method: 'PATCH',
@@ -108,7 +109,7 @@ export const useSaleSection = () => {
     setModalOpen(true);
   };
 
-  const openEditModal = (section: SaleSection) => {
+  const openEditModal = (section: SaleSectionWithUrl) => {
     setEditingSection(section);
     setFormData({ 
       badge: section.badge || '',
@@ -118,7 +119,8 @@ export const useSaleSection = () => {
       endDate: new Date(section.endDate).toISOString().split('T')[0],
       ctaText: section.ctaText || '',
       ctaLink: section.ctaLink || '',
-      imageMain: section.imageMain,
+      imageMain: section.imageMain || '',
+      imageUrl: section.imageUrl || '',
       isActive: section.isActive
     });
     setModalOpen(true);

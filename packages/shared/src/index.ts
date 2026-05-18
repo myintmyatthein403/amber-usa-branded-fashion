@@ -27,3 +27,4 @@ export * from './cms.schema';
 export * from './forms.schema';
 export * from './api.schema';
 export * from './permission.schema';
+export * from './stats.schema';

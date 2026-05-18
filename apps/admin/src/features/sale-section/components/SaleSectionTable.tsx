@@ -1,18 +1,18 @@
-import React from 'react';
-import { Trash2, Edit2, Check, Power, Timer } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, Edit2, Check, Power, Timer, AlertTriangle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { SaleSection } from '../schema';
+import { SaleSectionWithUrl } from '../schema';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 interface SaleSectionTableProps {
-  sections: SaleSection[] | null;
-  onEdit: (section: SaleSection) => void;
+  sections: SaleSectionWithUrl[] | null;
+  onEdit: (section: SaleSectionWithUrl) => void;
   onDelete: (id: string) => void;
-  onToggleActive: (section: SaleSection) => void;
+  onToggleActive: (section: SaleSectionWithUrl) => void;
 }
 
 export const SaleSectionTable: React.FC<SaleSectionTableProps> = ({ 
@@ -21,11 +21,22 @@ export const SaleSectionTable: React.FC<SaleSectionTableProps> = ({
   onDelete, 
   onToggleActive 
 }) => {
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
   if (!sections || sections.length === 0) {
     return (
       <div className="py-20 text-center text-xs font-medium text-muted-foreground uppercase tracking-widest italic">No promotional sections discovered.</div>
     );
   }
+
+  const handleDeleteClick = (id: string) => {
+    if (confirmDelete === id) {
+      onDelete(id);
+      setConfirmDelete(null);
+    } else {
+      setConfirmDelete(id);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -35,15 +46,38 @@ export const SaleSectionTable: React.FC<SaleSectionTableProps> = ({
           section.isActive ? "border-primary shadow-2xl shadow-primary/5" : "border-border grayscale opacity-60 hover:grayscale-0 hover:opacity-100"
         )}>
           <div className="aspect-[21/9] overflow-hidden bg-muted relative">
-            <img src={section.imageMain} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+            <img src={section.imageMain || section.imageUrl || ''} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-6 left-8 right-6">
                <span className="text-[9px] font-bold text-primary uppercase tracking-[0.3em] mb-2 block">{section.badge}</span>
                <h3 className="text-2xl font-serif text-white">{section.title} <span className="italic opacity-80">{section.titleItalic}</span></h3>
             </div>
+
+            {/* Confirmation Overlay */}
+            {confirmDelete === section.id && (
+              <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-4 z-20">
+                <AlertTriangle className="w-8 h-8 text-destructive" />
+                <p className="text-white text-xs font-bold text-center px-4">Delete this sale section?</p>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => handleDeleteClick(section.id)}
+                    className="px-4 py-2 bg-destructive text-white text-[10px] font-bold uppercase tracking-wider hover:bg-destructive/80 transition-colors"
+                  >
+                    Confirm
+                  </button>
+                  <button 
+                    onClick={() => setConfirmDelete(null)}
+                    className="px-4 py-2 bg-white text-black text-[10px] font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="absolute top-4 right-4 flex gap-2">
                <button onClick={() => onEdit(section)} className="p-2 bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white hover:text-black transition-all duration-300"><Edit2 size={14} /></button>
-               <button onClick={() => onDelete(section.id)} className="p-2 bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-destructive transition-all duration-300"><Trash2 size={14} /></button>
+               <button onClick={() => handleDeleteClick(section.id)} className={cn("p-2 backdrop-blur-md border transition-all duration-300", confirmDelete === section.id ? "bg-destructive border-destructive text-white" : "bg-white/10 border-white/20 text-white hover:bg-destructive hover:border-destructive")}><Trash2 size={14} /></button>
             </div>
           </div>
 

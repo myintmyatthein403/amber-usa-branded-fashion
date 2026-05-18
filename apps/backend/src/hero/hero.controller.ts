@@ -23,8 +23,7 @@ export class HeroController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  @UsePipes(new ZodValidationPipe(HeroSectionSchema))
-  create(@Body() data: any) {
+  async create(@Body() data: any) {
     return this.heroService.create(data);
   }
 
@@ -43,8 +42,7 @@ export class HeroController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  @UsePipes(new ZodValidationPipe(HeroSectionSchema.partial()))
-  update(@Param('id') id: string, @Body() data: any) {
+  async update(@Param('id') id: string, @Body() data: any) {
     return this.heroService.update(id, data);
   }
 

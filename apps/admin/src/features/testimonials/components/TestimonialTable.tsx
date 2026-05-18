@@ -1,5 +1,5 @@
-import React from 'react';
-import { Trash2, Edit2, Star, Check, Power, User, MapPin } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, Edit2, Star, Check, Power, User, MapPin, AlertTriangle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Testimonial } from '../schema';
@@ -21,11 +21,22 @@ export const TestimonialTable: React.FC<TestimonialTableProps> = ({
   onDelete, 
   onToggleActive 
 }) => {
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
   if (!testimonials || testimonials.length === 0) {
     return (
       <div className="col-span-full py-20 text-center text-xs font-medium text-muted-foreground uppercase tracking-widest italic">No voices discovered.</div>
     );
   }
+
+  const handleDeleteClick = (id: string) => {
+    if (confirmDelete === id) {
+      onDelete(id);
+      setConfirmDelete(null);
+    } else {
+      setConfirmDelete(id);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -34,6 +45,29 @@ export const TestimonialTable: React.FC<TestimonialTableProps> = ({
           "group relative bg-card border transition-all duration-500 overflow-hidden flex flex-col",
           testimonial.isActive ? "border-primary shadow-lg shadow-primary/5" : "border-border hover:border-primary/50"
         )}>
+          
+          {/* Confirmation Overlay */}
+          {confirmDelete === testimonial.id && (
+            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-4 z-30">
+              <AlertTriangle className="w-8 h-8 text-destructive" />
+              <p className="text-white text-xs font-bold text-center px-4">Delete this testimonial?</p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => handleDeleteClick(testimonial.id)}
+                  className="px-4 py-2 bg-destructive text-white text-[10px] font-bold uppercase tracking-wider hover:bg-destructive/80 transition-colors"
+                >
+                  Confirm
+                </button>
+                <button 
+                  onClick={() => setConfirmDelete(null)}
+                  className="px-4 py-2 bg-white text-black text-[10px] font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="p-6 flex-1 space-y-6">
             <div className="flex justify-between items-start">
               <div className="flex space-x-0.5">
@@ -80,7 +114,7 @@ export const TestimonialTable: React.FC<TestimonialTableProps> = ({
              </button>
              <div className="flex items-center gap-1">
                 <button onClick={() => onEdit(testimonial)} className="p-2 text-muted-foreground hover:text-foreground transition-colors"><Edit2 size={14} /></button>
-                <button onClick={() => onDelete(testimonial.id)} className="p-2 text-muted-foreground hover:text-destructive transition-colors"><Trash2 size={14} /></button>
+                <button onClick={() => handleDeleteClick(testimonial.id)} className={cn("p-2 transition-colors", confirmDelete === testimonial.id ? "text-destructive" : "text-muted-foreground hover:text-destructive")}><Trash2 size={14} /></button>
              </div>
           </div>
         </div>

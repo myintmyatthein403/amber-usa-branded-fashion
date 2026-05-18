@@ -43,8 +43,8 @@ export const HeroSectionSchema = z.object({
   ctaPrimaryLink: z.string().min(1, 'Primary CTA Link is required'),
   ctaSecondaryText: z.string().min(1, 'Secondary CTA Text is required'),
   ctaSecondaryLink: z.string().min(1, 'Secondary CTA Link is required'),
-  imageMain: z.string().url('Invalid URL for Main Image'),
-  imageSecondary: z.string().url('Invalid URL for Secondary Image').optional().or(z.literal('')),
+  imageMain: z.string().optional().or(z.literal('')),
+  imageSecondary: z.string().optional().or(z.literal('')),
   isActive: z.boolean(),
 });
 
@@ -82,7 +82,8 @@ export const SaleSectionSchema = z.object({
   endDate: z.string().min(1, 'End date is required'),
   ctaText: z.string().optional(),
   ctaLink: z.string().optional(),
-  imageMain: z.string().min(1, 'Main image is required'),
+  imageMain: z.string().optional().or(z.literal('')),
+  imageUrl: z.string().url().optional().or(z.literal('')),
   isActive: z.boolean().default(false),
 });
 

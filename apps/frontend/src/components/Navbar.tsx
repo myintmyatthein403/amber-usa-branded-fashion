@@ -161,17 +161,18 @@ export default function Navbar() {
               >
                 <ShoppingBag className="w-5 h-5" />
               </motion.div>
-              <AnimatePresence>
-                {mounted && cartCount > 0 && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-2 -right-2 bg-[#D4AF37] text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold"
-                  >
-                    {cartCount}
-                  </motion.span>
-                )}
-              </AnimatePresence>
+                <AnimatePresence>
+                  {mounted && cartCount > 0 && (
+                    <motion.span
+                      initial={false}
+                      animate={{ scale: 1 }}
+                      className="absolute -top-2 -right-2 bg-[#D4AF37] text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold"
+                      suppressHydrationWarning
+                    >
+                      {cartCount}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
             </button>
             <button
               className="md:hidden hover:text-[#D4AF37] transition-colors"

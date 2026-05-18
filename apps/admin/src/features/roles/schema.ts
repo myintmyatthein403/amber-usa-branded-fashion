@@ -34,20 +34,30 @@ export const AVAILABLE_PERMISSIONS: PermissionGroup[] = [
     ]
   },
   {
-    category: 'Sales & Marketing',
+    category: 'Sales & Logistics',
     items: [
       { id: 'orders:manage', label: 'Manage Orders & Fulfillment' },
-      { id: 'marketing:manage', label: 'Manage Campaigns & Coupons' },
+      { id: 'logistics:manage', label: 'Manage Warehouses & Inventory' },
+    ]
+  },
+  {
+    category: 'Marketing & Growth',
+    items: [
+      { id: 'marketing:manage', label: 'Manage Marketing' },
       { id: 'giftcards:manage', label: 'Manage Gift Cards' },
-      { id: 'ads:manage', label: 'Ads & Promotions' },
+      { id: 'ads:manage', label: 'Manage Ads & Promotions' },
+      { id: 'sales:manage', label: 'Manage Sale Events' },
+      { id: 'coupons:manage', label: 'Manage Discount Codes' },
+      { id: 'collections:manage', label: 'Manage Collections' },
     ]
   },
   {
     category: 'Website Content',
     items: [
-      { id: 'content:manage', label: 'Update Sections (Hero, Mission)' },
+      { id: 'content:manage', label: 'Manage Website Sections' },
       { id: 'reviews:manage', label: 'Review & Approve Feedback' },
       { id: 'community:manage', label: 'Community Posts Moderation' },
+      { id: 'hero:manage', label: 'Manage Hero Section' },
     ]
   },
   {
@@ -56,6 +66,7 @@ export const AVAILABLE_PERMISSIONS: PermissionGroup[] = [
       { id: 'staff:manage', label: 'Manage Staff Directory' },
       { id: 'roles:manage', label: 'Manage Roles & RBAC' },
       { id: 'settings:manage', label: 'Global System Settings' },
+      { id: 'users:manage', label: 'Manage Customer Profiles' },
     ]
   }
 ];

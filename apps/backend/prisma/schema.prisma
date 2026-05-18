@@ -297,7 +297,7 @@ model HeroSection {
   ctaSecondaryText String  @default("Check Legitimacy")
   ctaSecondaryLink String  @default("/track")
   
-  imageMain       String
+  imageMain       String?
   imageSecondary  String?
   
   isActive        Boolean  @default(false)
@@ -363,7 +363,8 @@ model SaleSection {
   ctaText         String?  @default("Shop the Sale")
   ctaLink         String?  @default("/shop")
   
-  imageMain       String
+  imageMain       String?
+  imageUrl        String?
   
   isActive        Boolean  @default(false)
   createdAt       DateTime @default(now())

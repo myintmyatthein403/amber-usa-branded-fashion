@@ -123,10 +123,11 @@ export const API_ROUTES = {
     CARGO_BY_ID: (id: string) => `/logistics/cargo/${id}`,
     CARGO_STATUS: (id: string) => `/logistics/cargo/${id}/status`,
     },
-    MEDIA: {
+MEDIA: {
     BASE: '/media',
     UPLOAD: '/media/upload',
     BY_ID: (id: string) => `/media/${id}`,
-    },
-    };
+  },
+  STATS: '/stats',
+};
 

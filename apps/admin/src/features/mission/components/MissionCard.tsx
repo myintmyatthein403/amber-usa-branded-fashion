@@ -1,5 +1,5 @@
-import React from 'react';
-import { Trash2, Edit2, Check, Power } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, Edit2, Check, Power, AlertTriangle } from 'lucide-react';
 import { MissionSection } from '../schema';
 import { cn } from '../../../lib/utils';
 
@@ -16,6 +16,21 @@ export const MissionCard: React.FC<MissionCardProps> = ({
   onDelete, 
   onToggleActive 
 }) => {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleDelete = () => {
+    if (showConfirm) {
+      onDelete(mission.id);
+      setShowConfirm(false);
+    } else {
+      setShowConfirm(true);
+    }
+  };
+
+  const handleCancel = () => {
+    setShowConfirm(false);
+  };
+
   return (
     <div className={cn(
       "group relative bg-card border transition-all duration-500 overflow-hidden",
@@ -28,9 +43,32 @@ export const MissionCard: React.FC<MissionCardProps> = ({
             <Check size={16} />
           </div>
         )}
+
+        {/* Confirmation Overlay */}
+        {showConfirm && (
+          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-4 z-20">
+            <AlertTriangle className="w-8 h-8 text-destructive" />
+            <p className="text-white text-xs font-bold text-center px-4">Delete this mission section?</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={handleDelete}
+                className="px-4 py-2 bg-destructive text-white text-[10px] font-bold uppercase tracking-wider hover:bg-destructive/80 transition-colors"
+              >
+                Confirm
+              </button>
+              <button 
+                onClick={handleCancel}
+                className="px-4 py-2 bg-white text-black text-[10px] font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
            <button onClick={() => onEdit(mission)} className="p-3 bg-white text-black hover:bg-primary hover:text-white transition-colors"><Edit2 size={18}/></button>
-           <button onClick={() => onDelete(mission.id)} className="p-3 bg-white text-destructive hover:bg-destructive hover:text-white transition-colors"><Trash2 size={18}/></button>
+           <button onClick={handleDelete} className={cn("p-3 transition-colors", showConfirm ? "bg-destructive text-white" : "bg-white text-destructive hover:bg-destructive hover:text-white")}><Trash2 size={18}/></button>
         </div>
       </div>
       <div className="p-6 space-y-4">

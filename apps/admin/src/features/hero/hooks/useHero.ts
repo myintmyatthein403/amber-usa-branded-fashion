@@ -113,7 +113,7 @@ export const useHero = () => {
       ctaPrimaryLink: hero.ctaPrimaryLink,
       ctaSecondaryText: hero.ctaSecondaryText,
       ctaSecondaryLink: hero.ctaSecondaryLink,
-      imageMain: hero.imageMain,
+      imageMain: hero.imageMain || '',
       imageSecondary: hero.imageSecondary || '',
       isActive: hero.isActive
     });

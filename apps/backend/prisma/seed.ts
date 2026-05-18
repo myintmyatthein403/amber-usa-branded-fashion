@@ -23,9 +23,10 @@ async function main() {
       description: 'Complete system access and ownership. Can manage all staff, settings, and financial data.',
       permissions: [
         'products:read', 'products:write', 'categories:manage', 'brands:manage',
-        'orders:manage', 'marketing:manage', 'giftcards:manage', 'ads:manage',
-        'content:manage', 'reviews:manage', 'community:manage',
-        'staff:manage', 'roles:manage', 'settings:manage'
+        'orders:manage', 'logistics:manage',
+        'marketing:manage', 'giftcards:manage', 'ads:manage', 'sales:manage', 'coupons:manage', 'collections:manage',
+        'content:manage', 'reviews:manage', 'community:manage', 'hero:manage',
+        'staff:manage', 'roles:manage', 'settings:manage', 'users:manage'
       ],
       color: 'text-primary',
       isImmutable: true,
@@ -35,8 +36,9 @@ async function main() {
       description: 'Operational manager. Can manage products, orders, customers, and website content.',
       permissions: [
         'products:read', 'products:write', 'categories:manage', 'brands:manage',
-        'orders:manage', 'marketing:manage', 'ads:manage',
-        'content:manage', 'reviews:manage', 'community:manage'
+        'orders:manage', 'logistics:manage', 'marketing:manage', 'ads:manage',
+        'content:manage', 'reviews:manage', 'community:manage', 'hero:manage',
+        'sales:manage', 'coupons:manage', 'collections:manage'
       ],
       color: 'text-emerald-500',
       isImmutable: true,

@@ -64,9 +64,9 @@ const sidebarConfig: SidebarItem[] = [
     label: 'Logistics', 
     icon: Truck,
     subItems: [
-      { id: 'warehouses', label: 'Warehouses', icon: Box, permissions: ['settings:manage'] },
-      { id: 'inventory', label: 'Inventory Ledger', icon: Layers, permissions: ['settings:manage'] },
-      { id: 'cargo', label: 'Cargo Shipments', icon: Truck, permissions: ['orders:manage'] },
+      { id: 'warehouses', label: 'Warehouses', icon: Box, permissions: ['logistics:manage'] },
+      { id: 'inventory', label: 'Inventory Ledger', icon: Layers, permissions: ['logistics:manage'] },
+      { id: 'cargo', label: 'Cargo Shipments', icon: Truck, permissions: ['logistics:manage'] },
     ]
   },
   { 
@@ -85,11 +85,11 @@ const sidebarConfig: SidebarItem[] = [
     label: 'Marketing', 
     icon: Ticket,
     subItems: [
-      { id: 'sales', label: 'Sales Campaigns', icon: Tag, permissions: ['marketing:manage'] },
-      { id: 'coupons', label: 'Discount Codes', icon: Ticket, permissions: ['marketing:manage'] },
+      { id: 'sales', label: 'Sales Campaigns', icon: Tag, permissions: ['sales:manage'] },
+      { id: 'coupons', label: 'Discount Codes', icon: Ticket, permissions: ['coupons:manage'] },
       { id: 'gift-cards', label: 'Gift Cards', icon: Gift, permissions: ['giftcards:manage'] },
       { id: 'ads', label: 'Ads Management', icon: Megaphone, permissions: ['ads:manage'] },
-      { id: 'collections', label: 'Collections', icon: Layers, permissions: ['marketing:manage'] },
+      { id: 'collections', label: 'Collections', icon: Layers, permissions: ['collections:manage'] },
     ]
   },
   { 
@@ -127,14 +127,23 @@ export const Sidebar: React.FC = () => {
    const userPermissions = user?.permissions || [];
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
+  useEffect(() => {
+    if (userRole === 'SUPERADMIN') {
+      setExpandedGroups(['catalog', 'logistics', 'operations', 'marketing', 'website', 'system']);
+    } else {
+      setExpandedGroups([]);
+    }
+  }, [userRole]);
+
   const checkAccess = (item: { id: string, roles?: string[], permissions?: string[] }) => {
-    // Superadmin has access to everything
-    if (userRole === 'SUPERADMIN') return true;
+    const isAdmin = userRole?.toUpperCase() === 'SUPERADMIN';
+    if (isAdmin) return true;
 
     // Check Roles if specified
     if (item.roles) {
       if (!userRole) return false;
-      return item.roles.includes(userRole);
+      const normalizedUserRole = userRole.toUpperCase();
+      return item.roles.some(r => r.toUpperCase() === normalizedUserRole);
     }
 
     // Check Permissions if specified
@@ -145,7 +154,8 @@ export const Sidebar: React.FC = () => {
     return true;
   };
 
-  const filteredSidebarConfig = userRole === 'SUPERADMIN' 
+  const isSuperAdmin = userRole?.toUpperCase() === 'SUPERADMIN';
+  const filteredSidebarConfig = isSuperAdmin 
     ? sidebarConfig
     : sidebarConfig
         .filter(item => {

@@ -14,7 +14,8 @@ interface SaleSectionData {
   endDate: string;
   ctaText: string;
   ctaLink: string;
-  imageMain: string;
+  imageMain: string | null;
+  imageUrl: string | null;
 }
 
 interface ResponseData {
@@ -124,7 +125,7 @@ export default function SaleSection() {
 
           {/* Right: Visual Side */}
           <div className="flex-1 relative">
-            {data.data.imageMain && (
+            {(data.data.imageMain || data.data.imageUrl) && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
@@ -133,7 +134,7 @@ export default function SaleSection() {
                 className="relative aspect-square md:aspect-video lg:aspect-square w-full bg-white/5 rounded-sm overflow-hidden border border-white/10"
               >
                 <Image
-                  src={data.data.imageMain}
+                  src={data.data.imageMain || data.data.imageUrl || ''}
                   alt="Limited Sale Event"
                   fill
                   className="object-cover transition-all duration-1000"

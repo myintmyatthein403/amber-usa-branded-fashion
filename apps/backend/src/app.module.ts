@@ -35,6 +35,7 @@ import { StripeModule } from './stripe/stripe.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { LogisticsModule } from './logistics/logistics.module';
+import { StatsModule } from './stats/stats.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { LogisticsModule } from './logistics/logistics.module';
     OrdersModule,
     PaymentMethodsModule,
     LogisticsModule,
+    StatsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

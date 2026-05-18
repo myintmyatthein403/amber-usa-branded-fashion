@@ -9,8 +9,10 @@ export const SaleSectionSchema = z.object({
   endDate: z.string().min(1, 'End date is required'),
   ctaText: z.string().optional(),
   ctaLink: z.string().optional(),
-  imageMain: z.string().min(1, 'Main image is required'),
+  imageMain: z.string().optional().or(z.literal('')),
+  imageUrl: z.string().url().optional().or(z.literal('')),
   isActive: z.boolean().default(false),
 });
 
 export type SaleSection = z.infer<typeof SaleSectionSchema> & { id: string };
+export type SaleSectionWithUrl = SaleSection & { imageUrl?: string | null };

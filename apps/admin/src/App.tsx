@@ -48,15 +48,15 @@ const TAB_PERMISSIONS: Record<string, string[]> = {
   brands: ['brands:manage'],
   variants: ['products:write'],
   orders: ['orders:manage'],
-  warehouses: ['settings:manage'],
-  inventory: ['settings:manage'],
-  cargo: ['orders:manage'],
+  warehouses: ['logistics:manage'],
+  inventory: ['logistics:manage'],
+  cargo: ['logistics:manage'],
   reviews: ['reviews:manage'],
-  sales: ['marketing:manage'],
-  coupons: ['marketing:manage'],
+  sales: ['sales:manage'],
+  coupons: ['coupons:manage'],
   giftcards: ['giftcards:manage'],
   ads: ['ads:manage'],
-  collections: ['marketing:manage'],
+  collections: ['collections:manage'],
   hero: ['content:manage'],
   mission: ['content:manage'],
   'gift-card-section': ['content:manage'],
@@ -104,7 +104,7 @@ function App() {
     if (!user) return false;
     
     const userRole = extractRoleString(user);
-    if (userRole === 'SUPERADMIN') return true;
+    if (userRole?.toUpperCase() === 'SUPERADMIN') return true;
     
     const required = TAB_PERMISSIONS[tab];
     if (!required) return true;
@@ -122,13 +122,14 @@ function App() {
       }
 
        try {
-         const profile = await apiService<null, User>(API_ROUTES.AUTH.PROFILE);
+         const response = await apiService<null, { data: User }>(API_ROUTES.AUTH.PROFILE);
+         const profile = response.data;
          updateUser(profile);
          
          // Only fetch pending count if user is admin/superadmin (Finding 5)
-         if (profile && profile.role && ['ADMIN', 'SUPERADMIN'].includes(profile.role)) {
-           const pendingCount = await apiService<null, { count: number }>(API_ROUTES.ORDERS.PENDING_COUNT);
-           setPendingOrdersCount(pendingCount.count);
+         if (profile && profile.role && ['ADMIN', 'SUPERADMIN'].includes(extractRoleString(profile) || '')) {
+           const pendingResponse = await apiService<null, { data: { count: number } }>(API_ROUTES.ORDERS.PENDING_COUNT);
+           setPendingOrdersCount(pendingResponse.data.count);
          } else {
            setPendingOrdersCount(0);
          }

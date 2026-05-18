@@ -10,8 +10,9 @@ export function useFetch<T>(endpoint: string, options: { immediate?: boolean } =
     setLoading(true);
     setError(null);
     try {
-      const result = await apiService(endpoint) as T[];
-      setData(result);
+      const response = await apiService(endpoint);
+      const result = (response as any)?.data ?? (Array.isArray(response) ? response : []);
+      setData(Array.isArray(result) ? result : []);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(message);
