@@ -33,8 +33,8 @@ export class LogisticsService {
     return this.logisticsRepository.findInventoryByVariant(variantId);
   }
 
-  async getInventoryByWarehouse(warehouseId: string) {
-    return this.logisticsRepository.findInventoryByWarehouse(warehouseId);
+  async getInventoryByWarehouse(warehouseId: string, options?: { page?: number; limit?: number; search?: string }) {
+    return this.logisticsRepository.findInventoryByWarehouse(warehouseId, options);
   }
 
   async updateStock(variantId: string, warehouseId: string, quantity: number) {

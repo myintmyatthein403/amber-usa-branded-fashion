@@ -49,13 +49,40 @@ export class LogisticsRepository {
     });
   }
 
-  async findInventoryByWarehouse(warehouseId: string) {
-    return this.prisma.inventory.findMany({
-      where: { warehouseId },
-      include: {
-        variant: { include: { product: true } },
+  async findInventoryByWarehouse(warehouseId: string, options?: { page?: number; limit?: number; search?: string }) {
+    const { page = 1, limit = 20, search } = options || {};
+    const skip = (page - 1) * limit;
+    
+    const where: any = { warehouseId };
+    
+    if (search) {
+      where.OR = [
+        { variant: { product: { name: { contains: search, mode: 'insensitive' } } } },
+        { variant: { sku: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.inventory.findMany({
+        where,
+        include: {
+          variant: { include: { product: true } },
+        },
+        skip,
+        take: limit,
+      }),
+      this.prisma.inventory.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
-    });
+    };
   }
 
   async findInventoryByVariant(variantId: string) {

@@ -5,9 +5,11 @@ import {
   Patch,
   Body,
   Param,
+  Query,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
+import { ApiQuery } from '@nestjs/swagger';
 import { LogisticsService } from './logistics.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -59,8 +61,20 @@ export class LogisticsController {
   @Get('inventory/warehouse/:warehouseId')
   @ApiOperation({ summary: 'Get inventory for a specific warehouse' })
   @ApiParam({ name: 'warehouseId', description: 'Warehouse ID' })
-  getInventoryByWarehouse(@Param('warehouseId') warehouseId: string) {
-    return this.logisticsService.getInventoryByWarehouse(warehouseId);
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  getInventoryByWarehouse(
+    @Param('warehouseId') warehouseId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.logisticsService.getInventoryByWarehouse(warehouseId, {
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
+      search,
+    });
   }
 
   @Patch('inventory/update')

@@ -15,15 +15,19 @@ export const WarehousesPage: React.FC = () => {
     inventoryModalOpen,
     setInventoryModalOpen,
     selectedWarehouse,
+    warehouseInventory,
     loadingInventory,
     inventorySearch,
     setInventorySearch,
-    filteredInventory,
+    inventoryPagination,
+    viewMode,
+    setViewMode,
     submitting,
     formData,
     setFormData,
     handleCreate,
-    openInventory
+    openInventory,
+    handleInventoryPageChange
   } = useWarehouses();
 
   return (
@@ -79,8 +83,12 @@ export const WarehousesPage: React.FC = () => {
           warehouse={selectedWarehouse}
           inventorySearch={inventorySearch}
           setInventorySearch={setInventorySearch}
-          filteredInventory={filteredInventory}
+          inventory={warehouseInventory}
           loadingInventory={loadingInventory}
+          pagination={inventoryPagination}
+          onPageChange={handleInventoryPageChange}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
         />
       </Modal>
     </div>
