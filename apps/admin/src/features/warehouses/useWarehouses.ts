@@ -43,8 +43,8 @@ export const useWarehouses = () => {
     setInventoryModalOpen(true);
     setLoadingInventory(true);
     try {
-      const data = await apiService<unknown, any[]>(API_ROUTES.LOGISTICS.INVENTORY_BY_WAREHOUSE(warehouse.id));
-      setWarehouseInventory(data || []);
+      const response = await apiService<unknown, { data: any[] }>(API_ROUTES.LOGISTICS.INVENTORY_BY_WAREHOUSE(warehouse.id));
+      setWarehouseInventory(response?.data || []);
     } catch (error) {
       console.error('Failed to fetch warehouse inventory:', error);
     } finally {
