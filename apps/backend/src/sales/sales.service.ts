@@ -24,8 +24,8 @@ export class SalesService {
     return sale;
   }
 
-  async getAllSales(): Promise<Sale[]> {
-    return this.salesRepository.findAll();
+  async getAllSales(options?: { page?: number; limit?: number; search?: string }) {
+    return this.salesRepository.findAll(options);
   }
 
   async getActiveSales(): Promise<Sale[]> {

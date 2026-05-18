@@ -12,20 +12,47 @@ export class SalesRepository {
     });
   }
 
-  async findAll(): Promise<Sale[]> {
-    return this.prisma.sale.findMany({
-      include: {
-        products: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            images: true,
+  async findAll(options?: { page?: number; limit?: number; search?: string }) {
+    const { page = 1, limit = 10, search } = options || {};
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.sale.findMany({
+        where,
+        include: {
+          products: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              images: true,
+            },
           },
         },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.sale.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 
   async findActive() {

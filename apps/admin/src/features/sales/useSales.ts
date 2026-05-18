@@ -1,18 +1,82 @@
-import { useState, useMemo } from 'react';
-import { useFetch, useDelete } from '../../hooks/useCrud';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useFetch } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
 import { Sale, SaleProduct } from './schema';
 
+interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+type ViewMode = 'grid' | 'list';
+
 export const useSales = () => {
-  const { data: sales, loading, refresh } = useFetch<Sale>(API_ROUTES.SALES.BASE);
-  const { data: allProducts } = useFetch<SaleProduct>(API_ROUTES.PRODUCTS.BASE);
-  const { deleteItem } = useDelete(API_ROUTES.SALES.BASE);
-  
+  const [salesData, setSalesData] = useState<{ data: Sale[]; meta: PaginationMeta } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 0,
+  });
+
+  const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem('salesViewMode');
+    return (saved as ViewMode) || 'list';
+  });
+
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [productSearch, setProductSearch] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const { data: allProducts } = useFetch<SaleProduct>(API_ROUTES.PRODUCTS.BASE);
+
+  const fetchSales = useCallback(async (page: number = 1, searchQuery: string = '') => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: pagination.limit.toString(),
+      });
+      if (searchQuery) params.append('search', searchQuery);
+
+      const response = await apiService<unknown, { data: Sale[]; meta: PaginationMeta }>(
+        `${API_ROUTES.SALES.BASE}?${params}`
+      );
+      setSalesData(response);
+      setPagination(prev => ({ ...prev, ...response.meta, page }));
+    } catch (error) {
+      console.error('Failed to fetch sales:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.limit]);
+
+  useEffect(() => {
+    fetchSales(pagination.page, search);
+  }, [pagination.page]);
+
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, page }));
+  };
+
+  const handleSearch = (searchQuery: string) => {
+    setSearch(searchQuery);
+    setPagination(prev => ({ ...prev, page: 1 }));
+    fetchSales(1, searchQuery);
+  };
+
+  const toggleViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('salesViewMode', mode);
+  };
 
   const initialFormData = { 
     name: '', 
@@ -59,7 +123,7 @@ export const useSales = () => {
 
       setModalOpen(false);
       setEditingSale(null);
-      refresh();
+      fetchSales(pagination.page, search);
       resetForm();
     } catch (error) {
       console.error('Failed to save sale:', error);
@@ -73,11 +137,27 @@ export const useSales = () => {
     setEditingSale(null);
   };
 
-  const handleDelete = async (id: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this sale event?');
-    if (!confirmed) return;
-    const success = await deleteItem(id);
-    if (success) refresh();
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    try {
+      await apiService(API_ROUTES.SALES.BY_ID(deletingId), { method: 'DELETE' });
+      fetchSales(pagination.page, search);
+    } catch (error) {
+      console.error('Failed to delete sale:', error);
+    } finally {
+      setDeleteConfirmOpen(false);
+      setDeletingId(null);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    setDeletingId(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmOpen(false);
+    setDeletingId(null);
   };
 
   const openAddModal = () => {
@@ -111,9 +191,13 @@ export const useSales = () => {
   };
 
   return {
-    sales,
-    allProducts,
+    sales: salesData?.data || null,
     loading,
+    pagination,
+    search,
+    setSearch: handleSearch,
+    viewMode,
+    setViewMode: toggleViewMode,
     modalOpen,
     setModalOpen,
     submitting,
@@ -128,6 +212,10 @@ export const useSales = () => {
     openAddModal,
     openEditModal,
     toggleProductSelection,
-    refresh
+    deleteConfirmOpen,
+    confirmDelete,
+    cancelDelete,
+    handlePageChange,
+    refresh: () => fetchSales(pagination.page, search)
   };
 };
