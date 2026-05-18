@@ -16,6 +16,18 @@ export class BrandsRepository {
     });
   }
 
+  async findMany(skip: number, take: number): Promise<Brand[]> {
+    return this.prisma.brand.findMany({
+      skip,
+      take,
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.brand.count();
+  }
+
   async findById(id: string): Promise<Brand | null> {
     return this.prisma.brand.findUnique({ where: { id } });
   }

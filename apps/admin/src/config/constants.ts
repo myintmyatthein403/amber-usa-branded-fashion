@@ -1,7 +1,7 @@
 export const APP_CONFIG = {
   NAME: 'Amber Brand Fashion',
   DESCRIPTION: 'Myanmar Heritage Management Portal',
-  API_BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  API_BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:5050',
   DATE_FORMAT: 'MMM dd, yyyy',
 };
 

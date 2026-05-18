@@ -16,6 +16,18 @@ export class CategoriesRepository {
     });
   }
 
+  async findMany(skip: number, take: number): Promise<Category[]> {
+    return this.prisma.category.findMany({
+      skip,
+      take,
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.category.count();
+  }
+
   async findById(id: string): Promise<Category | null> {
     return this.prisma.category.findUnique({ where: { id } });
   }

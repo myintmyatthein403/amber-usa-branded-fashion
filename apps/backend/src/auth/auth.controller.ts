@@ -40,8 +40,7 @@ export class AuthController {
   }
 
   @Post('register')
-  @UsePipes(new ZodValidationPipe(RegisterSchema))
-  async register(@Body() registerDto: any) {
+  async register(@Body(new ZodValidationPipe(RegisterSchema)) registerDto: any) {
     return this.authService.register(registerDto);
   }
 
@@ -53,8 +52,10 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
-  @UsePipes(new ZodValidationPipe(UserSchema.partial()))
-  async updateProfile(@Request() req: any, @Body() profileData: any) {
+  async updateProfile(
+    @Request() req: any,
+    @Body(new ZodValidationPipe(UserSchema.partial())) profileData: any,
+  ) {
     return this.authService.updateProfile(req.user.userId, profileData);
   }
 }

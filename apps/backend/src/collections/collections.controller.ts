@@ -23,8 +23,7 @@ export class CollectionsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  @UsePipes(new ZodValidationPipe(CollectionSchema))
-  create(@Body() data: any) {
+  create(@Body(new ZodValidationPipe(CollectionSchema)) data: any) {
     return this.collectionsService.create(data);
   }
 
@@ -41,8 +40,10 @@ export class CollectionsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  @UsePipes(new ZodValidationPipe(CollectionSchema.partial()))
-  update(@Param('id') id: string, @Body() data: any) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(CollectionSchema.partial())) data: any,
+  ) {
     return this.collectionsService.update(id, data);
   }
 

@@ -29,18 +29,16 @@ export class VariantsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  @UsePipes(new ZodValidationPipe(CreateVariantDto))
-  create(@Body() createVariantDto: CreateVariantDto) {
+  create(@Body(new ZodValidationPipe(CreateVariantDto)) createVariantDto: CreateVariantDto) {
     return this.variantsService.createVariant(createVariantDto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  @UsePipes(new ZodValidationPipe(UpdateVariantDto.partial()))
   update(
     @Param('id') id: string,
-    @Body() updateVariantDto: UpdateVariantDto,
+    @Body(new ZodValidationPipe(UpdateVariantDto.partial())) updateVariantDto: UpdateVariantDto,
   ) {
     return this.variantsService.updateVariant(id, updateVariantDto);
   }

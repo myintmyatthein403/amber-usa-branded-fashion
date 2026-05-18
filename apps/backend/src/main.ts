@@ -18,14 +18,6 @@ async function bootstrap() {
   app.useGlobalFilters(new PrismaExceptionFilter(), new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
   // Setup Swagger
   const config = new DocumentBuilder()
     .setTitle('Amber Brand Fashion API')

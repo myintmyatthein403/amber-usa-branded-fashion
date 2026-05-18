@@ -139,3 +139,30 @@ export const GiftCardOptionSchema = z.object({
 });
 
 export type GiftCardOption = z.infer<typeof GiftCardOptionSchema>;
+
+export const PaginatedMetaSchema = z.object({
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  totalPages: z.number(),
+});
+
+export type PaginatedMeta = z.infer<typeof PaginatedMetaSchema>;
+
+export const PaginatedResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
+  z.object({
+    data: z.array(dataSchema),
+    meta: PaginatedMetaSchema,
+  });
+
+export const CategoryBaseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export type CategoryBase = z.infer<typeof CategoryBaseSchema>;
+
+export const PaginatedCategoriesResponse = PaginatedResponseSchema(CategoryBaseSchema);
+export type PaginatedCategoriesResponse = z.infer<typeof PaginatedCategoriesResponse>;

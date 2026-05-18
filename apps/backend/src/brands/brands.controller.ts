@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   UsePipes,
+  Query,
 } from '@nestjs/common';
 import { BrandsService } from './brands.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -17,6 +18,11 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { BrandSchema } from '@amber/shared';
 import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
 
+interface PaginationQuery {
+  page?: number;
+  limit?: number;
+}
+
 @Controller('brands')
 export class BrandsController {
   constructor(private readonly brandsService: BrandsService) {}
@@ -24,14 +30,15 @@ export class BrandsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  @UsePipes(new ZodValidationPipe(BrandSchema))
-  create(@Body() createBrandDto: CreateBrandDto) {
+  create(@Body(new ZodValidationPipe(BrandSchema)) createBrandDto: CreateBrandDto) {
     return this.brandsService.createBrand(createBrandDto);
   }
 
   @Get()
-  findAll() {
-    return this.brandsService.getAllBrands();
+  findAll(@Query() query: PaginationQuery) {
+    const page = query.page ? Math.max(1, parseInt(String(query.page), 10)) : 1;
+    const limit = query.limit ? Math.max(1, Math.min(100, parseInt(String(query.limit), 10))) : 10;
+    return this.brandsService.getAllBrands(page, limit);
   }
 
   @Get(':id')
@@ -42,8 +49,10 @@ export class BrandsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  @UsePipes(new ZodValidationPipe(BrandSchema.partial()))
-  update(@Param('id') id: string, @Body() updateBrandDto: UpdateBrandDto) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(BrandSchema.partial())) updateBrandDto: UpdateBrandDto,
+  ) {
     return this.brandsService.updateBrand(id, updateBrandDto);
   }
 

@@ -4,6 +4,16 @@ import { Brand } from '@prisma/client';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
 
+export interface PaginatedBrandsResult {
+  data: Brand[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 @Injectable()
 export class BrandsService {
   constructor(private brandsRepository: BrandsRepository) {}
@@ -13,8 +23,22 @@ export class BrandsService {
     return this.brandsRepository.create(sanitizedData);
   }
 
-  async getAllBrands(): Promise<Brand[]> {
-    return this.brandsRepository.findAll();
+  async getAllBrands(page: number = 1, limit: number = 10): Promise<PaginatedBrandsResult> {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.brandsRepository.findMany(skip, limit),
+      this.brandsRepository.count(),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getBrandById(id: string): Promise<Brand | null> {

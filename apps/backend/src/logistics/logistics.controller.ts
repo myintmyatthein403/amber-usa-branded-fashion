@@ -38,9 +38,8 @@ export class LogisticsController {
   }
 
   @Post('warehouses')
-  @UsePipes(new ZodValidationPipe(WarehouseSchema))
   @ApiOperation({ summary: 'Create a new warehouse' })
-  createWarehouse(@Body() data: any) {
+  createWarehouse(@Body(new ZodValidationPipe(WarehouseSchema)) data: any) {
     return this.logisticsService.createWarehouse(data);
   }
 
@@ -83,9 +82,8 @@ export class LogisticsController {
   }
 
   @Post('cargo')
-  @UsePipes(new ZodValidationPipe(CreateCargoShipmentSchema))
   @ApiOperation({ summary: 'Create a new cargo shipment' })
-  createCargoShipment(@Body() data: CreateCargoShipmentInput) {
+  createCargoShipment(@Body(new ZodValidationPipe(CreateCargoShipmentSchema)) data: CreateCargoShipmentInput) {
     return this.logisticsService.createCargoShipment(data);
   }
 

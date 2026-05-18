@@ -26,8 +26,7 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Permissions(Permission.PRODUCTS_WRITE)
   @Post()
-  @UsePipes(new ZodValidationPipe(ProductSchema))
-  create(@Body() createProductDto: CreateProductDto) {
+  create(@Body(new ZodValidationPipe(ProductSchema)) createProductDto: CreateProductDto) {
     return this.productsService.createProduct(createProductDto);
   }
 
@@ -59,8 +58,10 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Permissions(Permission.PRODUCTS_WRITE)
   @Patch(':id')
-  @UsePipes(new ZodValidationPipe(UpdateProductDto))
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateProductDto)) updateProductDto: UpdateProductDto,
+  ) {
     return this.productsService.updateProduct(id, updateProductDto);
   }
 

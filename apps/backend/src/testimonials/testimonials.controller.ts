@@ -23,8 +23,7 @@ export class TestimonialsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  @UsePipes(new ZodValidationPipe(TestimonialSchema))
-  create(@Body() data: any) {
+  create(@Body(new ZodValidationPipe(TestimonialSchema)) data: any) {
     return this.testimonialsService.create(data);
   }
 
@@ -43,8 +42,10 @@ export class TestimonialsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  @UsePipes(new ZodValidationPipe(TestimonialSchema.partial()))
-  update(@Param('id') id: string, @Body() data: any) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(TestimonialSchema.partial())) data: any,
+  ) {
     return this.testimonialsService.update(id, data);
   }
 

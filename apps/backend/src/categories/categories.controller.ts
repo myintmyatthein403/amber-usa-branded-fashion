@@ -8,6 +8,7 @@ import {
   UseGuards,
   Patch,
   UsePipes,
+  Query,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -17,28 +18,38 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { CategorySchema } from '@amber/shared';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 
+interface PaginationQuery {
+  page?: number;
+  limit?: number;
+}
+
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
-  findAll() {
-    return this.categoriesService.getAllCategories();
+  findAll(
+    @Query() query: PaginationQuery,
+  ) {
+    const page = query.page ? Math.max(1, parseInt(String(query.page), 10)) : 1;
+    const limit = query.limit ? Math.max(1, Math.min(100, parseInt(String(query.limit), 10))) : 10;
+    return this.categoriesService.getAllCategories(page, limit);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  @UsePipes(new ZodValidationPipe(CategorySchema))
-  create(@Body() createCategoryDto: CreateCategoryDto) {
+  create(@Body(new ZodValidationPipe(CategorySchema)) createCategoryDto: CreateCategoryDto) {
     return this.categoriesService.createCategory(createCategoryDto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  @UsePipes(new ZodValidationPipe(CategorySchema.partial()))
-  update(@Param('id') id: string, @Body() updateCategoryDto: UpdateCategoryDto) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(CategorySchema.partial())) updateCategoryDto: UpdateCategoryDto,
+  ) {
     return this.categoriesService.updateCategory(id, updateCategoryDto);
   }
 
