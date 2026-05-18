@@ -28,6 +28,10 @@ export class LogisticsService {
     return this.logisticsRepository.createWarehouse(data as unknown as Warehouse);
   }
 
+  async updateWarehouse(id: string, data: Record<string, unknown>) {
+    return this.logisticsRepository.updateWarehouse(id, data);
+  }
+
   // --- Inventory Management ---
   async getInventoryByVariant(variantId: string) {
     return this.logisticsRepository.findInventoryByVariant(variantId);

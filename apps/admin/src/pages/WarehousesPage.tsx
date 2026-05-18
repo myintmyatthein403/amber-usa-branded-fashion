@@ -14,6 +14,7 @@ export const WarehousesPage: React.FC = () => {
     setModalOpen,
     inventoryWarehouseId,
     selectedWarehouse,
+    editingWarehouse,
     warehouseInventory,
     loadingInventory,
     inventorySearch,
@@ -25,6 +26,9 @@ export const WarehousesPage: React.FC = () => {
     formData,
     setFormData,
     handleCreate,
+    handleEdit,
+    openEditModal,
+    closeEditModal,
     openInventory,
     closeInventory,
     handleInventoryPageChange,
@@ -94,6 +98,7 @@ export const WarehousesPage: React.FC = () => {
         <WarehouseList 
           warehouses={warehouses}
           onOpenInventory={openInventory}
+          onEdit={openEditModal}
         />
       )}
 
@@ -109,6 +114,23 @@ export const WarehousesPage: React.FC = () => {
           setFormData={setFormData as any}
           onSubmit={handleCreate}
           submitting={submitting}
+          editing={false}
+        />
+      </Modal>
+
+      {/* Edit Warehouse Modal */}
+      <Modal 
+        isOpen={!!editingWarehouse} 
+        onClose={closeEditModal} 
+        title="Edit Warehouse Node"
+        size="md"
+      >
+        <WarehouseForm 
+          formData={formData as any}
+          setFormData={setFormData as any}
+          onSubmit={handleEdit}
+          submitting={submitting}
+          editing={true}
         />
       </Modal>
     </div>

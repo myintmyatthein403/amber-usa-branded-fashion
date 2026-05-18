@@ -45,6 +45,13 @@ export class LogisticsController {
     return this.logisticsService.createWarehouse(data);
   }
 
+  @Patch('warehouses/:id')
+  @ApiOperation({ summary: 'Update a warehouse' })
+  @ApiParam({ name: 'id', description: 'Warehouse ID' })
+  updateWarehouse(@Param('id') id: string, @Body() data: any) {
+    return this.logisticsService.updateWarehouse(id, data);
+  }
+
   @Get('inventory')
   @ApiOperation({ summary: 'Get inventory overview' })
   getInventoryOverview() {

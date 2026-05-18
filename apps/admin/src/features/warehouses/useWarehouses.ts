@@ -18,6 +18,7 @@ export const useWarehouses = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [inventoryWarehouseId, setInventoryWarehouseId] = useState<string | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   const [warehouseInventory, setWarehouseInventory] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
@@ -56,6 +57,39 @@ export const useWarehouses = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWarehouse) return;
+    setSubmitting(true);
+    try {
+      await apiService(`${API_ROUTES.LOGISTICS.WAREHOUSES}/${editingWarehouse.id}`, {
+        method: 'PATCH',
+        body: formData
+      });
+      setEditingWarehouse(null);
+      setFormData({ name: '', location: 'USA', address: '' });
+      refresh();
+    } catch (error) {
+      console.error('Failed to update warehouse:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openEditModal = (warehouse: Warehouse) => {
+    setEditingWarehouse(warehouse);
+    setFormData({
+      name: warehouse.name,
+      location: warehouse.location,
+      address: warehouse.address || ''
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingWarehouse(null);
+    setFormData({ name: '', location: 'USA', address: '' });
   };
 
   const fetchInventory = useCallback(async (warehouseId: string, page: number = 1, search: string = '') => {
@@ -123,6 +157,7 @@ export const useWarehouses = () => {
     setModalOpen,
     inventoryWarehouseId,
     selectedWarehouse,
+    editingWarehouse,
     warehouseInventory,
     loadingInventory,
     inventorySearch,
@@ -134,6 +169,9 @@ export const useWarehouses = () => {
     formData,
     setFormData,
     handleCreate,
+    handleEdit,
+    openEditModal,
+    closeEditModal,
     openInventory,
     closeInventory,
     handleInventoryPageChange,

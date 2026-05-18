@@ -1,5 +1,5 @@
 import React from 'react';
-import { Warehouse as WarehouseIcon, MapPin, ChevronRight } from 'lucide-react';
+import { Warehouse as WarehouseIcon, MapPin, ChevronRight, Pencil } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Warehouse } from '../schema';
@@ -11,9 +11,10 @@ function cn(...inputs: ClassValue[]) {
 interface WarehouseListProps {
   warehouses: Warehouse[] | null;
   onOpenInventory: (warehouse: Warehouse) => void;
+  onEdit: (warehouse: Warehouse) => void;
 }
 
-export const WarehouseList: React.FC<WarehouseListProps> = ({ warehouses, onOpenInventory }) => {
+export const WarehouseList: React.FC<WarehouseListProps> = ({ warehouses, onOpenInventory, onEdit }) => {
   if (!warehouses || warehouses.length === 0) {
     return (
       <div className="col-span-full py-20 text-center text-xs font-medium text-muted-foreground uppercase tracking-widest italic">No warehouse nodes registered.</div>
@@ -47,18 +48,27 @@ export const WarehouseList: React.FC<WarehouseListProps> = ({ warehouses, onOpen
                  </div>
               </div>
 
-              <div className="pt-6 border-t border-border flex items-center justify-between">
-                 <div className="space-y-1">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Managed Stock</div>
-                    <div className="text-xl font-mono font-bold text-foreground">{(w as any)._count?.inventory || 0} <span className="text-[10px] text-muted-foreground font-normal">SKUs</span></div>
-                 </div>
-                 <button 
-                   onClick={() => onOpenInventory(w)}
-                   className="p-3 bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-full"
-                 >
-                    <ChevronRight size={16} />
-                 </button>
-              </div>
+<div className="pt-6 border-t border-border flex items-center justify-between">
+                  <div className="space-y-1">
+                     <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Managed Stock</div>
+                     <div className="text-xl font-mono font-bold text-foreground">{(w as any)._count?.inventory || 0} <span className="text-[10px] text-muted-foreground font-normal">SKUs</span></div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <button 
+                       onClick={() => onEdit(w)}
+                       className="p-3 bg-secondary text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-300 rounded-full"
+                       title="Edit"
+                     >
+                       <Pencil size={16} />
+                     </button>
+                     <button 
+                       onClick={() => onOpenInventory(w)}
+                       className="p-3 bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-full"
+                     >
+                       <ChevronRight size={16} />
+                     </button>
+                  </div>
+               </div>
            </div>
         </div>
       ))}
