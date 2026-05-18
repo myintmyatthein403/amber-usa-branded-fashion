@@ -77,6 +77,9 @@ export const DeliveryMethodFormDataSchema = z.object({
   estimatedDays: z.string().optional(),
   isActive: z.boolean().default(true),
   freeOverAmount: z.number().optional(),
+  logoUrl: z.string().optional(),
+  logoLink: z.string().optional(),
+  locationPrices: z.record(z.number()).optional(),
 });
 
 export type DeliveryMethodFormData = z.infer<typeof DeliveryMethodFormDataSchema>;

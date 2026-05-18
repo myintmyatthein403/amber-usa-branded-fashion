@@ -491,6 +491,9 @@ model DeliveryMethod {
   estimatedDays  String?
   isActive       Boolean  @default(true)
   freeOverAmount Decimal? @db.Decimal(10, 2)
+  logoUrl        String?
+  logoLink       String?
+  locationPrices Json?    // { "USA": 10, "MYANMAR": 5000 }
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
