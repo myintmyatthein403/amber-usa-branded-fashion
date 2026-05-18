@@ -9,6 +9,11 @@ export class LogisticsRepository {
   async findAllWarehouses() {
     return this.prisma.warehouse.findMany({
       orderBy: { name: 'asc' },
+      include: {
+        _count: {
+          select: { inventory: true },
+        },
+      },
     });
   }
 
