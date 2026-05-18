@@ -14,7 +14,7 @@ interface ProductFormProps {
   brands: Brand[] | null;
   collections: any[] | null;
   sales: any[] | null;
-  onSubmit: (e: React.FormEvent) => void;
+  onNext?: () => void;
   submitting: boolean;
   editingProduct: Product | null;
   onOpenMedia: (index?: number) => void;
@@ -26,7 +26,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   categories,
   brands,
   collections,
-  onSubmit,
+  onNext,
   submitting,
   editingProduct,
   onOpenMedia
@@ -35,8 +35,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     setProductForm({ ...productForm, [field]: value });
   };
 
+  const handleNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onNext) onNext();
+  };
+
   return (
-    <form onSubmit={onSubmit} className="space-y-12 py-10 animate-in fade-in slide-in-from-left-4 duration-500">
+    <form onSubmit={handleNext} className="space-y-12 py-10 animate-in fade-in slide-in-from-left-4 duration-500">
       <EditorialImagery 
         images={productForm.images || []} 
         onChange={(images) => handleFieldChange('images', images)} 
@@ -74,7 +79,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
       <div className="flex justify-end pt-10 border-t border-border">
         <button type="submit" disabled={submitting} className="flex items-center gap-3 bg-foreground text-primary-foreground px-10 py-4 text-xs font-bold uppercase tracking-[0.3em] hover:bg-primary transition-colors duration-500 disabled:opacity-50">
-          {submitting ? 'Processing...' : editingProduct ? 'Commit Changes' : 'Initialize SKU'}
+          {submitting ? 'Processing...' : 'Proceed to Variants'}
           <ChevronRight size={16} />
         </button>
       </div>

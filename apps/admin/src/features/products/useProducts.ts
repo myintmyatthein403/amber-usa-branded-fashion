@@ -58,6 +58,8 @@ export const useProducts = () => {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingVariant, setEditingVariant] = useState<Variant | null>(null);
   
   const initialProductForm = {
@@ -286,10 +288,21 @@ export const useProducts = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const confirmed = window.confirm('Delete this product and all its variants permanently?');
-    if (!confirmed) return;
-    const success = await deleteItem(id);
+    setDeletingId(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    const success = await deleteItem(deletingId);
+    setDeleteConfirmOpen(false);
+    setDeletingId(null);
     if (success) fetchProducts();
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmOpen(false);
+    setDeletingId(null);
   };
 
   return {
@@ -330,6 +343,11 @@ export const useProducts = () => {
     handleDelete,
     openEditModal,
     resetForm,
-    refresh: fetchProducts
+    refresh: fetchProducts,
+    deleteConfirmOpen,
+    setDeleteConfirmOpen,
+    confirmDelete,
+    cancelDelete,
+    deletingId
   };
 };

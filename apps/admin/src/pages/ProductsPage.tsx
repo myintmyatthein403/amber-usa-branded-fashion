@@ -51,15 +51,17 @@ export const ProductsPage: React.FC = () => {
     handleProductSubmit,
     handleDelete,
     openEditModal,
-    resetForm
+    resetForm,
+    deleteConfirmOpen,
+    setDeleteConfirmOpen,
+    confirmDelete,
+    cancelDelete,
+    deletingId
   } = useProducts();
 
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [mediaTarget, setMediaTarget] = React.useState<'product' | 'variant'>('product');
   const [replacingImageIndex, setReplacingImageIndex] = React.useState<number | null>(null);
-  
-  // Custom delete confirmation state
-  const [deleteId, setDeleteId] = React.useState<string | null>(null);
 
   const handleMediaSelect = (url: string) => {
     if (mediaTarget === 'product') {
@@ -90,13 +92,6 @@ export const ProductsPage: React.FC = () => {
   const openVariantMedia = () => {
     setMediaTarget('variant');
     setMediaSelectorOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (deleteId) {
-      await handleDelete(deleteId); // Use the handle function from hook
-      setDeleteId(null);
-    }
   };
 
   return (
@@ -158,13 +153,13 @@ export const ProductsPage: React.FC = () => {
             <ProductGridView 
               products={products} 
               onEdit={openEditModal} 
-              onDelete={(id) => setDeleteId(id)} 
+              onDelete={handleDelete} 
             />
           ) : (
             <ProductListView 
               products={products} 
               onEdit={openEditModal} 
-              onDelete={(id) => setDeleteId(id)} 
+              onDelete={handleDelete} 
             />
           )}
 
@@ -197,16 +192,30 @@ export const ProductsPage: React.FC = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Product" size="sm">
+      <Modal isOpen={deleteConfirmOpen} onClose={cancelDelete} title="Delete Product" size="sm">
         <div className="space-y-6">
-          <div className="flex items-center gap-4 text-destructive">
-             <AlertTriangle size={32} />
-             <h4 className="text-sm font-bold uppercase tracking-widest">Confirm Permanent Removal</h4>
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-6 h-6 text-destructive" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-serif text-foreground">Delete this product?</p>
+              <p className="text-sm text-muted-foreground">This action cannot be undone. All associated inventory variants will be removed.</p>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">Are you absolutely sure you want to delete this product? This action cannot be undone, and all associated inventory variants will be wiped.</p>
-          <div className="flex gap-4 pt-4">
-            <button onClick={() => setDeleteId(null)} className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border border-border hover:border-primary transition-colors">Cancel</button>
-            <button onClick={confirmDelete} className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">Permanent Delete</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <button
+              onClick={cancelDelete}
+              className="px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground border border-border hover:border-foreground transition-all duration-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all duration-300"
+            >
+              Delete
+            </button>
           </div>
         </div>
       </Modal>
@@ -241,10 +250,7 @@ export const ProductsPage: React.FC = () => {
             categories={categories as any}
             brands={brands as any}
             sales={sales as any}
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleProductSubmit();
-            }}
+            onNext={() => setStep(2)}
             submitting={submitting}
             editingProduct={editingProduct as any}
             onOpenMedia={openProductMedia}

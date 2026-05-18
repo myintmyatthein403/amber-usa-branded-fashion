@@ -28,8 +28,8 @@ export const useVariants = () => {
 
   const fetchVariants = async () => {
     try {
-      const data = await apiService<unknown, any[]>(API_ROUTES.VARIANTS.BASE);
-      setVariants(data || []);
+      const response = await apiService<unknown, { data: any[] }>(API_ROUTES.VARIANTS.BASE);
+      setVariants(response?.data || []);
     } catch (error) {
       console.error('Failed to fetch variants:', error);
     } finally {
@@ -39,8 +39,8 @@ export const useVariants = () => {
 
   const fetchProducts = async () => {
     try {
-      const data = await apiService<unknown, any[]>(API_ROUTES.PRODUCTS.BASE);
-      setProducts(data || []);
+      const response = await apiService<unknown, { data: any[] }>(API_ROUTES.PRODUCTS.BASE);
+      setProducts(response?.data || []);
     } catch (error) {
       console.error('Failed to fetch products:', error);
     }
@@ -48,8 +48,8 @@ export const useVariants = () => {
 
   const fetchWarehouses = async () => {
     try {
-      const data = await apiService<unknown, any[]>(API_ROUTES.LOGISTICS.WAREHOUSES);
-      setWarehouses(data || []);
+      const response = await apiService<unknown, { data: any[] }>(API_ROUTES.LOGISTICS.WAREHOUSES);
+      setWarehouses(response?.data || []);
     } catch (error) {
       console.error('Failed to fetch warehouses:', error);
     }
