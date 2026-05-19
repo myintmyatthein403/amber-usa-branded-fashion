@@ -13,7 +13,7 @@ import CurrencySwitcher from "./CurrencySwitcher";
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(typeof window !== 'undefined');
+  const [mounted, setMounted] = useState(false);
   const [ads, setAds] = useState<any[]>([]);
   
   const isSearchOpen = useStore((state) => state.isSearchOpen);

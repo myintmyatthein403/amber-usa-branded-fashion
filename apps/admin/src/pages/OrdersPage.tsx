@@ -135,10 +135,12 @@ export const OrdersPage: React.FC = () => {
         size="xl"
       >
         {selectedOrder && (
-          <OrderDetails 
+          <OrderDetails
             order={selectedOrder}
             onUpdateStatus={handleUpdateStatus}
             updatingStatus={updatingStatus}
+            onUpdateTracking={handleUpdateTracking}
+            onRefund={handleRefund}
           />
         )}
       </Modal>

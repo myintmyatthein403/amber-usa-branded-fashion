@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import Stripe from 'stripe';
-import { OrderPaidEvent } from '../common/events/domain.events';
+import { OrderPaidEvent, OrderPaymentFailedEvent } from '../common/events/domain.events';
 
 @Injectable()
 export class StripeService {
@@ -182,20 +182,107 @@ export class StripeService {
     return { received: true };
   }
 
+  async createRefund(
+    orderId: string,
+    amount?: number,
+    reason?:
+      | 'requested_by_customer'
+      | 'fraudulent'
+      | 'duplicate'
+      | 'expired_uncaptured_charge',
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        stripePaymentIntentId: true,
+        totalAmount: true,
+        paymentStatus: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+
+    if (order.paymentStatus !== 'PAID') {
+      throw new BadRequestException(
+        'Can only refund orders with PAID payment status',
+      );
+    }
+
+    if (!order.stripePaymentIntentId) {
+      throw new BadRequestException(
+        'No Stripe payment intent found for this order',
+      );
+    }
+
+    const stripe = await this.getStripeInstance();
+
+    // Calculate refund amount
+    const refundAmount = amount
+      ? Math.round(amount * 100)
+      : Math.round(Number(order.totalAmount) * 100);
+
+    const refund = await stripe.refunds.create({
+      payment_intent: order.stripePaymentIntentId,
+      amount: refundAmount,
+      // Note: Stripe's reason type is more restrictive, so we'll omit it for now
+      // reason: reason || 'requested_by_customer' as any,
+    });
+
+    // Update order payment status to REFUNDED
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { paymentStatus: 'REFUNDED' },
+    });
+
+    return {
+      id: refund.id,
+      amount: refund.amount / 100,
+      status: refund.status,
+      reason: refund.reason,
+    };
+  }
+
+  async getRefunds(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { stripePaymentIntentId: true },
+    });
+
+    if (!order || !order.stripePaymentIntentId) {
+      throw new NotFoundException(
+        'No Stripe payment intent found for this order',
+      );
+    }
+
+    const stripe = await this.getStripeInstance();
+    const refunds = await stripe.refunds.list({
+      payment_intent: order.stripePaymentIntentId,
+    });
+
+    return refunds.data.map((refund) => ({
+      id: refund.id,
+      amount: refund.amount / 100,
+      status: refund.status,
+      reason: refund.reason,
+      created: refund.created,
+    }));
+  }
+
   private async handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
     const orderId = paymentIntent.metadata.orderId;
     if (!orderId) return;
 
-    try {
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: { paymentStatus: 'FAILED' },
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to update order ${orderId} status to FAILED: ${error.message}`,
-      );
-    }
+    this.logger.warn(`Payment failed for order ${orderId}. Emitting failure event.`);
+    this.eventEmitter.emit(
+      'order.payment_failed',
+      new OrderPaymentFailedEvent(
+        orderId,
+        paymentIntent.last_payment_error?.message,
+      ),
+    );
   }
 
   private async handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {

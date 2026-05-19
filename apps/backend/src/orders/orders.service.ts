@@ -154,7 +154,32 @@ export class OrdersService {
     return updatedOrder;
   }
 
-  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus, options?: { skipRestock?: boolean }) {
+  async updateOrderTracking(
+    id: string,
+    trackingData: {
+      carrier?: string;
+      trackingNumber?: string;
+      warehouseId?: string;
+    },
+  ) {
+    const order = await this.ordersRepository.findById(id);
+    if (!order) throw new NotFoundException('Order not found');
+
+    const updateData: any = {};
+    if (trackingData.carrier) updateData.carrier = trackingData.carrier;
+    if (trackingData.trackingNumber)
+      updateData.trackingNumber = trackingData.trackingNumber;
+    if (trackingData.warehouseId)
+      updateData.warehouseId = trackingData.warehouseId;
+
+    return this.ordersRepository.update(id, updateData);
+  }
+
+  async updatePaymentStatus(
+    id: string,
+    paymentStatus: PaymentStatus,
+    options?: { skipRestock?: boolean },
+  ) {
     const order = await this.ordersRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
 
@@ -162,12 +187,17 @@ export class OrdersService {
       const previousStatus = order.paymentStatus;
       try {
         await this.prisma.$transaction(async (tx) => {
-          await tx.order.update({ where: { id }, data: { paymentStatus: 'FAILED' } });
+          await tx.order.update({
+            where: { id },
+            data: { paymentStatus: 'FAILED' },
+          });
           await this.ordersRepository.restockWithTransaction(tx, id);
         });
       } catch (error) {
         await this.ordersRepository.updatePaymentStatus(id, previousStatus);
-        throw new BadRequestException('Failed to process payment failure: stock rollback failed');
+        throw new BadRequestException(
+          'Failed to process payment failure: stock rollback failed',
+        );
       }
     } else {
       await this.ordersRepository.updatePaymentStatus(id, paymentStatus);
@@ -261,5 +291,33 @@ export class OrdersService {
 
   async getPendingOrdersCount() {
     return this.ordersRepository.countPending();
+  }
+
+  /**
+   * Automatically cancel and restock orders that are PENDING and older than 1 hour
+   */
+  async cleanupStaleOrders() {
+    const oneHourAgo = new Date();
+    oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+
+    const staleOrders = await this.prisma.order.findMany({
+      where: {
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        createdAt: { lt: oneHourAgo },
+      },
+      select: { id: true },
+    });
+
+    for (const order of staleOrders) {
+      try {
+        await this.updateOrderStatus(order.id, 'CANCELLED');
+      } catch (error) {
+        // Log error but continue with other orders
+        console.error(`Failed to cleanup stale order ${order.id}:`, error);
+      }
+    }
+
+    return staleOrders.length;
   }
 }

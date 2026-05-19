@@ -11,17 +11,24 @@ export class SaleSectionService {
 
   async findAll(page = 1, limit = 10, search?: string) {
     const skip = (page - 1) * limit;
-    const where = search ? {
-      OR: [
-        { title: { contains: search, mode: 'insensitive' as const } },
-        { description: { contains: search, mode: 'insensitive' as const } },
-        { badge: { contains: search, mode: 'insensitive' as const } },
-      ]
-    } : {};
-    
+    const where = search
+      ? {
+          OR: [
+            { title: { contains: search, mode: 'insensitive' as const } },
+            { description: { contains: search, mode: 'insensitive' as const } },
+            { badge: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
     const [items, total] = await Promise.all([
-      this.repository.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' } }),
-      this.repository.count(where)
+      this.repository.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.repository.count(where),
     ]);
 
     return {
@@ -31,7 +38,7 @@ export class SaleSectionService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
-      }
+      },
     };
   }
 

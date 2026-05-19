@@ -19,7 +19,8 @@ export class GiftCardSectionService {
 
   async findOne(id: string) {
     const section = await this.repository.findById(id);
-    if (!section) throw new NotFoundException(`Gift card section ${id} not found`);
+    if (!section)
+      throw new NotFoundException(`Gift card section ${id} not found`);
     return section;
   }
 

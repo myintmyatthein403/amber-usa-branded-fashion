@@ -21,6 +21,7 @@ export const useOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingTracking, setUpdatingTracking] = useState(false);
 
   const { deleteItem } = useDelete(API_ROUTES.ORDERS.BASE);
 
@@ -55,7 +56,7 @@ export const useOrders = () => {
   const handleUpdateStatus = async (id: string, newStatus: OrderStatus) => {
     setUpdatingStatus(true);
     try {
-      await apiService(API_ROUTES.ORDERS.BY_ID(id), {
+      await apiService(API_ROUTES.ORDERS.UPDATE_STATUS(id), {
         method: 'PATCH',
         body: { status: newStatus },
       });
@@ -67,6 +68,40 @@ export const useOrders = () => {
       console.error('Failed to update order status:', error);
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleUpdateTracking = async (id: string, trackingData: { carrier: string; trackingNumber: string }) => {
+    setUpdatingTracking(true);
+    try {
+      await apiService(API_ROUTES.ORDERS.BY_ID(id) + '/tracking', {
+        method: 'PATCH',
+        body: trackingData,
+      });
+      fetchOrders();
+      if (selectedOrder?.id === id) {
+        setSelectedOrder({ ...selectedOrder, ...trackingData });
+      }
+    } catch (error) {
+      console.error('Failed to update tracking information:', error);
+    } finally {
+      setUpdatingTracking(false);
+    }
+  };
+
+  const handleRefund = async (id: string, amount?: number) => {
+    try {
+      await apiService(`${API_ROUTES.ORDERS.BASE}/${id}/refund`, {
+        method: 'POST',
+        body: { amount },
+      });
+      fetchOrders();
+      if (selectedOrder?.id === id) {
+        setSelectedOrder({ ...selectedOrder, paymentStatus: 'REFUNDED', status: 'REFUNDED' });
+      }
+    } catch (error) {
+      console.error('Failed to process refund:', error);
+      alert('Refund failed. Please check Stripe logs.');
     }
   };
 
@@ -136,7 +171,10 @@ export const useOrders = () => {
     modalOpen,
     setModalOpen,
     updatingStatus,
+    updatingTracking,
     handleUpdateStatus,
+    handleUpdateTracking,
+    handleRefund,
     handleDelete,
     refresh: fetchOrders
   };

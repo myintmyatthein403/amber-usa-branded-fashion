@@ -35,16 +35,17 @@ export default function OrderSummary({
             }
             className="flex space-x-6 items-center"
           >
-            <div className="relative w-20 aspect-[3/4] rounded-sm overflow-hidden bg-white shadow-sm shrink-0">
-              <Image
-                src={item.image}
-                alt={item.name}
-                fill
-                className="object-cover"
-              />
-              <span className="absolute -top-2 -right-2 bg-[#1A1A1A] text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
-                {item.quantity}
-              </span>
+<div className="relative w-20 aspect-[3/4] rounded-sm overflow-hidden bg-white shadow-sm shrink-0">
+              {item.image ? (
+                <Image
+                  src={item.image}
+                  alt={item.name}
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-100" />
+              )}
             </div>
             <div className="flex-1">
               <h4 className="text-sm font-serif font-bold text-[#1A1A1A]">

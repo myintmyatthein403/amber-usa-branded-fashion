@@ -25,11 +25,16 @@ export class DeliveryMethodsRepository {
     });
   }
 
-  async create(data: Prisma.DeliveryMethodCreateInput): Promise<DeliveryMethod> {
+  async create(
+    data: Prisma.DeliveryMethodCreateInput,
+  ): Promise<DeliveryMethod> {
     return this.prisma.deliveryMethod.create({ data });
   }
 
-  async update(id: string, data: Prisma.DeliveryMethodUpdateInput): Promise<DeliveryMethod> {
+  async update(
+    id: string,
+    data: Prisma.DeliveryMethodUpdateInput,
+  ): Promise<DeliveryMethod> {
     return this.prisma.deliveryMethod.update({
       where: { id },
       data,

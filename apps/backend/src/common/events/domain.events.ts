@@ -7,6 +7,13 @@ export class OrderPaidEvent {
   ) {}
 }
 
+export class OrderPaymentFailedEvent {
+  constructor(
+    public readonly orderId: string,
+    public readonly error?: string,
+  ) {}
+}
+
 export class OrderCancelledEvent {
   constructor(public readonly orderId: string) {}
 }

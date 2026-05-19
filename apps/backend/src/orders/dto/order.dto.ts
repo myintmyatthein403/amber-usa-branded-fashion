@@ -8,7 +8,14 @@ export const CreateOrderItemDto = OrderItemSchema;
 export type CreateOrderItemDto = z.infer<typeof CreateOrderItemDto>;
 
 export const OrderStatusDto = z.object({
-  status: z.enum(['PENDING', 'PROCESSING', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'REFUNDED']),
+  status: z.enum([
+    'PENDING',
+    'PROCESSING',
+    'DELIVERING',
+    'COMPLETED',
+    'CANCELLED',
+    'REFUNDED',
+  ]),
 });
 
 export type OrderStatusDto = z.infer<typeof OrderStatusDto>;
@@ -21,7 +28,14 @@ export type PaymentStatusDto = z.infer<typeof PaymentStatusDto>;
 
 export const BulkOrderStatusDto = z.object({
   ids: z.array(z.string().uuid()),
-  status: z.enum(['PENDING', 'PROCESSING', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'REFUNDED']),
+  status: z.enum([
+    'PENDING',
+    'PROCESSING',
+    'DELIVERING',
+    'COMPLETED',
+    'CANCELLED',
+    'REFUNDED',
+  ]),
 });
 
 export type BulkOrderStatusDto = z.infer<typeof BulkOrderStatusDto>;
@@ -32,6 +46,14 @@ export const BulkPaymentStatusDto = z.object({
 });
 
 export type BulkPaymentStatusDto = z.infer<typeof BulkPaymentStatusDto>;
+
+export const TrackingUpdateDto = z.object({
+  carrier: z.string().optional(),
+  trackingNumber: z.string().optional(),
+  warehouseId: z.string().uuid().optional(),
+});
+
+export type TrackingUpdateDto = z.infer<typeof TrackingUpdateDto>;
 
 export const OrderQueryDto = z.object({
   page: z.number().optional(),

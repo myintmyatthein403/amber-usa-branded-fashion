@@ -12,8 +12,10 @@ export class SalesService {
 
   async createSale(data: SaleInput): Promise<Sale> {
     const sanitizedData = sanitizeData(data);
-    const productIds = (sanitizedData as Record<string, unknown>).productIds as string[] | undefined;
-    const saleData = sanitizeData(data) as Prisma.SaleCreateInput;
+    const productIds = (sanitizedData as Record<string, unknown>).productIds as
+      | string[]
+      | undefined;
+    const saleData = sanitizeData(data);
 
     const sale = await this.salesRepository.create(saleData);
 
@@ -24,7 +26,11 @@ export class SalesService {
     return sale;
   }
 
-  async getAllSales(options?: { page?: number; limit?: number; search?: string }) {
+  async getAllSales(options?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
     return this.salesRepository.findAll(options);
   }
 
@@ -44,8 +50,10 @@ export class SalesService {
       throw new NotFoundException(`Sale with ID ${id} not found`);
 
     const sanitizedData = sanitizeData(data);
-    const productIds = (sanitizedData as Record<string, unknown>).productIds as string[] | undefined;
-    const saleData = sanitizeData(data) as Prisma.SaleUpdateInput;
+    const productIds = (sanitizedData as Record<string, unknown>).productIds as
+      | string[]
+      | undefined;
+    const saleData = sanitizeData(data);
 
     const sale = await this.salesRepository.update(id, saleData);
 

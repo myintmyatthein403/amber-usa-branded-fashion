@@ -13,7 +13,9 @@ export class CollectionsService {
   constructor(private readonly collectionsRepository: CollectionsRepository) {}
 
   async create(data: CollectionInput) {
-    const sanitizedData = sanitizeData(data as unknown as Record<string, unknown>);
+    const sanitizedData = sanitizeData(
+      data as unknown as Record<string, unknown>,
+    );
     const productIds = (sanitizedData.productIds || []) as string[];
     const { productIds: _p, name, slug, ...rest } = sanitizedData;
 
@@ -21,11 +23,12 @@ export class CollectionsService {
       name: name as string,
       slug: slug as string,
       ...(rest as Record<string, unknown>),
-      products: productIds.length > 0
-        ? {
-            connect: productIds.map((id: string) => ({ id })),
-          }
-        : undefined,
+      products:
+        productIds.length > 0
+          ? {
+              connect: productIds.map((id: string) => ({ id })),
+            }
+          : undefined,
     };
 
     return this.collectionsRepository.create(createData as any);
@@ -54,11 +57,15 @@ export class CollectionsService {
     if (!collection)
       throw new NotFoundException(`Collection with ID ${id} not found`);
 
-    const sanitizedData = sanitizeData(data as unknown as Record<string, unknown>);
+    const sanitizedData = sanitizeData(
+      data as unknown as Record<string, unknown>,
+    );
     const productIds = sanitizedData.productIds as string[] | undefined;
     const { productIds: _p, ...rest } = sanitizedData;
 
-    const updateData: Prisma.CollectionUpdateInput = { ...(rest as Record<string, unknown>) };
+    const updateData: Prisma.CollectionUpdateInput = {
+      ...(rest as Record<string, unknown>),
+    };
 
     if (productIds !== undefined && productIds !== null) {
       updateData.products = {

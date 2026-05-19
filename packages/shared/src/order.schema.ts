@@ -31,6 +31,14 @@ export const OrderSchema = z.object({
   currency: z.string().default('USD'),
   paymentMethod: z.string().min(1, 'Payment method is required'),
   shippingAddress: z.string().min(1, 'Shipping address is required'),
+  trackingNumber: z.string().optional(),
+  carrier: z.string().optional(),
+  warehouseId: z.string().uuid().optional().nullable(),
+  warehouse: z.object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    location: z.string().optional(),
+  }).optional(),
   userId: z.string().uuid().optional().nullable(),
   user: z.object({
     id: z.string().optional(),

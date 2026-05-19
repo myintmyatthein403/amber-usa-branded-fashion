@@ -2,7 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Product, Prisma } from '@prisma/client';
 import { ProductsRepository } from './products.repository';
 import { sanitizeData } from '../common/utils/data-sanitizer';
-import { CreateProductDto, UpdateProductDto, ProductQueryDto, StockValidationItemDto } from './dto/product.dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductQueryDto,
+  StockValidationItemDto,
+} from './dto/product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -25,7 +30,18 @@ export class ProductsService {
       limit?: number;
       search?: string;
     } = {},
-  ): Promise<{ data: Product[]; meta: { total: number; page: number; limit: number; totalPages: number } } | Product[]> {
+  ): Promise<
+    | {
+        data: Product[];
+        meta: {
+          total: number;
+          page: number;
+          limit: number;
+          totalPages: number;
+        };
+      }
+    | Product[]
+  > {
     const {
       isFeatured,
       isNewArrival,

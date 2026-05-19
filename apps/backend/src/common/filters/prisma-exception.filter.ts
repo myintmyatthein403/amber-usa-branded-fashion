@@ -93,7 +93,8 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         break;
       case 'P2014':
         status = HttpStatus.CONFLICT;
-        message = 'The change you are trying to make would violate a required relation';
+        message =
+          'The change you are trying to make would violate a required relation';
         error = 'Required Relation Violation';
         break;
       case 'P2015':
@@ -162,7 +163,10 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         error = 'Inconsistent Result Types';
         break;
       default:
-        this.logger.error(`Unhandled Prisma error: ${exception.code}`, exception.stack);
+        this.logger.error(
+          `Unhandled Prisma error: ${exception.code}`,
+          exception.stack,
+        );
         message = 'An unexpected database error occurred';
     }
 

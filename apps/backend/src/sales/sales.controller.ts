@@ -24,7 +24,11 @@ export class SalesController {
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
   create(@Body() createSaleDto: Prisma.SaleCreateInput) {
-    return this.salesService.createSale(createSaleDto as unknown as Parameters<typeof this.salesService.createSale>[0]);
+    return this.salesService.createSale(
+      createSaleDto as unknown as Parameters<
+        typeof this.salesService.createSale
+      >[0],
+    );
   }
 
   @Get()
@@ -60,7 +64,12 @@ export class SalesController {
     @Param('id') id: string,
     @Body() updateSaleDto: Prisma.SaleUpdateInput,
   ) {
-    return this.salesService.updateSale(id, updateSaleDto as unknown as Parameters<typeof this.salesService.updateSale>[1]);
+    return this.salesService.updateSale(
+      id,
+      updateSaleDto as unknown as Parameters<
+        typeof this.salesService.updateSale
+      >[1],
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

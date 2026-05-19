@@ -32,7 +32,10 @@ export class FooterSectionRepository {
     return this.prisma.footerSection.findUnique({ where: { id } });
   }
 
-  async update(id: string, data: Prisma.FooterSectionUpdateInput): Promise<FooterSection> {
+  async update(
+    id: string,
+    data: Prisma.FooterSectionUpdateInput,
+  ): Promise<FooterSection> {
     if (data.isActive) {
       await this.prisma.footerSection.updateMany({
         where: { isActive: true, NOT: { id } },

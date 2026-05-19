@@ -28,18 +28,21 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
-  findAll(
-    @Query() query: PaginationQuery,
-  ) {
+  findAll(@Query() query: PaginationQuery) {
     const page = query.page ? Math.max(1, parseInt(String(query.page), 10)) : 1;
-    const limit = query.limit ? Math.max(1, Math.min(100, parseInt(String(query.limit), 10))) : 10;
+    const limit = query.limit
+      ? Math.max(1, Math.min(100, parseInt(String(query.limit), 10)))
+      : 10;
     return this.categoriesService.getAllCategories(page, limit);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  create(@Body(new ZodValidationPipe(CategorySchema)) createCategoryDto: CreateCategoryDto) {
+  create(
+    @Body(new ZodValidationPipe(CategorySchema))
+    createCategoryDto: CreateCategoryDto,
+  ) {
     return this.categoriesService.createCategory(createCategoryDto);
   }
 
@@ -48,7 +51,8 @@ export class CategoriesController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(CategorySchema.partial())) updateCategoryDto: UpdateCategoryDto,
+    @Body(new ZodValidationPipe(CategorySchema.partial()))
+    updateCategoryDto: UpdateCategoryDto,
   ) {
     return this.categoriesService.updateCategory(id, updateCategoryDto);
   }

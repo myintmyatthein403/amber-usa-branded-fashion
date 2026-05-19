@@ -54,7 +54,10 @@ export class UsersService {
       delete sanitizedData.role;
     }
     if (sanitizedData.password) {
-      sanitizedData.password = await bcrypt.hash(sanitizedData.password as string, 10);
+      sanitizedData.password = await bcrypt.hash(
+        sanitizedData.password as string,
+        10,
+      );
     }
 
     const user = await this.usersRepository.create(sanitizedData as any);
@@ -105,10 +108,16 @@ export class UsersService {
       delete sanitizedData.role;
     }
     if (sanitizedData.password) {
-      sanitizedData.password = await bcrypt.hash(sanitizedData.password as string, 10);
+      sanitizedData.password = await bcrypt.hash(
+        sanitizedData.password as string,
+        10,
+      );
     }
 
-    const updatedUser = await this.usersRepository.update(id, sanitizedData as any);
+    const updatedUser = await this.usersRepository.update(
+      id,
+      sanitizedData as any,
+    );
     const { password: _, ...result } = updatedUser;
     return result;
   }

@@ -62,7 +62,7 @@ function ShopContent() {
   const [selectedColor, setSelectedColor] = useState("All");
   const [selectedSize, setSelectedSize] = useState("All");
   
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 3000]);
   const [minPriceInput, setMinPriceInput] = useState("0");
   const [maxPriceInput, setMaxPriceInput] = useState("10000"); 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || "");
@@ -103,7 +103,7 @@ function ShopContent() {
     setCurrentPage(1);
   }, [selectedBrand, selectedCategory, selectedCollection, selectedColor, selectedSize, priceRange, searchQuery, onlyInStock, onlySale, sortBy]);
 
-  const MAX_PRICE_USD = 10000;
+  const MAX_PRICE_USD = 3000;
   const maxPrice = currency === 'USD' ? MAX_PRICE_USD : MAX_PRICE_USD * exchangeRate;
   
   useEffect(() => {

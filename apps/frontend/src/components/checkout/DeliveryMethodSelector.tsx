@@ -25,6 +25,8 @@ export default function DeliveryMethodSelector({
   onBack,
   onContinue,
 }: DeliveryMethodSelectorProps) {
+  const isValid = !!selectedId;
+
   return (
     <>
       <h3 className="text-xl font-serif">Shipping Method</h3>

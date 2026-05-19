@@ -4,6 +4,7 @@ export { default as PaymentMethodSelector } from "./PaymentMethodSelector";
 export { default as ManualPaymentSection } from "./ManualPaymentSection";
 export { default as OrderSummary } from "./OrderSummary";
 export { default as StripePaymentSection } from "./StripePaymentSection";
+export { default as ReviewStep } from "./ReviewStep";
 
 export interface CheckoutFormData {
   email: string;
@@ -41,4 +42,14 @@ export interface StockValidationResult {
   productId: string;
   variantId?: string;
   inStock: boolean;
+}
+
+export interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
+  isUsdPrice?: boolean;
+  size?: string;
 }

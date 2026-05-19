@@ -23,7 +23,10 @@ export class BrandsService {
     return this.brandsRepository.create(sanitizedData);
   }
 
-  async getAllBrands(page: number = 1, limit: number = 10): Promise<PaginatedBrandsResult> {
+  async getAllBrands(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<PaginatedBrandsResult> {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       this.brandsRepository.findMany(skip, limit),

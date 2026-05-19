@@ -8,7 +8,9 @@ export class VariantsRepository {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateVariantDto): Promise<Variant> {
-    const { warehouseId, ...variantData } = data as CreateVariantDto & { warehouseId?: string };
+    const { warehouseId, ...variantData } = data as CreateVariantDto & {
+      warehouseId?: string;
+    };
     return this.prisma.$transaction(async (tx) => {
       const variant = await tx.variant.create({
         data: {

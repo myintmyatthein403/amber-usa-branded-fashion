@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Order, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -113,7 +118,12 @@ export class OrdersRepository {
     });
   }
 
-  async findMany(where: Prisma.OrderWhereInput, skip?: number, take?: number, orderBy?: any): Promise<[Order[], number]> {
+  async findMany(
+    where: Prisma.OrderWhereInput,
+    skip?: number,
+    take?: number,
+    orderBy?: any,
+  ): Promise<[Order[], number]> {
     return Promise.all([
       this.prisma.order.findMany({
         where,
@@ -138,12 +148,25 @@ export class OrdersRepository {
     return this.prisma.order.update({ where: { id }, data: { status } });
   }
 
-  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<Order> {
+  async updatePaymentStatus(
+    id: string,
+    paymentStatus: PaymentStatus,
+  ): Promise<Order> {
     return this.prisma.order.update({ where: { id }, data: { paymentStatus } });
   }
 
-  async updateStripeInfo(id: string, stripePaymentIntentId: string): Promise<Order> {
-    return this.prisma.order.update({ where: { id }, data: { stripePaymentIntentId } });
+  async updateStripeInfo(
+    id: string,
+    stripePaymentIntentId: string,
+  ): Promise<Order> {
+    return this.prisma.order.update({
+      where: { id },
+      data: { stripePaymentIntentId },
+    });
+  }
+
+  async update(id: string, data: any): Promise<Order> {
+    return this.prisma.order.update({ where: { id }, data });
   }
 
   async bulkUpdateStatus(ids: string[], status: OrderStatus) {
@@ -175,7 +198,12 @@ export class OrdersRepository {
         if (item.variantId && !item.isPreOrder) {
           if (order.warehouseId) {
             await tx.inventory.update({
-              where: { variantId_warehouseId: { variantId: item.variantId, warehouseId: order.warehouseId } },
+              where: {
+                variantId_warehouseId: {
+                  variantId: item.variantId,
+                  warehouseId: order.warehouseId,
+                },
+              },
               data: { quantity: { increment: item.quantity } },
             });
           }
@@ -185,19 +213,30 @@ export class OrdersRepository {
           });
         }
       }
-      await tx.order.update({ where: { id: orderId }, data: { restocked: true } });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { restocked: true },
+      });
     });
   }
 
   async restockWithTransaction(tx: any, orderId: string): Promise<void> {
-    const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
     if (!order || order.restocked) return;
 
     for (const item of order.items) {
       if (item.variantId && !item.isPreOrder) {
         if (order.warehouseId) {
           await tx.inventory.update({
-            where: { variantId_warehouseId: { variantId: item.variantId, warehouseId: order.warehouseId } },
+            where: {
+              variantId_warehouseId: {
+                variantId: item.variantId,
+                warehouseId: order.warehouseId,
+              },
+            },
             data: { quantity: { increment: item.quantity } },
           });
         }
@@ -207,13 +246,19 @@ export class OrdersRepository {
         });
       }
     }
-    await tx.order.update({ where: { id: orderId }, data: { restocked: true } });
+    await tx.order.update({
+      where: { id: orderId },
+      data: { restocked: true },
+    });
   }
 
   async findByOrderNumber(orderNumber: string): Promise<Order | null> {
     return this.prisma.order.findUnique({
       where: { orderNumber },
-      include: { items: true, user: { select: { id: true, email: true, name: true } } },
+      include: {
+        items: true,
+        user: { select: { id: true, email: true, name: true } },
+      },
     });
   }
 
@@ -226,7 +271,9 @@ export class OrdersRepository {
   }
 
   async findWarehouseWithStock(variantId: string, quantity: number) {
-    return this.prisma.inventory.findFirst({ where: { variantId, quantity: { gte: quantity } } });
+    return this.prisma.inventory.findFirst({
+      where: { variantId, quantity: { gte: quantity } },
+    });
   }
 
   async findDefaultWarehouse(location: string) {
@@ -238,7 +285,10 @@ export class OrdersRepository {
   }
 
   async findVariantForOrder(id: string) {
-    return this.prisma.variant.findUnique({ where: { id }, include: { product: true } });
+    return this.prisma.variant.findUnique({
+      where: { id },
+      include: { product: true },
+    });
   }
 
   async findProductForOrder(id: string) {

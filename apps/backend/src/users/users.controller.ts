@@ -41,7 +41,10 @@ export class UsersController {
   }
 
   @Post()
-  async create(@Body() createDto: CreateUserDto, @Req() req: AuthenticatedRequest) {
+  async create(
+    @Body() createDto: CreateUserDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.usersService.create(createDto, req.user);
   }
 

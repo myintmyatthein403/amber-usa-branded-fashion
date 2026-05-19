@@ -23,7 +23,10 @@ export class CategoriesService {
     return this.categoriesRepository.create(sanitizedData);
   }
 
-  async getAllCategories(page: number = 1, limit: number = 10): Promise<PaginatedResult> {
+  async getAllCategories(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<PaginatedResult> {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       this.categoriesRepository.findMany(skip, limit),

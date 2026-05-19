@@ -20,7 +20,14 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { OrderSchema, OrderStatus, PaymentStatus } from '@amber/shared';
-import { CreateOrderDto, OrderStatusDto, PaymentStatusDto, BulkOrderStatusDto, BulkPaymentStatusDto } from './dto/order.dto';
+import {
+  CreateOrderDto,
+  OrderStatusDto,
+  PaymentStatusDto,
+  BulkOrderStatusDto,
+  BulkPaymentStatusDto,
+  TrackingUpdateDto,
+} from './dto/order.dto';
 import {
   ApiTags,
   ApiOperation,
@@ -48,12 +55,14 @@ export class OrdersController {
 
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
-  @UsePipes(new ZodValidationPipe(OrderSchema.omit({ id: true, orderNumber: true })))
+  @UsePipes(
+    new ZodValidationPipe(OrderSchema.omit({ id: true, orderNumber: true })),
+  )
   @ApiOperation({ summary: 'Create a new order' })
   @ApiResponse({ status: 201, description: 'Order successfully created.' })
   createOrder(@Req() req: AuthenticatedRequest, @Body() data: CreateOrderDto) {
     const userId = req.user?.userId || '';
-    const parts = data.shippingAddress.split(',').map(s => s.trim());
+    const parts = data.shippingAddress.split(',').map((s) => s.trim());
     const nameParts = parts[0]?.split(' ') || [];
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -74,7 +83,7 @@ export class OrdersController {
       currency: data.currency,
       deliveryFee: undefined,
       warehouseId: undefined,
-      items: data.items.map(item => ({
+      items: data.items.map((item) => ({
         productId: item.productId,
         variantId: item.variantId || undefined,
         name: item.name,
@@ -110,6 +119,16 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get count of pending orders' })
   getPendingCount() {
     return this.ordersService.getPendingOrdersCount();
+  }
+
+  @Post('cleanup')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cleanup stale pending orders' })
+  async cleanupOrders() {
+    const count = await this.ordersService.cleanupStaleOrders();
+    return { message: `Cleaned up ${count} stale orders` };
   }
 
   @Get('track/:orderNumber')
@@ -156,7 +175,7 @@ export class OrdersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update order status' })
   updateOrderStatus(@Param('id') id: string, @Body() body: OrderStatusDto) {
-    return this.ordersService.updateOrderStatus(id, body.status as OrderStatus);
+    return this.ordersService.updateOrderStatus(id, body.status);
   }
 
   @Patch(':id/payment-status')
@@ -165,7 +184,7 @@ export class OrdersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update payment status' })
   updatePaymentStatus(@Param('id') id: string, @Body() body: PaymentStatusDto) {
-    return this.ordersService.updatePaymentStatus(id, body.status as PaymentStatus);
+    return this.ordersService.updatePaymentStatus(id, body.status);
   }
 
   @Patch('bulk-status')
@@ -174,7 +193,7 @@ export class OrdersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Bulk update order status' })
   bulkUpdateStatus(@Body() body: BulkOrderStatusDto) {
-    return this.ordersService.bulkUpdateStatus(body.ids, body.status as OrderStatus);
+    return this.ordersService.bulkUpdateStatus(body.ids, body.status);
   }
 
   @Patch('bulk-payment-status')
@@ -183,7 +202,51 @@ export class OrdersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Bulk update payment status' })
   bulkUpdatePaymentStatus(@Body() body: BulkPaymentStatusDto) {
-    return this.ordersService.bulkUpdatePaymentStatus(body.ids, body.status as PaymentStatus);
+    return this.ordersService.bulkUpdatePaymentStatus(body.ids, body.status);
+  }
+
+  @Patch(':id/tracking')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update order tracking information' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  updateOrderTracking(
+    @Param('id') id: string,
+    @Body() body: TrackingUpdateDto,
+  ) {
+    return this.ordersService.updateOrderTracking(id, body);
+  }
+
+  @Post(':id/refund')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Process refund for an order' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async processRefund(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      amount?: number;
+      reason?:
+        | 'requested_by_customer'
+        | 'fraudulent'
+        | 'duplicate'
+        | 'expired_uncaptured_charge';
+    },
+  ) {
+    return this.stripeService.createRefund(id, body.amount, body.reason);
+  }
+
+  @Get(':id/refunds')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get refund history for an order' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  async getRefunds(@Param('id') id: string) {
+    return this.stripeService.getRefunds(id);
   }
 
   @Delete(':id')

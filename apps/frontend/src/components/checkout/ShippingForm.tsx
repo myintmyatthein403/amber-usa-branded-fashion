@@ -9,6 +9,8 @@ interface ShippingFormProps {
 }
 
 export default function ShippingForm({ formData, onUpdate, onContinue }: ShippingFormProps) {
+  const isValid = formData.email && formData.firstName && formData.lastName && formData.address && formData.phone;
+
   return (
     <>
       <div className="space-y-6">
@@ -67,7 +69,7 @@ export default function ShippingForm({ formData, onUpdate, onContinue }: Shippin
         onClick={onContinue}
         className="w-full bg-[#1A1A1A] text-white py-5 uppercase tracking-[0.3em] text-[10px] font-bold hover:bg-[#D4AF37] transition-all shadow-xl"
       >
-        Continue to Shipping
+        Continue to Delivery
       </button>
     </>
   );

@@ -16,7 +16,12 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CargoStatus } from '@prisma/client';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { WarehouseSchema, CreateCargoShipmentSchema, CargoStatusSchema, type CreateCargoShipmentInput } from '@amber/shared';
+import {
+  WarehouseSchema,
+  CreateCargoShipmentSchema,
+  CargoStatusSchema,
+  type CreateCargoShipmentInput,
+} from '@amber/shared';
 import {
   ApiTags,
   ApiOperation,
@@ -104,7 +109,10 @@ export class LogisticsController {
 
   @Post('cargo')
   @ApiOperation({ summary: 'Create a new cargo shipment' })
-  createCargoShipment(@Body(new ZodValidationPipe(CreateCargoShipmentSchema)) data: CreateCargoShipmentInput) {
+  createCargoShipment(
+    @Body(new ZodValidationPipe(CreateCargoShipmentSchema))
+    data: CreateCargoShipmentInput,
+  ) {
     return this.logisticsService.createCargoShipment(data);
   }
 

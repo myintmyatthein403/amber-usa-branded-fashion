@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "motion/react";
-import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight } from "lucide-react";
+import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, Package } from "lucide-react";
 import Image from "next/image";
 import { useCartActions } from "@/hooks/useCartActions";
 import Link from "next/link";
@@ -92,7 +92,13 @@ export default function CartDrawer() {
                     className="flex space-x-4"
                   >
                     <div className="relative w-24 aspect-[3/4] bg-[#F5F0E1] rounded-sm overflow-hidden shrink-0">
-                      <Image src={item.image} alt={item.name} fill className="object-cover" />
+                      {item.image ? (
+                        <Image src={item.image} alt={item.name} fill className="object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-8 h-8 text-[#1A1A1A]/20" />
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 flex flex-col justify-between py-1">
                       <div className="space-y-1">

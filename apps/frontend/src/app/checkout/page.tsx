@@ -16,10 +16,12 @@ import {
   ManualPaymentSection,
   OrderSummary,
   StripePaymentSection,
+  ReviewStep,
   type CheckoutFormData,
   type DeliveryMethod,
   type PaymentMethod,
   type StockValidationResult,
+  type CartItem,
 } from "@/components/checkout";
 
 export default function CheckoutPage() {
@@ -37,7 +39,7 @@ export default function CheckoutPage() {
   const [orderError, setOrderError] = useState<string | null>(null);
   const [isValidatingStock, setIsValidatingStock] = useState(false);
 
-  const cartItems = useStore((state) => state.cartItems);
+  const cartItems: CartItem[] = useStore((state) => state.cartItems);
   const subtotal = useStore((state) => state.getSubtotal());
   const clearCart = useStore((state) => state.clearCart);
   const formatPrice = useStore((state) => state.formatPrice);
@@ -438,6 +440,10 @@ export default function CheckoutPage() {
             <span className={cn(step >= 3 ? "text-[#1A1A1A]" : "text-[#1A1A1A]/20")}>
               Payment
             </span>
+            <ChevronRight className="w-3 h-3 text-[#1A1A1A]/20" />
+            <span className={cn(step >= 4 ? "text-[#1A1A1A]" : "text-[#1A1A1A]/20")}>
+              Review
+            </span>
           </div>
 
           <AnimatePresence mode="wait">
@@ -495,29 +501,50 @@ export default function CheckoutPage() {
                     if (type !== "STRIPE") setClientSecret(null);
                   }}
                 />
+                
+                <div className="flex gap-4">
+                  <button
+                    onClick={handleBack}
+                    className="flex-1 border border-[#1A1A1A]/10 hover:bg-zinc-50 transition-all py-5 uppercase tracking-[0.3em] text-[10px] font-bold"
+                  >
+                    Back to Shipping
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    disabled={!formData.paymentMethod}
+                    className="flex-1 bg-[#1A1A1A] text-white py-5 uppercase tracking-[0.3em] text-[10px] font-bold hover:bg-[#D4AF37] transition-all disabled:opacity-50"
+                  >
+                    Review Order
+                  </button>
+                </div>
+              </motion.div>
+            )}
 
-                {selectedPayment?.type === "STRIPE" ? (
-                  <StripePaymentSection
-                    clientSecret={clientSecret}
-                    isCreating={isCreatingIntent}
-                    error={paymentError}
-                    orderId={currentOrderId || undefined}
-                    onSuccess={handleComplete}
-                    onError={(msg) => setPaymentError(msg)}
-                  />
-                ) : selectedPayment ? (
-                  <ManualPaymentSection
-                    payment={selectedPayment}
-                    onBack={handleBack}
-                    onComplete={handleComplete}
-                  />
-                ) : null}
-
-                {orderError && (
-                  <div className="mt-4 p-4 bg-red-50 border border-red-200 text-red-600 text-sm">
-                    {orderError}
-                  </div>
-                )}
+            {step === 4 && (
+              <motion.div
+                key="step4"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="space-y-8"
+              >
+                <ReviewStep
+                  formData={formData}
+                  deliveryMethods={deliveryMethods}
+                  paymentMethods={paymentMethods}
+                  cartItems={cartItems}
+                  subtotal={subtotal}
+                  formatPrice={formatPrice}
+                  onBack={handleBack}
+                  onConfirm={handleComplete}
+                  selectedPayment={selectedPayment}
+                  selectedMethod={selectedMethod}
+                  isStripe={selectedPayment?.type === "STRIPE"}
+                  stripeClientSecret={clientSecret}
+                  isCreatingStripeIntent={isCreatingIntent}
+                  stripeError={paymentError}
+                  orderId={currentOrderId || undefined}
+                />
               </motion.div>
             )}
           </AnimatePresence>

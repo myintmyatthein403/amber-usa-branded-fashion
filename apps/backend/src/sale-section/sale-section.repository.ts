@@ -44,7 +44,10 @@ export class SaleSectionRepository {
     return this.prisma.saleSection.findUnique({ where: { id } });
   }
 
-  async update(id: string, data: Prisma.SaleSectionUpdateInput): Promise<SaleSection> {
+  async update(
+    id: string,
+    data: Prisma.SaleSectionUpdateInput,
+  ): Promise<SaleSection> {
     if (data.isActive) {
       await this.prisma.saleSection.updateMany({
         where: { isActive: true, NOT: { id } },

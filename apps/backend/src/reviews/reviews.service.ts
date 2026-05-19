@@ -31,10 +31,7 @@ export class ReviewsService {
     if (!review) throw new NotFoundException(`Review with ID ${id} not found`);
 
     const sanitizedData = sanitizeData(data);
-    return this.reviewsRepository.update(
-      id,
-      sanitizedData,
-    );
+    return this.reviewsRepository.update(id, sanitizedData);
   }
 
   async deleteReview(id: string): Promise<Review> {

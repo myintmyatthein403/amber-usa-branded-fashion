@@ -29,7 +29,10 @@ export class PaymentMethodsRepository {
     return this.prisma.paymentMethod.create({ data });
   }
 
-  async update(id: string, data: Prisma.PaymentMethodUpdateInput): Promise<PaymentMethod> {
+  async update(
+    id: string,
+    data: Prisma.PaymentMethodUpdateInput,
+  ): Promise<PaymentMethod> {
     return this.prisma.paymentMethod.update({
       where: { id },
       data,

@@ -6,7 +6,11 @@ import {
 import { VariantsRepository } from './variants.repository';
 import { Variant } from '@prisma/client';
 import { sanitizeData } from '../common/utils/data-sanitizer';
-import { CreateVariantDto, UpdateVariantDto, VariantStockUpdateDto } from './dto/variant.dto';
+import {
+  CreateVariantDto,
+  UpdateVariantDto,
+  VariantStockUpdateDto,
+} from './dto/variant.dto';
 
 @Injectable()
 export class VariantsService {
@@ -52,7 +56,10 @@ export class VariantsService {
     return this.variantsRepository.update(id, sanitizedData);
   }
 
-  async updateVariantStock(id: string, data: VariantStockUpdateDto): Promise<Variant> {
+  async updateVariantStock(
+    id: string,
+    data: VariantStockUpdateDto,
+  ): Promise<Variant> {
     const variant = await this.variantsRepository.findById(id);
     if (!variant) throw new NotFoundException('Variant not found');
 

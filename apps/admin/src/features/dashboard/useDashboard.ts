@@ -6,7 +6,10 @@ import {
   Users, 
   ShoppingBag, 
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  MapPin,
+  Package,
+  TrendingUp
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -34,6 +37,28 @@ interface ChartData {
   orders: number;
 }
 
+interface PopularCity {
+  city: string;
+  orderCount: number;
+  revenue: number;
+  averageOrderValue: number;
+}
+
+interface InventoryTurnover {
+  warehouse: string;
+  totalOrders: number;
+  totalRevenue: number;
+  totalItemsSold: number;
+  averageOrderValue: number;
+  turnoverRate: number;
+}
+
+interface ConversionRate {
+  totalVisitors: number;
+  totalOrders: number;
+  conversionRate: number;
+}
+
 export interface DisplaySale {
   id: string;
   customerName: string;
@@ -47,6 +72,9 @@ export const useDashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [popularCities, setPopularCities] = useState<PopularCity[]>([]);
+  const [inventoryTurnover, setInventoryTurnover] = useState<InventoryTurnover[]>([]);
+  const [conversionRate, setConversionRate] = useState<ConversionRate | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,17 +82,25 @@ export const useDashboard = () => {
       if (!token) return;
       
       try {
-        const response = await apiService<null, {
-          data: {
-            stats: DashboardStats;
-            recentSales: RecentSale[];
-            chartData: ChartData[];
-          }
-        }>(API_ROUTES.STATS);
+        const [dashboardResponse, citiesResponse, inventoryResponse, conversionResponse] = await Promise.all([
+          apiService<null, {
+            data: {
+              stats: DashboardStats;
+              recentSales: RecentSale[];
+              chartData: ChartData[];
+            }
+          }>(API_ROUTES.STATS),
+          apiService<null, { data: PopularCity[] }>(`${API_ROUTES.STATS}/popular-cities?limit=5`),
+          apiService<null, { data: InventoryTurnover[] }>(`${API_ROUTES.STATS}/inventory-turnover?days=30`),
+          apiService<null, { data: ConversionRate }>(`${API_ROUTES.STATS}/conversion-rate?days=30`),
+        ]);
 
-        setStats(response.data.stats);
-        setRecentSales(response.data.recentSales);
-        setChartData(response.data.chartData);
+        setStats(dashboardResponse.data.stats);
+        setRecentSales(dashboardResponse.data.recentSales);
+        setChartData(dashboardResponse.data.chartData);
+        setPopularCities(citiesResponse.data);
+        setInventoryTurnover(inventoryResponse.data);
+        setConversionRate(conversionResponse.data);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {
@@ -134,6 +170,9 @@ export const useDashboard = () => {
     recentSales: displayRecentSales,
     pendingOrdersCount: stats?.pendingOrders ?? pendingOrdersCount,
     chartData,
+    popularCities,
+    inventoryTurnover,
+    conversionRate,
     loading,
   };
 };

@@ -11,7 +11,11 @@ import {
   Mail,
   ArrowRight,
   CreditCard,
-  Loader2
+  Loader2,
+  TruckIcon,
+  MapPinned,
+  BarChart3,
+  RotateCcw
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -27,15 +31,26 @@ interface OrderDetailsProps {
   order: Order;
   onUpdateStatus: (id: string, status: OrderStatus) => void;
   updatingStatus: boolean;
+  onUpdateTracking?: (id: string, trackingData: { carrier: string; trackingNumber: string }) => void;
+  onRefund?: (id: string, amount?: number) => void;
 }
 
 export const OrderDetails: React.FC<OrderDetailsProps> = ({
   order,
   onUpdateStatus,
-  updatingStatus
+  updatingStatus,
+  onUpdateTracking,
+  onRefund
 }) => {
   const status = STATUS_CONFIG[order.status];
   const payment = PAYMENT_STATUS_CONFIG[order.paymentStatus];
+
+  const handleRefund = () => {
+    if (!onRefund || !order.id) return;
+    if (confirm('Are you sure you want to refund this order? This will process the refund via Stripe.')) {
+      onRefund(order.id);
+    }
+  };
 
   return (
     <div className="space-y-8 py-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -143,19 +158,14 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
                           </div>
                           <div>
                             <div className="text-xs font-bold text-foreground">{item.name}</div>
-                            {item.size && <div className="text-[9px] font-bold text-primary uppercase tracking-widest mt-1">Size: {item.size}</div>}
+                            {item.size && <div className="text-[9px] text-muted-foreground uppercase tracking-widest">Size: {item.size}</div>}
+                            {item.isPreOrder && <div className="text-[8px] text-amber-600 font-bold uppercase tracking-widest mt-0.5">Pre-Order</div>}
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <span className="text-xs font-mono font-bold">x{item.quantity}</span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <span className="text-xs font-mono">{item.isUsd ? '$' : 'Ks'}{item.price.toLocaleString()}</span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <span className="text-xs font-mono font-bold">{item.isUsd ? '$' : 'Ks'}{(item.price * item.quantity).toLocaleString()}</span>
-                      </td>
+                      <td className="p-4 text-center text-xs font-mono font-bold text-muted-foreground">{item.quantity}</td>
+                      <td className="p-4 text-right text-xs font-mono font-bold text-muted-foreground">{item.isUsd ? '$' : 'MMK'} {Number(item.price).toLocaleString()}</td>
+                      <td className="p-4 text-right text-xs font-mono font-bold text-foreground">{item.isUsd ? '$' : 'MMK'} {(Number(item.price) * item.quantity).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -164,28 +174,24 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
           </div>
         </div>
 
-        {/* Payment Summary */}
+        {/* Sidebar: Totals, Payment, Tracking */}
         <div className="space-y-6">
-          <div className="bg-card border border-border p-6 space-y-6 shadow-sm">
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground border-b border-border pb-4 flex items-center gap-2">
-              <CreditCard size={14} /> Settlement Summary
+          <div className="bg-muted/10 border border-border p-6 space-y-6">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground border-b border-border pb-3 flex items-center gap-2">
+              <CreditCard size={14} /> Financial Summary
             </h4>
             
-            <div className="space-y-4">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-muted-foreground font-medium">Subtotal</span>
-                <span className="font-mono">{order.currency} {order.totalAmount.toLocaleString()}</span>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Subtotal:</span>
+                <span className="text-[10px] font-mono font-bold text-foreground">{order.currency} {order.totalAmount.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-muted-foreground font-medium">Shipping</span>
-                <span className="font-mono text-emerald-600">FREE</span>
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Delivery:</span>
+                <span className="text-[10px] font-mono font-bold text-emerald-600">FREE</span>
               </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-muted-foreground font-medium">Tax</span>
-                <span className="font-mono">{order.currency} 0</span>
-              </div>
-              <div className="pt-4 border-t border-border flex justify-between items-center">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground">Final Total</span>
+              <div className="flex justify-between items-center pt-3 border-t border-border">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-foreground">Total:</span>
                 <span className="text-lg font-mono font-bold text-primary">{order.currency} {order.totalAmount.toLocaleString()}</span>
               </div>
             </div>
@@ -201,6 +207,84 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
                   <payment.icon size={8} />
                   {payment.label}
                 </div>
+              </div>
+              
+              {/* Refund Action */}
+              {order.paymentStatus === 'PAID' && onRefund && (
+                <button
+                  onClick={handleRefund}
+                  className="w-full mt-2 flex items-center justify-center gap-2 border border-rose-500/30 bg-rose-500/5 text-rose-500 hover:bg-rose-500 hover:text-white py-3 text-[9px] font-bold uppercase tracking-[0.2em] transition-all"
+                >
+                  <RotateCcw size={12} />
+                  Refund Order
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tracking Information */}
+          <div className="bg-muted/10 border border-border p-6 space-y-4">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
+              <TruckIcon size={14} /> Tracking Information
+            </h4>
+            
+            {order.trackingNumber ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Carrier:</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-foreground">{order.carrier || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tracking Number:</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-primary font-mono">{order.trackingNumber}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Status:</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600">In Transit</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                  No tracking information available yet. Assign tracking when order is shipped.
+                </p>
+                {onUpdateTracking && (
+                  <button
+                    onClick={() => {
+                      const carrier = prompt('Enter carrier (e.g., FedEx, DHL):');
+                      if (carrier) {
+                        const trackingNumber = prompt('Enter tracking number:');
+                        if (trackingNumber) {
+                          onUpdateTracking(order.id!, { carrier, trackingNumber });
+                        }
+                      }
+                    }}
+                    className="w-full bg-primary text-primary-foreground px-4 py-2 text-[9px] font-bold uppercase tracking-[0.2em] hover:bg-primary/90 transition-all"
+                  >
+                    Add Tracking Information
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Analytics Preview */}
+          <div className="bg-muted/10 border border-border p-6 space-y-4">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
+              <BarChart3 size={14} /> Analytics Insights
+            </h4>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Delivery City:</span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-primary">
+                  {order.shippingAddress.split(',')[2]?.trim() || 'Unknown'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Warehouse:</span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-primary">
+                  {order.warehouse?.name || 'N/A'}
+                </span>
               </div>
             </div>
           </div>

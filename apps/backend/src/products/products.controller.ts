@@ -17,7 +17,12 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { ProductSchema, Permission } from '@amber/shared';
-import { CreateProductDto, UpdateProductDto, ProductQueryDto, StockValidationItemDto } from './dto/product.dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductQueryDto,
+  StockValidationItemDto,
+} from './dto/product.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -26,16 +31,28 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Permissions(Permission.PRODUCTS_WRITE)
   @Post()
-  create(@Body(new ZodValidationPipe(ProductSchema)) createProductDto: CreateProductDto) {
+  create(
+    @Body(new ZodValidationPipe(ProductSchema))
+    createProductDto: CreateProductDto,
+  ) {
     return this.productsService.createProduct(createProductDto);
   }
 
   @Get()
   async findAll(@Query() query: ProductQueryDto) {
     return this.productsService.getAllProducts({
-      isFeatured: query.isFeatured !== undefined ? query.isFeatured === 'true' : undefined,
-      isNewArrival: query.isNewArrival !== undefined ? query.isNewArrival === 'true' : undefined,
-      isBestSeller: query.isBestSeller !== undefined ? query.isBestSeller === 'true' : undefined,
+      isFeatured:
+        query.isFeatured !== undefined
+          ? query.isFeatured === 'true'
+          : undefined,
+      isNewArrival:
+        query.isNewArrival !== undefined
+          ? query.isNewArrival === 'true'
+          : undefined,
+      isBestSeller:
+        query.isBestSeller !== undefined
+          ? query.isBestSeller === 'true'
+          : undefined,
       onSale: query.onSale !== undefined ? query.onSale === 'true' : undefined,
       categoryId: query.categoryId,
       brandId: query.brandId,
@@ -60,7 +77,8 @@ export class ProductsController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(UpdateProductDto)) updateProductDto: UpdateProductDto,
+    @Body(new ZodValidationPipe(UpdateProductDto))
+    updateProductDto: UpdateProductDto,
   ) {
     return this.productsService.updateProduct(id, updateProductDto);
   }

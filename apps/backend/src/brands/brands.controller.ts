@@ -30,14 +30,18 @@ export class BrandsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  create(@Body(new ZodValidationPipe(BrandSchema)) createBrandDto: CreateBrandDto) {
+  create(
+    @Body(new ZodValidationPipe(BrandSchema)) createBrandDto: CreateBrandDto,
+  ) {
     return this.brandsService.createBrand(createBrandDto);
   }
 
   @Get()
   findAll(@Query() query: PaginationQuery) {
     const page = query.page ? Math.max(1, parseInt(String(query.page), 10)) : 1;
-    const limit = query.limit ? Math.max(1, Math.min(100, parseInt(String(query.limit), 10))) : 10;
+    const limit = query.limit
+      ? Math.max(1, Math.min(100, parseInt(String(query.limit), 10)))
+      : 10;
     return this.brandsService.getAllBrands(page, limit);
   }
 
@@ -51,7 +55,8 @@ export class BrandsController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(BrandSchema.partial())) updateBrandDto: UpdateBrandDto,
+    @Body(new ZodValidationPipe(BrandSchema.partial()))
+    updateBrandDto: UpdateBrandDto,
   ) {
     return this.brandsService.updateBrand(id, updateBrandDto);
   }

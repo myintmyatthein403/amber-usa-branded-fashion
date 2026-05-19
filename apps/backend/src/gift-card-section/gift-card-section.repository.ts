@@ -6,7 +6,9 @@ import { GiftCardSection, Prisma } from '@prisma/client';
 export class GiftCardSectionRepository {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: Prisma.GiftCardSectionCreateInput): Promise<GiftCardSection> {
+  async create(
+    data: Prisma.GiftCardSectionCreateInput,
+  ): Promise<GiftCardSection> {
     if (data.isActive) {
       await this.prisma.giftCardSection.updateMany({
         where: { isActive: true },
@@ -32,7 +34,10 @@ export class GiftCardSectionRepository {
     return this.prisma.giftCardSection.findUnique({ where: { id } });
   }
 
-  async update(id: string, data: Prisma.GiftCardSectionUpdateInput): Promise<GiftCardSection> {
+  async update(
+    id: string,
+    data: Prisma.GiftCardSectionUpdateInput,
+  ): Promise<GiftCardSection> {
     if (data.isActive) {
       await this.prisma.giftCardSection.updateMany({
         where: { isActive: true, NOT: { id } },
