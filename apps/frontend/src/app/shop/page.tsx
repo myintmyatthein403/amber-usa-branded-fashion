@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useMemo, Suspense, useEffect, useCallback } from "react";
+import { useState, useMemo, Suspense, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import QuickViewModal from "@/components/modals/QuickViewModal";
 import CompareDrawer from "@/components/CompareDrawer";
+import ShopSidebar from "@/components/ShopSidebar";
+import { useDebounce } from "@/hooks/useDebounce";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Percent, Loader2, Search, LayoutGrid, SlidersHorizontal } from "lucide-react";
@@ -60,7 +62,9 @@ function ShopContent() {
   const [selectedColor, setSelectedColor] = useState("All");
   const [selectedSize, setSelectedSize] = useState("All");
   
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]); 
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
+  const [minPriceInput, setMinPriceInput] = useState("0");
+  const [maxPriceInput, setMaxPriceInput] = useState("10000"); 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || "");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 9;
@@ -70,6 +74,23 @@ function ShopContent() {
   const [sortBy, setSortBy] = useState("latest");
 
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [filterLoading, setFilterLoading] = useState(false);
+  
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const debouncedPriceRange = useDebounce(priceRange, 500);
+  
+  const isDebouncing = searchQuery !== debouncedSearchQuery || 
+    priceRange[0] !== debouncedPriceRange[0] || 
+    priceRange[1] !== debouncedPriceRange[1];
+    
+  useEffect(() => {
+    if (isDebouncing) {
+      setFilterLoading(true);
+    } else {
+      const timer = setTimeout(() => setFilterLoading(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isDebouncing]);
 
   useEffect(() => {
     const search = searchParams.get('search');
@@ -87,7 +108,33 @@ function ShopContent() {
   
   useEffect(() => {
     setPriceRange([0, maxPrice]);
+    setMinPriceInput("0");
+    setMaxPriceInput(maxPrice.toLocaleString());
   }, [currency, exchangeRate, maxPrice]);
+
+  const formatNumber = (value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, '');
+    if (!cleaned) return '';
+    return parseInt(cleaned, 10).toLocaleString();
+  };
+
+  const parseFormattedNumber = (value: string) => {
+    return parseInt(value.replace(/[^0-9]/g, ''), 10) || 0;
+  };
+
+  const handleMinPriceChange = (value: string) => {
+    const formatted = formatNumber(value);
+    setMinPriceInput(formatted);
+    const numValue = parseFormattedNumber(formatted);
+    setPriceRange([Math.min(numValue, priceRange[1] - 1), priceRange[1]]);
+  };
+
+  const handleMaxPriceChange = (value: string) => {
+    const formatted = formatNumber(value);
+    setMaxPriceInput(formatted);
+    const numValue = parseFormattedNumber(formatted);
+    setPriceRange([priceRange[0], Math.max(numValue, priceRange[0] + 1)]);
+  };
 
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
@@ -156,14 +203,14 @@ function ShopContent() {
         productPriceInCurrentCurrency = product.price / exchangeRate;
       }
       
-      const priceMatch = productPriceInCurrentCurrency >= priceRange[0] && productPriceInCurrentCurrency <= priceRange[1];
+      const priceMatch = productPriceInCurrentCurrency >= debouncedPriceRange[0] && productPriceInCurrentCurrency <= debouncedPriceRange[1];
       const stockMatch = !onlyInStock || product.inStock;
       const saleMatch = !onlySale || product.onSale;
       
-      const searchMatch = searchQuery === "" || 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const searchMatch = debouncedSearchQuery === "" || 
+        product.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        product.brand.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        product.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
       
       return brandMatch && categoryMatch && collectionMatch && sizeMatch && priceMatch && stockMatch && saleMatch && searchMatch;
     });
@@ -183,7 +230,7 @@ function ShopContent() {
     }
 
     return results;
-  }, [products, selectedBrand, selectedCategory, selectedCollection, selectedSize, priceRange, onlyInStock, onlySale, sortBy, searchQuery, currency, exchangeRate]);
+  }, [products, selectedBrand, selectedCategory, selectedCollection, selectedSize, debouncedPriceRange, onlyInStock, onlySale, sortBy, debouncedSearchQuery, currency, exchangeRate]);
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
@@ -200,187 +247,31 @@ function ShopContent() {
     setTimeout(() => setAddingId(null), 800);
   };
 
-  const SidebarContent = () => (
-    <div className="space-y-12">
-      {/* Sale Filter */}
-      <div className="space-y-4">
-        <button 
-          onClick={() => setOnlySale(!onlySale)}
-          className={cn(
-            "flex items-center space-x-3 w-full p-4 border transition-all group",
-            onlySale ? "border-red-500 bg-red-50" : "border-[#1A1A1A]/10 hover:border-[#D4AF37]"
-          )}
-        >
-          <div className={cn(
-            "w-5 h-5 border flex items-center justify-center",
-            onlySale ? "bg-red-500 border-red-500" : "border-[#1A1A1A]/20"
-          )}>
-            {onlySale && <Check className="w-3 h-3 text-white" />}
-          </div>
-          <div className="flex items-center space-x-2">
-            <Percent className={cn("w-4 h-4", onlySale ? "text-red-500" : "text-[#1A1A1A]/40")} />
-            <span className={cn("text-xs font-bold uppercase tracking-widest", onlySale ? "text-red-500" : "text-[#1A1A1A]/60")}>On Sale</span>
-          </div>
-        </button>
-      </div>
+  const handleClearFilters = useCallback(() => {
+    setSelectedBrand("All");
+    setSelectedCategory("All");
+    setSelectedCollection("All");
+    setSelectedColor("All");
+    setSelectedSize("All");
+    setPriceRange([0, maxPrice]);
+    setOnlyInStock(false);
+    setOnlySale(false);
+    setSearchQuery("");
+    setMinPriceInput("0");
+    setMaxPriceInput(maxPrice.toLocaleString());
+  }, [maxPrice, setSelectedBrand, setSelectedCategory, setSelectedCollection, setSelectedSize, setPriceRange, setOnlyInStock, setOnlySale, setSearchQuery]);
 
-      {/* Collections */}
-      <div className="space-y-6">
-        <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">Collections</h4>
-        <div className="flex flex-col space-y-4">
-          {collections.map((coll) => (
-            <button
-              key={coll}
-              onClick={() => setSelectedCollection(coll)}
-              className={cn(
-                "text-left text-sm font-medium transition-all hover:text-[#D4AF37]",
-                selectedCollection === coll ? "text-[#D4AF37] translate-x-2" : "text-[#1A1A1A]/60"
-              )}
-            >
-              {coll}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Brands */}
-      <div className="space-y-6">
-        <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">Brands</h4>
-        <div className="flex flex-col space-y-4">
-          {brands.map((brand) => (
-            <button
-              key={brand}
-              onClick={() => setSelectedBrand(brand)}
-              className={cn(
-                "text-left text-sm font-medium transition-all hover:text-[#D4AF37]",
-                selectedBrand === brand ? "text-[#D4AF37] translate-x-2" : "text-[#1A1A1A]/60"
-              )}
-            >
-              {brand}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Categories */}
-      <div className="space-y-6">
-        <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">Categories</h4>
-        <div className="flex flex-col space-y-4">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={cn(
-                "text-left text-sm font-medium transition-all hover:text-[#D4AF37]",
-                selectedCategory === cat ? "text-[#D4AF37] translate-x-2" : "text-[#1A1A1A]/60"
-              )}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Price Range */}
-      <div className="space-y-6">
-        <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">Price Range</h4>
-        <div className="space-y-8">
-          <div className="relative h-2 w-full bg-[#1A1A1A]/5 rounded-full mt-10">
-            <div 
-              className="absolute h-full bg-[#D4AF37] rounded-full"
-              style={{
-                left: `${(priceRange[0] / maxPrice) * 100}%`,
-                right: `${100 - (priceRange[1] / maxPrice) * 100}%`
-              }}
-            />
-            <input
-              type="range"
-              min="0"
-              max={maxPrice}
-              step={currency === 'USD' ? 10 : 1000}
-              value={priceRange[0]}
-              onChange={(e) => {
-                const val = Math.min(parseInt(e.target.value), priceRange[1] - (maxPrice * 0.05));
-                setPriceRange([val, priceRange[1]]);
-              }}
-              className="absolute w-full -top-1 h-2 bg-transparent appearance-none pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#D4AF37] [&::-webkit-slider-thumb]:appearance-none accent-[#D4AF37]"
-            />
-            <input
-              type="range"
-              min="0"
-              max={maxPrice}
-              step={currency === 'USD' ? 10 : 1000}
-              value={priceRange[1]}
-              onChange={(e) => {
-                const val = Math.max(parseInt(e.target.value), priceRange[0] + (maxPrice * 0.05));
-                setPriceRange([priceRange[0], val]);
-              }}
-              className="absolute w-full -top-1 h-2 bg-transparent appearance-none pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#D4AF37] [&::-webkit-slider-thumb]:appearance-none accent-[#D4AF37]"
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <span className="text-[8px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Min ({currency})</span>
-              <input 
-                type="number"
-                value={Math.round(priceRange[0])}
-                onChange={(e) => setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])}
-                className="w-full bg-[#1A1A1A]/5 border-none px-3 py-2 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[#D4AF37]"
-              />
-            </div>
-            <div className="space-y-2">
-              <span className="text-[8px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Max ({currency})</span>
-              <input 
-                type="number"
-                value={Math.round(priceRange[1])}
-                onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value) || 0])}
-                className="w-full bg-[#1A1A1A]/5 border-none px-3 py-2 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[#D4AF37]"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Sizes */}
-      <div className="space-y-6">
-        <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">USA Size</h4>
-        <div className="grid grid-cols-3 gap-2">
-          {sizes.map((size) => (
-            <button
-              key={size}
-              onClick={() => setSelectedSize(size)}
-              className={cn(
-                "py-2 border text-[10px] font-bold uppercase tracking-widest transition-all",
-                selectedSize === size 
-                  ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" 
-                  : "border-[#1A1A1A]/10 text-[#1A1A1A]/60 hover:border-[#D4AF37] hover:text-[#D4AF37]"
-              )}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <button 
-        onClick={() => {
-          setSelectedBrand("All");
-          setSelectedCategory("All");
-          setSelectedCollection("All");
-          setSelectedColor("All");
-          setSelectedSize("All");
-          setPriceRange([0, maxPrice]);
-          setOnlyInStock(false);
-          setOnlySale(false);
-          setSearchQuery("");
-        }}
-        className="text-[10px] uppercase tracking-widest font-bold text-red-500 hover:text-red-600 transition-colors pt-4 block"
-      >
-        Clear All Filters
-      </button>
-    </div>
-  );
+  const handleResetFilters = useCallback(() => {
+    setSelectedBrand("All");
+    setSelectedCategory("All");
+    setSelectedCollection("All");
+    setSelectedColor("All");
+    setSelectedSize("All");
+    setPriceRange([0, maxPrice]);
+    setOnlyInStock(false);
+    setOnlySale(false);
+    setSearchQuery("");
+  }, [maxPrice, setSelectedBrand, setSelectedCategory, setSelectedCollection, setSelectedSize, setPriceRange, setOnlyInStock, setOnlySale, setSearchQuery]);
 
   return (
     <>
@@ -416,7 +307,29 @@ function ShopContent() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <SidebarContent />
+<ShopSidebar 
+                selectedBrand={selectedBrand}
+                setSelectedBrand={setSelectedBrand}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                selectedCollection={selectedCollection}
+                setSelectedCollection={setSelectedCollection}
+                selectedSize={selectedSize}
+                setSelectedSize={setSelectedSize}
+                priceRange={priceRange}
+                setPriceRange={setPriceRange}
+                onlyInStock={onlyInStock}
+                setOnlyInStock={setOnlyInStock}
+                onlySale={onlySale}
+                setOnlySale={setOnlySale}
+                products={products}
+                currency={currency}
+                exchangeRate={exchangeRate}
+                minPriceInput={minPriceInput}
+                maxPriceInput={maxPriceInput}
+                setMinPriceInput={setMinPriceInput}
+                setMaxPriceInput={setMaxPriceInput}
+              />
               <button 
                 onClick={() => setIsFilterDrawerOpen(false)}
                 className="w-full bg-[#1A1A1A] text-white py-4 uppercase tracking-[0.3em] text-[10px] font-bold mt-12 mb-8"
@@ -447,7 +360,29 @@ function ShopContent() {
         <div className="flex flex-col md:flex-row gap-12">
           {/* Sidebar Filters - Desktop */}
           <aside className="hidden md:block w-72 shrink-0 border-r border-[#1A1A1A]/5 pr-12">
-            <SidebarContent />
+            <ShopSidebar 
+              selectedBrand={selectedBrand}
+              setSelectedBrand={setSelectedBrand}
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              selectedCollection={selectedCollection}
+              setSelectedCollection={setSelectedCollection}
+              selectedSize={selectedSize}
+              setSelectedSize={setSelectedSize}
+              priceRange={priceRange}
+              setPriceRange={setPriceRange}
+              onlyInStock={onlyInStock}
+              setOnlyInStock={setOnlyInStock}
+              onlySale={onlySale}
+              setOnlySale={setOnlySale}
+              products={products}
+              currency={currency}
+              exchangeRate={exchangeRate}
+              minPriceInput={minPriceInput}
+              maxPriceInput={maxPriceInput}
+              setMinPriceInput={setMinPriceInput}
+              setMaxPriceInput={setMaxPriceInput}
+            />
           </aside>
 
           {/* Product Grid Area */}
@@ -627,11 +562,7 @@ function ShopContent() {
                         setSelectedCategory("All");
                         setSelectedCollection("All");
                         setSelectedColor("All");
-                        setSelectedSize("All");
-                        setPriceRange([0, maxPrice]);
-                        setOnlyInStock(false);
-                        setOnlySale(false);
-                        setSearchQuery("");
+                        handleResetFilters();
                       }}
                       className="text-[10px] uppercase tracking-widest font-bold border-b-2 border-[#D4AF37] pb-1 hover:text-[#D4AF37] transition-colors"
                     >

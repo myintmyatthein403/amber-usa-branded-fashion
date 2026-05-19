@@ -51,14 +51,20 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
         // Handle nested data structure { data: [...] }
         const data: Product[] = Array.isArray(result) ? result : (result?.data || []);
         
-        const productsWithImages = data.map((p) => ({
-          ...p,
-          inStock: p.variants?.some((v) => v.stock > 0) ?? true,
-          image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
-          secondaryImage: p.images?.[1] || p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
-          sizes: Array.from(new Set(p.variants?.map((v) => v.size) || [])),
-          colors: Array.from(new Set(p.variants?.map((v) => v.color) || [])),
-        }));
+        const productsWithImages = data.map((p: any) => {
+          const hasVariantStock = p.variants?.some((v: any) => v.stock > 0);
+          const hasProductStock = p.stock !== undefined && p.stock > 0;
+          const inStock = hasVariantStock || (hasProductStock && (!p.variants || p.variants.length === 0));
+          
+          return {
+            ...p,
+            inStock,
+            image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
+            secondaryImage: p.images?.[1] || p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
+            sizes: Array.from(new Set(p.variants?.map((v: any) => v.size) || [])),
+            colors: Array.from(new Set(p.variants?.map((v: any) => v.color) || [])),
+          };
+        });
         setProducts({ data: productsWithImages });
       } catch (error) {
         console.error('Failed to fetch products:', error);
@@ -156,6 +162,14 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
                   <div className="absolute top-4 right-4">
                     <span className="bg-red-500 text-white text-[8px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-none shadow-lg">
                       Sale
+                    </span>
+                  </div>
+                )}
+
+                {!product.inStock && (
+                  <div className="absolute top-4 left-4">
+                    <span className="bg-[#1A1A1A]/80 text-white text-[8px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-none">
+                      Out of Stock
                     </span>
                   </div>
                 )}
