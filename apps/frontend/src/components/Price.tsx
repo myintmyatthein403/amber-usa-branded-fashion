@@ -15,11 +15,15 @@ export default function Price({ amount, isUsdPrice = true, className }: PricePro
   const formatPrice = useStore((state) => state.formatPrice);
   
   if (!mounted) {
-    // Fallback during hydration to avoid mismatch
     return <span className={className}>...</span>;
   }
 
   const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+  
+  if (numAmount === null || numAmount === undefined || isNaN(numAmount)) {
+    return <span className={className}>—</span>;
+  }
+
   const safeIsUsdPrice = isUsdPrice === null ? true : isUsdPrice;
 
   return (

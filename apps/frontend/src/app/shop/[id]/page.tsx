@@ -29,6 +29,30 @@ export default function ProductDetailPage() {
   const [sanitizedDescription, setSanitizedDescription] = useState("");
   const [userSelectedImage, setUserSelectedImage] = useState<string | null>(null);
 
+  const derivedColors = useMemo(() => {
+    if (!product) return [];
+    if (product.colors && product.colors.length > 0) return product.colors;
+    if (!product.variants || product.variants.length === 0) return [];
+    const colorsSet = new Set(product.variants.map((v: ApiVariant) => v.color).filter(Boolean));
+    return Array.from(colorsSet);
+  }, [product]);
+
+  const derivedSizes = useMemo(() => {
+    if (!product) return [];
+    if (product.sizes && product.sizes.length > 0) return product.sizes;
+    if (!product.variants || product.variants.length === 0) return [];
+    const sizesSet = new Set(product.variants.map((v: ApiVariant) => v.size).filter(Boolean));
+    return Array.from(sizesSet);
+  }, [product]);
+
+  const derivedStock = useMemo(() => {
+    if (!product) return 0;
+    const productAny = product as unknown as { stock?: number; variants?: ApiVariant[] };
+    if (productAny.stock !== undefined && productAny.stock > 0) return productAny.stock;
+    if (!productAny.variants || productAny.variants.length === 0) return 0;
+    return productAny.variants.reduce((acc: number, v: ApiVariant) => acc + (v.stock || 0), 0);
+  }, [product]);
+
   const addToCart = useStore((state) => state.addToCart);
   const addToCompare = useStore((state) => state.addToCompare);
 
@@ -52,7 +76,11 @@ export default function ProductDetailPage() {
     }
     
     // 3. Fallback to default product image
-    return product.images[0];
+    if (product.images && product.images.length > 0) {
+      return product.images[0];
+    }
+
+    return "";
   }, [product, selectedSize, selectedColor, userSelectedImage]);
 
   useEffect(() => {
@@ -60,12 +88,13 @@ export default function ProductDetailPage() {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products/${id}`);
         if (!res.ok) throw new Error("Product not found");
-        const data = await res.json() as ApiProduct;
+        const result = await res.json() as { data: ApiProduct };
+        const productData = result.data;
         
-        setProduct(data);
+        setProduct(productData);
         if (typeof window !== 'undefined') {
           const defaultDesc = "Indulge in the elegance of authentic global fashion. Each piece is sourced directly from USA outlets to guarantee quality and authenticity.";
-          setSanitizedDescription(DOMPurify.sanitize(data.description || defaultDesc));
+          setSanitizedDescription(DOMPurify.sanitize(productData.description || defaultDesc));
         }
       } catch (error) {
         console.error("Failed to fetch product:", error);
@@ -100,11 +129,11 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = () => {
     if (!product) return;
-    if (!selectedSize && product.sizes?.length > 0) {
+    if (!selectedSize && derivedSizes.length > 0) {
       alert("Please select a size");
       return;
     }
-    if (!selectedColor && product.colors?.length > 0) {
+    if (!selectedColor && derivedColors.length > 0) {
       alert("Please select a color");
       return;
     }
@@ -184,13 +213,19 @@ export default function ProductDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               className="relative aspect-[4/5] bg-[#F5F0E1] overflow-hidden rounded-sm w-full"
             >
-              <Image
-                src={activeImage || product.images[0]}
-                alt={product.name}
-                fill
-                className="object-cover transition-all duration-700"
-                priority
-              />
+              {activeImage || product.images?.[0] ? (
+                <Image
+                  src={activeImage || product.images[0]}
+                  alt={product.name}
+                  fill
+                  className="object-cover transition-all duration-700"
+                  priority
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                  <span className="text-sm">No Image</span>
+                </div>
+              )}
               {product.onSale && (
                 <div className="absolute top-8 right-8 bg-red-500 text-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] shadow-xl rounded-full">
                   -{Math.round((1 - Number(product.price) / Number(product.compareAtPrice || product.price)) * 100)}% Off
@@ -311,7 +346,7 @@ export default function ProductDetailPage() {
                 <div className="space-y-4">
                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]">Available Colors</h4>
                    <div className="flex flex-wrap gap-3">
-                      {product.colors?.map((color: string) => (
+                      {derivedColors.map((color: string) => (
                         <button 
                           key={color} 
                           onClick={() => setSelectedColor(color)}
@@ -345,7 +380,7 @@ export default function ProductDetailPage() {
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {product.sizes?.map((size: string) => (
+                    {derivedSizes.map((size: string) => (
                       <button
                         key={size}
                         onClick={() => setSelectedSize(size)}
@@ -385,7 +420,7 @@ export default function ProductDetailPage() {
 
                 <div className="flex gap-4">
                   <button
-                    disabled={(!(product as any).variants?.length && !product.isPreOrder) || addingId === product.id}
+                    disabled={(derivedStock === 0 && !product.isPreOrder) || addingId === product.id}
                     onClick={handleAddToCart}
                     className={cn(
                       "flex-1 py-5 uppercase tracking-[0.2em] text-xs font-bold transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center space-x-4 shadow-xl disabled:opacity-50",
@@ -398,7 +433,7 @@ export default function ProductDetailPage() {
                         ? "Added to Bag" 
                         : product.isPreOrder 
                           ? "Pre-Order Now" 
-                          : (!(product as any).variants?.length ? "Out of Stock" : "Add to Shopping Bag")}
+                          : derivedStock === 0 ? "Out of Stock" : "Add to Shopping Bag"}
                     </span>
                   </button>
                   <button className="w-16 h-16 border border-[#1A1A1A]/10 flex items-center justify-center text-[#1A1A1A]/40 hover:text-red-500 hover:border-red-500 transition-all group">

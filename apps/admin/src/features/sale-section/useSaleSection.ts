@@ -1,12 +1,53 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
 import { SaleSection, SaleSectionWithUrl } from './schema';
 
 export const useSaleSection = () => {
-  const { data: sections, loading, refresh } = useFetch<SaleSectionWithUrl>(API_ROUTES.SALE_SECTION.BASE);
+  const [sections, setSections] = useState<SaleSectionWithUrl[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [search, setSearch] = useState('');
+  const [totalPages, setTotalPages] = useState(1);
+  
   const { deleteItem } = useDelete(API_ROUTES.SALE_SECTION.BASE);
+
+  const fetchSections = async (currentPage = page, currentSearch = search) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: limit.toString(),
+      });
+      
+      if (currentSearch) {
+        params.append('search', currentSearch);
+      }
+      
+      const response = await apiService(`${API_ROUTES.SALE_SECTION.BASE}?${params.toString()}`);
+      const data = (response as any)?.data?.data ?? [];
+      const pagination = (response as any)?.data?.pagination;
+      
+      setSections(data);
+      setTotal(pagination?.total || 0);
+      setTotalPages(pagination?.totalPages || 1);
+    } catch (error) {
+      console.error('Failed to fetch sections:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSections();
+  }, []);
+
+  const refresh = () => {
+    fetchSections(page, search);
+  };
   
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -126,11 +167,36 @@ export const useSaleSection = () => {
     setModalOpen(true);
   };
 
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+    fetchSections(1, value);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchSections(newPage, search);
+  };
+
   const handleDelete = async (id: string) => {
-    const confirmed = window.confirm('Remove this promotional section?');
-    if (!confirmed) return;
-    const success = await deleteItem(id);
+    setDeletingId(id);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    const success = await deleteItem(deletingId);
     if (success) refresh();
+    setDeleteModalOpen(false);
+    setDeletingId(null);
+  };
+
+  const cancelDelete = () => {
+    setDeleteModalOpen(false);
+    setDeletingId(null);
   };
 
   return {
@@ -149,6 +215,19 @@ export const useSaleSection = () => {
     handleDelete,
     openAddModal,
     openEditModal,
-    refresh
+    refresh,
+    // Pagination and search
+    page,
+    totalPages,
+    total,
+    search,
+    handleSearch,
+    handlePageChange,
+    // Delete modal
+    deleteModalOpen,
+    setDeleteModalOpen,
+    deletingId,
+    confirmDelete,
+    cancelDelete
   };
 };

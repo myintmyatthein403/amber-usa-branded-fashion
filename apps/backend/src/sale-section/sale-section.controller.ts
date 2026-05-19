@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { SaleSectionService } from './sale-section.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -28,8 +29,16 @@ export class SaleSectionController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  findAll() {
-    return this.saleSectionService.findAll();
+  findAll(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search?: string,
+  ) {
+    return this.saleSectionService.findAll(
+      parseInt(page),
+      parseInt(limit),
+      search,
+    );
   }
 
   @Get('active')

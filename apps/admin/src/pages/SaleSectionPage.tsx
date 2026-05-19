@@ -1,8 +1,8 @@
 import React from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Modal } from '../components/admin/Modal';
 import { useSaleSection } from '../features/sale-section/useSaleSection';
-import { SaleSectionTable } from '../features/sale-section/components/SaleSectionTable';
+import { SaleSectionGrid } from '../features/sale-section/components/SaleSectionGrid';
 import { SaleSectionForm } from '../features/sale-section/components/SaleSectionForm';
 
 export const SaleSectionPage: React.FC = () => {
@@ -21,7 +21,20 @@ export const SaleSectionPage: React.FC = () => {
     handleToggleActive,
     handleDelete,
     openAddModal,
-    openEditModal
+    openEditModal,
+    // Pagination and search
+    page,
+    totalPages,
+    total,
+    search,
+    handleSearch,
+    handlePageChange,
+    // Delete modal
+    deleteModalOpen,
+    setDeleteModalOpen,
+    deletingId,
+    confirmDelete,
+    cancelDelete
   } = useSaleSection();
 
   return (
@@ -39,19 +52,24 @@ export const SaleSectionPage: React.FC = () => {
         </button>
       </div>
 
-      {loading ? (
-        <div className="py-40 flex flex-col items-center justify-center gap-4">
-          <Loader2 className="animate-spin text-primary" size={40} />
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Synchronizing Assets...</p>
-        </div>
-      ) : (
-        <SaleSectionTable 
-          sections={sections}
-          onEdit={openEditModal}
-          onDelete={handleDelete}
-          onToggleActive={handleToggleActive}
-        />
-      )}
+      <SaleSectionGrid 
+        sections={sections}
+        loading={loading}
+        onEdit={openEditModal}
+        onDelete={handleDelete}
+        onToggleActive={handleToggleActive}
+        search={search}
+        handleSearch={handleSearch}
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        handlePageChange={handlePageChange}
+        deleteModalOpen={deleteModalOpen}
+        setDeleteModalOpen={setDeleteModalOpen}
+        deletingId={deletingId}
+        confirmDelete={confirmDelete}
+        cancelDelete={cancelDelete}
+      />
 
       <Modal 
         isOpen={modalOpen} 

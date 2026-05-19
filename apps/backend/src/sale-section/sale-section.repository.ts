@@ -16,10 +16,22 @@ export class SaleSectionRepository {
     return this.prisma.saleSection.create({ data });
   }
 
-  async findAll(): Promise<SaleSection[]> {
+  async findMany(params: {
+    where?: Prisma.SaleSectionWhereInput;
+    skip?: number;
+    take?: number;
+    orderBy?: Prisma.SaleSectionOrderByWithRelationInput;
+  }): Promise<SaleSection[]> {
     return this.prisma.saleSection.findMany({
-      orderBy: { createdAt: 'desc' },
+      where: params.where,
+      skip: params.skip,
+      take: params.take,
+      orderBy: params.orderBy || { createdAt: 'desc' },
     });
+  }
+
+  async findAll(): Promise<SaleSection[]> {
+    return this.findMany({});
   }
 
   async findActive(): Promise<SaleSection | null> {
