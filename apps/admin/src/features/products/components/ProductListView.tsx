@@ -2,15 +2,15 @@ import React from 'react';
 import { Trash2, Edit2, Layers, Tag, Eye } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Product } from '../schema';
+import { ProductWithRelations } from '../schema';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 interface ProductListViewProps {
-  products: Product[];
-  onEdit: (product: Product) => void;
+  products: ProductWithRelations[];
+  onEdit: (product: ProductWithRelations) => void;
   onDelete: (id: string) => void;
 }
 
@@ -32,7 +32,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({ products, onEd
           </thead>
           <tbody className="divide-y divide-border">
             {products.map((product) => (
-              <tr key={product.id} className="group hover:bg-muted/5 transition-colors duration-300">
+              <tr key={product.id} data-tour="product-row" className="group hover:bg-muted/5 transition-colors duration-300">
                 <td className="p-4">
                   <div className="w-12 h-16 bg-secondary overflow-hidden border border-border">
                     {product.images?.[0] ? (
@@ -53,7 +53,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({ products, onEd
                   </div>
                 </td>
                 <td className="p-4">
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{product.categoryId || 'Uncategorized'}</span>
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{product.category?.name || 'Uncategorized'}</span>
                 </td>
                 <td className="p-4 text-right">
                   <div className="flex flex-col items-end">

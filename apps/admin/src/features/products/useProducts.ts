@@ -2,16 +2,25 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
-import { Product, Variant, Category, Brand, Sale, Meta, Collection, Warehouse } from './schema';
+import { Product, Variant, Category, Brand, Sale, Meta, Collection, Warehouse, ProductWithRelations } from './schema';
 
 export const useProducts = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductWithRelations[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filters, setFilters] = useState({
+    status: '' as '' | 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
+    categoryId: '',
+    brandId: '',
+    onSale: null as boolean | null,
+    isFeatured: null as boolean | null,
+    isNewArrival: null as boolean | null,
+    isBestSeller: null as boolean | null,
+  });
 
   // Debounce search effect
   useEffect(() => {
@@ -22,6 +31,11 @@ export const useProducts = () => {
 
     return () => clearTimeout(handler);
   }, [search]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   const { data: categories } = useFetch<Category>(API_ROUTES.CATEGORIES.BASE);
   const { data: brands } = useFetch<Brand>(API_ROUTES.BRANDS.BASE);
@@ -38,8 +52,15 @@ export const useProducts = () => {
         limit: limit.toString(),
       });
       if (debouncedSearch) params.append('search', debouncedSearch);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.categoryId) params.append('categoryId', filters.categoryId);
+      if (filters.brandId) params.append('brandId', filters.brandId);
+      if (filters.onSale !== null) params.append('onSale', filters.onSale.toString());
+      if (filters.isFeatured !== null) params.append('isFeatured', filters.isFeatured.toString());
+      if (filters.isNewArrival !== null) params.append('isNewArrival', filters.isNewArrival.toString());
+      if (filters.isBestSeller !== null) params.append('isBestSeller', filters.isBestSeller.toString());
 
-      const response = await apiService<unknown, { data: Product[]; meta: Meta }>(`${API_ROUTES.PRODUCTS.BASE}?${params.toString()}`);
+      const response = await apiService<unknown, { data: ProductWithRelations[]; meta: Meta }>(`${API_ROUTES.PRODUCTS.BASE}?${params.toString()}`);
       setProducts(response.data || []);
       setMeta(response.meta || null);
     } catch (error) {
@@ -47,7 +68,7 @@ export const useProducts = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch]);
+  }, [page, limit, debouncedSearch, filters]);
 
   useEffect(() => {
     fetchProducts();
@@ -305,6 +326,18 @@ export const useProducts = () => {
     setDeletingId(null);
   };
 
+  const clearFilters = () => {
+    setFilters({
+      status: '',
+      categoryId: '',
+      brandId: '',
+      onSale: null,
+      isFeatured: null,
+      isNewArrival: null,
+      isBestSeller: null,
+    });
+  };
+
   return {
     products,
     meta,
@@ -315,6 +348,9 @@ export const useProducts = () => {
     setLimit,
     search,
     setSearch,
+    filters,
+    setFilters,
+    clearFilters,
     categories,
     brands,
     collections,
