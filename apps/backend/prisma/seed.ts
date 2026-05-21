@@ -429,6 +429,47 @@ async function main() {
 
   console.log('Payment Methods created');
 
+  const materialAttr = await prisma.attribute.upsert({
+    where: { slug: 'material' },
+    update: {},
+    create: {
+      name: 'Material',
+      slug: 'material',
+      type: 'text',
+      isFilterable: true,
+      position: 0,
+      values: {
+        create: [
+          { value: 'Cotton', slug: 'cotton', position: 0 },
+          { value: 'Silk', slug: 'silk', position: 1 },
+          { value: 'Linen', slug: 'linen', position: 2 },
+        ],
+      },
+    },
+    include: { values: true },
+  });
+
+  await prisma.attribute.upsert({
+    where: { slug: 'color-family' },
+    update: {},
+    create: {
+      name: 'Color',
+      slug: 'color-family',
+      type: 'color',
+      isFilterable: true,
+      position: 1,
+      values: {
+        create: [
+          { value: 'Gold', slug: 'gold', hexColor: '#D4AF37', position: 0 },
+          { value: 'Black', slug: 'black', hexColor: '#1A1A1A', position: 1 },
+          { value: 'Ivory', slug: 'ivory', hexColor: '#F5F0E1', position: 2 },
+        ],
+      },
+    },
+  });
+
+  console.log('Attributes seeded:', materialAttr.name);
+
   console.log('Seed completed with Thingyan Sale data');
 }
 

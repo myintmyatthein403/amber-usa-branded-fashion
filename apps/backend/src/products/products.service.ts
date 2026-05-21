@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Product, Prisma } from '@prisma/client';
 import { ProductsRepository } from './products.repository';
+import { AttributesService } from '../attributes/attributes.service';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 import {
   CreateProductDto,
@@ -11,10 +12,32 @@ import {
 
 @Injectable()
 export class ProductsService {
-  constructor(private productsRepository: ProductsRepository) {}
+  constructor(
+    private productsRepository: ProductsRepository,
+    private attributesService: AttributesService,
+  ) {}
+
+  private async normalizeVariants<T extends { attributeSelections?: unknown }>(
+    variants?: T[],
+  ): Promise<T[] | undefined> {
+    if (!variants?.length) return variants;
+    return Promise.all(
+      variants.map(async (variant) => ({
+        ...variant,
+        attributeSelections: await this.attributesService.validateSelections(
+          variant.attributeSelections as Record<string, string> | null,
+        ),
+      })),
+    );
+  }
 
   async createProduct(data: CreateProductDto): Promise<Product> {
     const sanitizedData = sanitizeData(data);
+    if (sanitizedData.variants) {
+      sanitizedData.variants = (await this.normalizeVariants(
+        sanitizedData.variants as CreateProductDto['variants'],
+      )) as CreateProductDto['variants'];
+    }
     return this.productsRepository.create(sanitizedData);
   }
 
@@ -104,6 +127,11 @@ export class ProductsService {
 
   async updateProduct(id: string, data: UpdateProductDto): Promise<Product> {
     const sanitizedData = sanitizeData(data);
+    if (sanitizedData.variants) {
+      sanitizedData.variants = (await this.normalizeVariants(
+        sanitizedData.variants as UpdateProductDto['variants'],
+      )) as UpdateProductDto['variants'];
+    }
     return this.productsRepository.update(id, sanitizedData);
   }
 

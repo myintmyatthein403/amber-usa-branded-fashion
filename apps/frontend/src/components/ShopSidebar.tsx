@@ -6,6 +6,19 @@ import { cn } from "@/lib/utils";
 import { Check, Percent, ChevronDown } from "lucide-react";
 import type { CategoryTreeNode } from "@amber/shared";
 
+interface FilterableAttributeFacet {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  values: Array<{
+    id: string;
+    value: string;
+    slug: string;
+    hexColor?: string | null;
+  }>;
+}
+
 interface SidebarContentProps {
   selectedBrand: string;
   setSelectedBrand: (brand: string) => void;
@@ -16,6 +29,11 @@ interface SidebarContentProps {
   setSelectedCollection: (collection: string) => void;
   selectedSize: string;
   setSelectedSize: (size: string) => void;
+  filterableAttributes?: FilterableAttributeFacet[];
+  selectedAttributeFilters?: Record<string, string>;
+  setSelectedAttributeFilters?: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >;
   priceRange: [number, number];
   setPriceRange: (range: [number, number]) => void;
   onlyInStock: boolean;
@@ -107,6 +125,9 @@ export default function ShopSidebar({
   setSelectedCollection,
   selectedSize,
   setSelectedSize,
+  filterableAttributes = [],
+  selectedAttributeFilters = {},
+  setSelectedAttributeFilters,
   priceRange,
   setPriceRange,
   onlyInStock,
@@ -191,6 +212,11 @@ export default function ShopSidebar({
     setSelectedCategoryId(null);
     setSelectedCollection("All");
     setSelectedSize("All");
+    if (setSelectedAttributeFilters) {
+      setSelectedAttributeFilters(
+        Object.fromEntries(filterableAttributes.map((a) => [a.id, "All"])),
+      );
+    }
     setPriceRange([0, maxPrice]);
     setOnlyInStock(false);
     setOnlySale(false);
@@ -201,6 +227,8 @@ export default function ShopSidebar({
     setSelectedCategoryId,
     setSelectedCollection,
     setSelectedSize,
+    setSelectedAttributeFilters,
+    filterableAttributes,
     setPriceRange,
     setOnlyInStock,
     setOnlySale,
@@ -421,6 +449,66 @@ export default function ShopSidebar({
           </div>
         </div>
       </div>
+
+      {filterableAttributes.map((attr) => (
+        <div key={attr.id} className="space-y-4">
+          <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">
+            {attr.name}
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedAttributeFilters?.((prev) => ({
+                  ...prev,
+                  [attr.id]: "All",
+                }))
+              }
+              className={cn(
+                "px-3 py-1.5 border text-[10px] font-bold uppercase tracking-widest transition-all",
+                (selectedAttributeFilters[attr.id] ?? "All") === "All"
+                  ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                  : "border-[#1A1A1A]/10 text-[#1A1A1A]/60 hover:border-[#D4AF37]",
+              )}
+            >
+              All
+            </button>
+            {attr.values.map((val) => (
+              <button
+                key={val.id}
+                type="button"
+                onClick={() =>
+                  setSelectedAttributeFilters?.((prev) => ({
+                    ...prev,
+                    [attr.id]: val.id,
+                  }))
+                }
+                className={cn(
+                  "px-3 py-1.5 border text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+                  selectedAttributeFilters[attr.id] === val.id
+                    ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                    : "border-[#1A1A1A]/10 text-[#1A1A1A]/60 hover:border-[#D4AF37]",
+                )}
+              >
+                {attr.type === "color" && val.hexColor && (
+                  <span
+                    className="w-3 h-3 border border-white/30 shrink-0"
+                    style={{ backgroundColor: val.hexColor }}
+                  />
+                )}
+                {attr.type === "image" && val.value.startsWith("http") ? (
+                  <img
+                    src={val.value}
+                    alt=""
+                    className="w-4 h-4 object-cover shrink-0"
+                  />
+                ) : null}
+                <span>{val.value}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
 
       <div className="space-y-6">
         <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">USA Size</h4>

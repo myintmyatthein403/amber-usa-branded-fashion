@@ -14,6 +14,7 @@ export const VariantSchema = z.object({
   images: z.array(z.string()).default([]),
   isPreOrder: z.boolean().default(false),
   preOrderShippingDate: z.string().optional().nullable(),
+  attributeSelections: z.record(z.string(), z.string()).optional().nullable(),
 });
 
 export const ProductSchema = z.object({

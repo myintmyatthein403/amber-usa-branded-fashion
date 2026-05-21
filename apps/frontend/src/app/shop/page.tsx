@@ -21,6 +21,26 @@ import {
   type CategoryTreeNode,
 } from "@amber/shared";
 
+interface ShopVariant {
+  stock: number;
+  size?: string;
+  color?: string;
+  attributeSelections?: Record<string, string> | null;
+}
+
+interface FilterableAttribute {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  values: Array<{
+    id: string;
+    value: string;
+    slug: string;
+    hexColor?: string | null;
+  }>;
+}
+
 interface ShopProduct {
   id: string;
   name: string;
@@ -35,6 +55,7 @@ interface ShopProduct {
   inStock: boolean;
   sizes: string[];
   colors: string[];
+  variants?: ShopVariant[];
   onSale?: boolean;
 }
 
@@ -69,6 +90,10 @@ function ShopContent() {
   const [selectedCollection, setSelectedCollection] = useState(initialCollectionFilter);
   const [selectedColor, setSelectedColor] = useState("All");
   const [selectedSize, setSelectedSize] = useState("All");
+  const [filterableAttributes, setFilterableAttributes] = useState<FilterableAttribute[]>([]);
+  const [selectedAttributeFilters, setSelectedAttributeFilters] = useState<
+    Record<string, string>
+  >({});
   
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 3000]);
   const [minPriceInput, setMinPriceInput] = useState("0");
@@ -109,7 +134,19 @@ function ShopContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedBrand, selectedCategoryId, selectedCollection, selectedColor, selectedSize, priceRange, searchQuery, onlyInStock, onlySale, sortBy]);
+  }, [
+    selectedBrand,
+    selectedCategoryId,
+    selectedCollection,
+    selectedColor,
+    selectedSize,
+    selectedAttributeFilters,
+    priceRange,
+    searchQuery,
+    onlyInStock,
+    onlySale,
+    sortBy,
+  ]);
 
   const MAX_PRICE_USD = 3000;
   const maxPrice = currency === 'USD' ? MAX_PRICE_USD : MAX_PRICE_USD * exchangeRate;
@@ -153,7 +190,7 @@ function ShopContent() {
     const result = await res.json();
     const data = result?.data || result || [];
 
-    const mappedProducts = data.map((p: { collections?: { name: string }[]; variants?: { stock: number; size?: string; color?: string }[]; category?: { id: string; name: string }; brand?: { name: string }; images?: string[] } & Record<string, unknown>) => ({
+    const mappedProducts = data.map((p: { collections?: { name: string }[]; variants?: ShopVariant[]; category?: { id: string; name: string }; brand?: { name: string }; images?: string[] } & Record<string, unknown>) => ({
       ...p,
       price: parseFloat(String(p.price)),
       originalPrice: p.compareAtPrice ? parseFloat(String(p.compareAtPrice)) : null,
@@ -165,7 +202,16 @@ function ShopContent() {
       image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
       inStock: p.variants?.some((v) => v.stock > 0) ?? true,
       sizes: Array.from(new Set(p.variants?.flatMap((v) => v.size ? [v.size] : []) || [])),
-      colors: Array.from(new Set(p.variants?.flatMap((v) => v.color ? [v.color] : []) || []))
+      colors: Array.from(new Set(p.variants?.flatMap((v) => v.color ? [v.color] : []) || [])),
+      variants: p.variants?.map((v) => ({
+        stock: v.stock,
+        size: v.size,
+        color: v.color,
+        attributeSelections:
+          v.attributeSelections && typeof v.attributeSelections === 'object'
+            ? (v.attributeSelections as Record<string, string>)
+            : null,
+      })),
     }));
 
     setProducts(mappedProducts);
@@ -193,6 +239,30 @@ function ShopContent() {
       }
     };
     fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    const fetchFilterableAttributes = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/attributes/public`,
+        );
+        const result = await res.json();
+        const data = (Array.isArray(result) ? result : result?.data ?? []) as FilterableAttribute[];
+        setFilterableAttributes(data);
+        setSelectedAttributeFilters((prev) => {
+          const next = { ...prev };
+          for (const attr of data) {
+            if (next[attr.id] === undefined) next[attr.id] = 'All';
+          }
+          return next;
+        });
+      } catch (error) {
+        console.error('Failed to fetch filterable attributes:', error);
+        setFilterableAttributes([]);
+      }
+    };
+    fetchFilterableAttributes();
   }, []);
 
   const categoryTree = useMemo<CategoryTreeNode[]>(
@@ -230,6 +300,15 @@ function ShopContent() {
           : product.category === selectedCategoryId);
       const collectionMatch = selectedCollection === "All" || product.collections?.includes(selectedCollection);
       const sizeMatch = selectedSize === "All" || product.sizes?.includes(selectedSize);
+
+      const attributeMatch = Object.entries(selectedAttributeFilters).every(
+        ([attributeId, valueId]) => {
+          if (!valueId || valueId === 'All') return true;
+          return product.variants?.some(
+            (v) => v.attributeSelections?.[attributeId] === valueId,
+          );
+        },
+      );
       
       let productPriceInCurrentCurrency = product.price;
       if (product.isUsdPrice && currency === 'MMK') {
@@ -247,7 +326,17 @@ function ShopContent() {
         product.brand.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
         product.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
       
-      return brandMatch && categoryMatch && collectionMatch && sizeMatch && priceMatch && stockMatch && saleMatch && searchMatch;
+      return (
+        brandMatch &&
+        categoryMatch &&
+        collectionMatch &&
+        sizeMatch &&
+        attributeMatch &&
+        priceMatch &&
+        stockMatch &&
+        saleMatch &&
+        searchMatch
+      );
     });
 
     switch (sortBy) {
@@ -265,7 +354,22 @@ function ShopContent() {
     }
 
     return results;
-  }, [products, selectedBrand, selectedCategoryId, categoryScopeIds, selectedCollection, selectedSize, debouncedPriceRange, onlyInStock, onlySale, sortBy, debouncedSearchQuery, currency, exchangeRate]);
+  }, [
+    products,
+    selectedBrand,
+    selectedCategoryId,
+    categoryScopeIds,
+    selectedCollection,
+    selectedSize,
+    selectedAttributeFilters,
+    debouncedPriceRange,
+    onlyInStock,
+    onlySale,
+    sortBy,
+    debouncedSearchQuery,
+    currency,
+    exchangeRate,
+  ]);
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
@@ -282,19 +386,37 @@ function ShopContent() {
     setTimeout(() => setAddingId(null), 800);
   };
 
+  const resetAttributeFilters = useCallback(() => {
+    setSelectedAttributeFilters(
+      Object.fromEntries(filterableAttributes.map((a) => [a.id, 'All'])),
+    );
+  }, [filterableAttributes]);
+
   const handleClearFilters = useCallback(() => {
     setSelectedBrand("All");
     setSelectedCategoryId(null);
     setSelectedCollection("All");
     setSelectedColor("All");
     setSelectedSize("All");
+    resetAttributeFilters();
     setPriceRange([0, maxPrice]);
     setOnlyInStock(false);
     setOnlySale(false);
     setSearchQuery("");
     setMinPriceInput("0");
     setMaxPriceInput(maxPrice.toLocaleString());
-  }, [maxPrice, setSelectedBrand, setSelectedCategoryId, setSelectedCollection, setSelectedSize, setPriceRange, setOnlyInStock, setOnlySale, setSearchQuery]);
+  }, [
+    maxPrice,
+    resetAttributeFilters,
+    setSelectedBrand,
+    setSelectedCategoryId,
+    setSelectedCollection,
+    setSelectedSize,
+    setPriceRange,
+    setOnlyInStock,
+    setOnlySale,
+    setSearchQuery,
+  ]);
 
   const handleResetFilters = useCallback(() => {
     setSelectedBrand("All");
@@ -302,11 +424,23 @@ function ShopContent() {
     setSelectedCollection("All");
     setSelectedColor("All");
     setSelectedSize("All");
+    resetAttributeFilters();
     setPriceRange([0, maxPrice]);
     setOnlyInStock(false);
     setOnlySale(false);
     setSearchQuery("");
-  }, [maxPrice, setSelectedBrand, setSelectedCategoryId, setSelectedCollection, setSelectedSize, setPriceRange, setOnlyInStock, setOnlySale, setSearchQuery]);
+  }, [
+    maxPrice,
+    resetAttributeFilters,
+    setSelectedBrand,
+    setSelectedCategoryId,
+    setSelectedCollection,
+    setSelectedSize,
+    setPriceRange,
+    setOnlyInStock,
+    setOnlySale,
+    setSearchQuery,
+  ]);
 
   return (
     <>
@@ -352,6 +486,9 @@ function ShopContent() {
                 setSelectedCollection={setSelectedCollection}
                 selectedSize={selectedSize}
                 setSelectedSize={setSelectedSize}
+                filterableAttributes={filterableAttributes}
+                selectedAttributeFilters={selectedAttributeFilters}
+                setSelectedAttributeFilters={setSelectedAttributeFilters}
                 priceRange={priceRange}
                 setPriceRange={setPriceRange}
                 onlyInStock={onlyInStock}
@@ -406,6 +543,9 @@ function ShopContent() {
               setSelectedCollection={setSelectedCollection}
               selectedSize={selectedSize}
               setSelectedSize={setSelectedSize}
+              filterableAttributes={filterableAttributes}
+              selectedAttributeFilters={selectedAttributeFilters}
+              setSelectedAttributeFilters={setSelectedAttributeFilters}
               priceRange={priceRange}
               setPriceRange={setPriceRange}
               onlyInStock={onlyInStock}

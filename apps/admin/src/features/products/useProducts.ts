@@ -129,20 +129,23 @@ export const useProducts = () => {
 
   const [productForm, setProductForm] = useState(initialProductForm);
   const [currentVariants, setCurrentVariants] = useState<Variant[]>([]);
-  const [newVariant, setNewVariant] = useState({ 
-    sku: '', 
+  const emptyNewVariant = () => ({
+    sku: '',
     barcode: '',
-    size: '', 
-    color: '', 
-    stock: '0', 
+    size: '',
+    color: '',
+    stock: '0',
     lowStockThreshold: '5',
-    price: '', 
+    price: '',
     compareAtPrice: '',
     weight: '0',
     images: [] as string[],
     warehouseId: '',
-    isPreOrder: false
+    isPreOrder: false,
+    attributeSelections: {} as Record<string, string>,
   });
+
+  const [newVariant, setNewVariant] = useState(emptyNewVariant());
 
   const warehouseList = useMemo(() => warehouses || [], [warehouses]);
 
@@ -158,7 +161,11 @@ export const useProducts = () => {
       compareAtPrice: newVariant.compareAtPrice ? Number(newVariant.compareAtPrice) : undefined,
       weight: newVariant.weight ? Number(newVariant.weight) : undefined,
       images: newVariant.images,
-      isPreOrder: newVariant.isPreOrder
+      isPreOrder: newVariant.isPreOrder,
+      attributeSelections:
+        Object.keys(newVariant.attributeSelections || {}).length > 0
+          ? newVariant.attributeSelections
+          : undefined,
     };
 
     if (editingVariant) {
@@ -171,7 +178,7 @@ export const useProducts = () => {
       };
       setCurrentVariants(prev => [...prev, variantToAdd]);
     }
-    setNewVariant({ sku: '', barcode: '', size: '', color: '', stock: '0', lowStockThreshold: '5', price: '', compareAtPrice: '', weight: '0', images: [], warehouseId: '', isPreOrder: false });
+    setNewVariant(emptyNewVariant());
   };
 
   const addBulkVariants = (variants: Partial<Variant>[]) => {
@@ -188,7 +195,8 @@ export const useProducts = () => {
       weight: v.weight || 0,
       images: v.images || [],
       isPreOrder: v.isPreOrder || false,
-      warehouseId: (v as any).warehouseId
+      warehouseId: (v as any).warehouseId,
+      attributeSelections: v.attributeSelections,
     }));
     setCurrentVariants(prev => [...prev, ...variantsToAdd]);
   };
@@ -207,7 +215,8 @@ export const useProducts = () => {
       weight: variant.weight?.toString() || '0',
       images: variant.images || [],
       warehouseId: '',
-      isPreOrder: variant.isPreOrder || false
+      isPreOrder: variant.isPreOrder || false,
+      attributeSelections: (variant.attributeSelections as Record<string, string>) || {},
     });
   };
 
@@ -259,6 +268,10 @@ export const useProducts = () => {
         saleId: productForm.saleId || undefined,
         collectionIds: productForm.collectionIds || [],
         variants: currentVariants.map(v => ({
+          ...(v.id &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.id)
+            ? { id: v.id }
+            : {}),
           sku: v.sku,
           barcode: v.barcode || undefined,
           size: v.size,
@@ -270,7 +283,11 @@ export const useProducts = () => {
           weight: v.weight ? Number(v.weight) : undefined,
           images: v.images || [],
           isPreOrder: v.isPreOrder ?? false,
-          preOrderShippingDate: v.preOrderShippingDate || undefined
+          preOrderShippingDate: v.preOrderShippingDate || undefined,
+          attributeSelections:
+            v.attributeSelections && Object.keys(v.attributeSelections).length > 0
+              ? v.attributeSelections
+              : undefined,
         }))
       };
 
@@ -295,20 +312,7 @@ export const useProducts = () => {
     setCurrentVariants([]);
     setEditingProduct(null);
     setEditingVariant(null);
-    setNewVariant({ 
-      sku: '', 
-      barcode: '', 
-      size: '', 
-      color: '', 
-      stock: '0', 
-      lowStockThreshold: '5', 
-      price: '', 
-      compareAtPrice: '', 
-      weight: '0', 
-      images: [], 
-      warehouseId: '', 
-      isPreOrder: false 
-    });
+    setNewVariant(emptyNewVariant());
     setStep(1);
   };
 

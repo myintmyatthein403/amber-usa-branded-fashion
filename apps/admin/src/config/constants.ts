@@ -129,6 +129,15 @@ export const API_ROUTES = {
     UPLOAD: '/media/upload',
     BY_ID: (id: string) => `/media/${id}`,
   },
+  ATTRIBUTES: {
+    BASE: '/attributes',
+    PUBLIC: '/attributes/public',
+    REORDER: '/attributes/reorder',
+    BY_ID: (id: string) => `/attributes/${id}`,
+    VALUES: (id: string) => `/attributes/${id}/values`,
+    VALUES_REORDER: (id: string) => `/attributes/${id}/values/reorder`,
+    VALUE_BY_ID: (id: string) => `/attributes/values/${id}`,
+  },
   STATS: '/stats',
 };
 

@@ -3,9 +3,63 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Product, Prisma, Variant } from '@prisma/client';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
 
+type VariantInput = CreateProductDto['variants'][number];
+
 @Injectable()
 export class ProductsRepository {
   constructor(private prisma: PrismaService) {}
+
+  private buildVariantData(
+    v: VariantInput,
+    productId: string,
+  ): Prisma.VariantCreateInput {
+    return {
+      sku: v.sku,
+      barcode: v.barcode,
+      size: v.size,
+      color: v.color,
+      stock: Number(v.stock) || 0,
+      lowStockThreshold: Number(v.lowStockThreshold) || 5,
+      price: v.price ? Number(v.price) : undefined,
+      compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
+      weight: Number(v.weight) || 0,
+      images: v.images || [],
+      isPreOrder: v.isPreOrder || false,
+      preOrderShippingDate: v.preOrderShippingDate
+        ? new Date(v.preOrderShippingDate)
+        : undefined,
+      attributeSelections: v.attributeSelections
+        ? (v.attributeSelections as Prisma.InputJsonValue)
+        : undefined,
+      product: { connect: { id: productId } },
+    };
+  }
+
+  private buildVariantUpdateData(v: VariantInput): Prisma.VariantUpdateInput {
+    const data: Prisma.VariantUpdateInput = {
+      sku: v.sku,
+      barcode: v.barcode,
+      size: v.size,
+      color: v.color,
+      stock: Number(v.stock) || 0,
+      lowStockThreshold: Number(v.lowStockThreshold) || 5,
+      price: v.price ? Number(v.price) : undefined,
+      compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
+      weight: Number(v.weight) || 0,
+      images: v.images || [],
+      isPreOrder: v.isPreOrder || false,
+      preOrderShippingDate: v.preOrderShippingDate
+        ? new Date(v.preOrderShippingDate)
+        : undefined,
+    };
+    if (v.attributeSelections !== undefined && v.attributeSelections !== null) {
+      data.attributeSelections =
+        v.attributeSelections as Prisma.InputJsonValue;
+    } else if (v.attributeSelections === null) {
+      data.attributeSelections = Prisma.JsonNull;
+    }
+    return data;
+  }
 
   async create(data: CreateProductDto): Promise<Product> {
     const {
@@ -53,23 +107,7 @@ export class ProductsRepository {
 
         for (const v of variants as CreateProductDto['variants']) {
           const variant = await tx.variant.create({
-            data: {
-              sku: v.sku,
-              barcode: v.barcode,
-              size: v.size,
-              color: v.color,
-              stock: Number(v.stock) || 0,
-              lowStockThreshold: Number(v.lowStockThreshold) || 5,
-              price: v.price ? Number(v.price) : undefined,
-              compareAtPrice: v.compareAtPrice
-                ? Number(v.compareAtPrice)
-                : undefined,
-              weight: Number(v.weight) || 0,
-              images: v.images || [],
-              isPreOrder: v.isPreOrder || false,
-              preOrderShippingDate: v.preOrderShippingDate,
-              productId: product.id,
-            },
+            data: this.buildVariantData(v, product.id),
           });
 
           if (defaultWarehouse && variant.stock > 0) {
@@ -216,23 +254,7 @@ export class ProductsRepository {
         }
 
         for (const v of variants as CreateProductDto['variants']) {
-          const variantData = {
-            sku: v.sku,
-            barcode: v.barcode,
-            size: v.size,
-            color: v.color,
-            stock: Number(v.stock) || 0,
-            lowStockThreshold: Number(v.lowStockThreshold) || 5,
-            price: v.price ? Number(v.price) : undefined,
-            compareAtPrice: v.compareAtPrice
-              ? Number(v.compareAtPrice)
-              : undefined,
-            weight: Number(v.weight) || 0,
-            images: v.images || [],
-            isPreOrder: v.isPreOrder || false,
-            preOrderShippingDate: v.preOrderShippingDate,
-            productId: id,
-          };
+          const variantData = this.buildVariantUpdateData(v);
 
           if (v.id && existingIds.includes(v.id)) {
             const variant = await tx.variant.findUnique({
@@ -240,13 +262,14 @@ export class ProductsRepository {
               include: { inventory: true },
             });
 
-            if (variant && variantData.stock !== undefined) {
+            const stockQty = Number(v.stock) || 0;
+            if (variant && stockQty !== undefined) {
               if (variant.inventory.length > 1) {
-                delete (variantData as any).stock;
+                delete (variantData as { stock?: number }).stock;
               } else if (variant.inventory.length === 1) {
                 await tx.inventory.update({
                   where: { id: variant.inventory[0].id },
-                  data: { quantity: variantData.stock },
+                  data: { quantity: stockQty },
                 });
               } else {
                 const defaultWarehouse =
@@ -259,7 +282,7 @@ export class ProductsRepository {
                     data: {
                       variantId: variant.id,
                       warehouseId: defaultWarehouse.id,
-                      quantity: variantData.stock,
+                      quantity: stockQty,
                     },
                   });
                 }
@@ -275,9 +298,7 @@ export class ProductsRepository {
               where: {
                 OR: [
                   { sku: v.sku },
-                  ...(variantData.barcode
-                    ? [{ barcode: variantData.barcode }]
-                    : []),
+                  ...(v.barcode ? [{ barcode: v.barcode }] : []),
                 ],
               },
             });
@@ -299,7 +320,7 @@ export class ProductsRepository {
               }
             } else {
               const newVariant = await tx.variant.create({
-                data: variantData,
+                data: this.buildVariantData(v, id),
               });
 
               if (newVariant.stock > 0) {

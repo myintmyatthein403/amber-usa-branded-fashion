@@ -456,6 +456,8 @@ model Variant {
   isPreOrder        Boolean  @default(false)
   preOrderShippingDate DateTime?
 
+  attributeSelections Json?   // { "attrId1": "valueId1", "attrId2": "valueId2" }
+
   images            String[]
   
   productId         String
@@ -624,4 +626,33 @@ model Media {
   height    Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Attribute {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  type        String   @default("text") // text, color, image
+  isRequired  Boolean  @default(false)
+  isFilterable Boolean @default(false)
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  values      AttributeValue[]
+}
+
+model AttributeValue {
+  id            String   @id @default(uuid())
+  attributeId   String
+  value         String
+  slug          String
+  position      Int      @default(0)
+  hexColor     String?  // For color type
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  attribute    Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@unique([attributeId, slug])
 }

@@ -1,6 +1,7 @@
 export * from './product.schema';
 export * from './category.utils';
 export * from './category.schema';
+export * from './attribute.schema';
 export * from './user.schema';
 export {
   OrderSchema,
