@@ -21,7 +21,8 @@ import {
   Truck,
   Megaphone,
   Lock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  DollarSign
 } from 'lucide-react';
 import { useAdminUIStore } from '../../store/useAdminUIStore';
 import { clsx, type ClassValue } from 'clsx';
@@ -33,7 +34,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type Tab = 'dashboard' | 'products' | 'categories' | 'brands' | 'variants' | 'hero' | 'mission' | 'gift-card-section' | 'sale-section' | 'footer-section' | 'testimonials' | 'community-posts' | 'collections' | 'coupons' | 'gift-cards' | 'sales' | 'reviews' | 'orders' | 'customers' | 'staff' | 'roles' | 'settings' | 'delivery-methods' | 'ads' | 'warehouses' | 'cargo' | 'inventory' | 'media';
+type Tab = 'dashboard' | 'products' | 'categories' | 'brands' | 'variants' | 'hero' | 'mission' | 'gift-card-section' | 'sale-section' | 'footer-section' | 'testimonials' | 'community-posts' | 'collections' | 'coupons' | 'gift-cards' | 'sales' | 'reviews' | 'orders' | 'customers' | 'staff' | 'roles' | 'settings' | 'delivery-methods' | 'ads' | 'warehouses' | 'cargo' | 'inventory' | 'media' | 'currencies';
 
 
 interface SidebarItem {
@@ -77,6 +78,7 @@ const sidebarConfig: SidebarItem[] = [
       { id: 'orders', label: 'Orders', icon: ShoppingBag, permissions: ['orders:manage'] },
       { id: 'reviews', label: 'Reviews', icon: MessageSquare, permissions: ['reviews:manage'] },
       { id: 'delivery-methods', label: 'Delivery Setup', icon: Truck, permissions: ['settings:manage'] },
+      { id: 'currencies', label: 'Currency Setup', icon: DollarSign, permissions: ['settings:manage'] },
       { id: 'customers', label: 'Customers', icon: Users, permissions: ['staff:manage'] },
     ]
   },

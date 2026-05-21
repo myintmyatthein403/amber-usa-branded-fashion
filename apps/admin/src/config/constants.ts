@@ -129,6 +129,15 @@ export const API_ROUTES = {
     UPLOAD: '/media/upload',
     BY_ID: (id: string) => `/media/${id}`,
   },
+  CURRENCIES: {
+    BASE: '/currencies',
+    BY_ID: (id: string) => `/currencies/${id}`,
+    SET_BASE: '/currencies/set-base',
+  },
+  EXCHANGE_RATES: {
+    BASE: '/exchange-rates',
+    BY_ID: (id: string) => `/exchange-rates/${id}`,
+  },
   ATTRIBUTES: {
     BASE: '/attributes',
     PUBLIC: '/attributes/public',

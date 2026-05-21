@@ -2,12 +2,16 @@ import { Injectable, OnApplicationBootstrap, Logger } from '@nestjs/common';
 import { SettingsRepository } from './settings.repository';
 import DOMPurify from 'isomorphic-dompurify';
 import { sanitizeData } from '../common/utils/data-sanitizer';
+import { ExchangeRateHelper } from '../currencies/exchange-rate.helper';
 
 @Injectable()
 export class SettingsService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SettingsService.name);
 
-  constructor(private readonly settingsRepository: SettingsRepository) {}
+  constructor(
+    private readonly settingsRepository: SettingsRepository,
+    private readonly exchangeRateHelper: ExchangeRateHelper,
+  ) {}
 
   async onApplicationBootstrap() {
     try {
@@ -32,7 +36,15 @@ export class SettingsService implements OnApplicationBootstrap {
   }
 
   async getSettings() {
-    return this.settingsRepository.findGlobal();
+    const settings = await this.settingsRepository.findGlobal();
+    const meta = await this.exchangeRateHelper.getUsdMmkMeta();
+    return {
+      ...settings,
+      usdToMmkRate: meta.rate,
+      rateSource: meta.rateSource,
+      rateUpdatedAt: meta.lastFetchedAt ?? new Date().toISOString(),
+      isManualOverride: meta.isManualOverride,
+    };
   }
 
   async updateSettings(data: {
@@ -43,8 +55,16 @@ export class SettingsService implements OnApplicationBootstrap {
     stripeSecretKey?: string;
     stripeWebhookSecret?: string;
   }) {
-    const sanitizedData = sanitizeData(data) as any;
-    const updateData: any = { ...sanitizedData };
+    const sanitizedData = sanitizeData(data) as {
+      privacyPolicy?: string;
+      termsConditions?: string;
+      usdToMmkRate?: number;
+      stripePublishableKey?: string | null;
+      stripeSecretKey?: string | null;
+      stripeWebhookSecret?: string | null;
+    };
+    const { usdToMmkRate: _ignoredRate, ...rest } = sanitizedData;
+    const updateData: typeof rest = { ...rest };
 
     // Sanitize HTML content
     if (updateData.privacyPolicy) {

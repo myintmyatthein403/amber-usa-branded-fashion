@@ -18,6 +18,11 @@ export const useSettings = () => {
     stripeWebhookSecret: '',
   });
 
+  const [rateMeta, setRateMeta] = useState<{
+    rateUpdatedAt?: string | null;
+    isManualOverride?: boolean;
+  }>({});
+
   const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
@@ -30,6 +35,10 @@ export const useSettings = () => {
         stripePublishableKey: data?.stripePublishableKey || '',
         stripeSecretKey: data?.stripeSecretKey || '',
         stripeWebhookSecret: data?.stripeWebhookSecret || '',
+      });
+      setRateMeta({
+        rateUpdatedAt: (data as Settings & { rateUpdatedAt?: string })?.rateUpdatedAt ?? null,
+        isManualOverride: (data as Settings & { isManualOverride?: boolean })?.isManualOverride ?? false,
       });
     } catch (error) {
       console.error('Failed to fetch settings:', error);
@@ -47,15 +56,20 @@ export const useSettings = () => {
     setSubmitting(true);
     setSuccess(false);
     try {
+      const { privacyPolicy, termsConditions, stripePublishableKey, stripeSecretKey, stripeWebhookSecret } = formData;
       await apiService(API_ROUTES.SETTINGS, {
         method: 'PATCH',
         body: {
-          ...formData,
-          usdToMmkRate: parseFloat(formData.usdToMmkRate),
+          privacyPolicy,
+          termsConditions,
+          stripePublishableKey,
+          stripeSecretKey,
+          stripeWebhookSecret,
         },
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
+      await fetchSettings();
     } catch (error) {
       console.error('Failed to update settings:', error);
     } finally {
@@ -63,7 +77,8 @@ export const useSettings = () => {
     }
   };
 
-  const updateField = useCallback((field: string, value: any) => {
+  const updateField = useCallback((field: string, value: unknown) => {
+    if (field === 'usdToMmkRate') return;
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
@@ -82,6 +97,7 @@ export const useSettings = () => {
     submitting,
     success,
     formData,
+    rateMeta,
     updateField,
     handleSubmit,
     quillModules,

@@ -36,6 +36,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { LogisticsModule } from './logistics/logistics.module';
 import { StatsModule } from './stats/stats.module';
+import { CurrenciesModule } from './currencies/currencies.module';
 import { AttributesModule } from './attributes/attributes.module';
 
 @Module({
@@ -76,6 +77,7 @@ import { AttributesModule } from './attributes/attributes.module';
     PaymentMethodsModule,
     LogisticsModule,
     StatsModule,
+    CurrenciesModule,
     AttributesModule,
   ],
   controllers: [AppController, HealthController],

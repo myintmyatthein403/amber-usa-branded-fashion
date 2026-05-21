@@ -22,7 +22,6 @@ export class SettingsController {
     data: {
       privacyPolicy?: string;
       termsConditions?: string;
-      usdToMmkRate?: number;
       stripePublishableKey?: string;
       stripeSecretKey?: string;
       stripeWebhookSecret?: string;

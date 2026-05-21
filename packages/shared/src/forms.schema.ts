@@ -302,10 +302,17 @@ export type AdFormData = z.infer<typeof AdFormDataSchema>;
 export const SettingsFormDataSchema = z.object({
   privacyPolicy: z.string().optional(),
   termsConditions: z.string().optional(),
-  usdToMmkRate: z.union([z.string(), z.number()]),
   stripePublishableKey: z.string().optional(),
   stripeSecretKey: z.string().optional(),
   stripeWebhookSecret: z.string().optional(),
+});
+
+/** Read-only display of live USD→MMK from exchange rates (not submitted on PATCH). */
+export const SettingsReadSchema = SettingsFormDataSchema.extend({
+  usdToMmkRate: z.union([z.string(), z.number()]).optional(),
+  rateSource: z.string().optional(),
+  rateUpdatedAt: z.string().optional(),
+  isManualOverride: z.boolean().optional(),
 });
 
 export type SettingsFormData = z.infer<typeof SettingsFormDataSchema>;
