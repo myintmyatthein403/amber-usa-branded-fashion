@@ -1,49 +1,84 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
+import { CategoryFormData, type CategoryReorderFlatItem } from '@amber/shared';
 import { Category } from './schema';
 
-interface PaginationMeta {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+export type CategoryFormState = CategoryFormData & { slug?: string };
+
+const DEFAULT_FORM_DATA: CategoryFormState = {
+  name: '',
+  slug: '',
+  description: '',
+  image: '',
+  isActive: true,
+  isFeatured: false,
+  displayOrder: 0,
+  parentId: undefined,
+  metaTitle: '',
+  metaDescription: '',
+};
+
+function categoryToFormData(category: Category): CategoryFormState {
+  return {
+    name: category.name,
+    slug: category.slug ?? '',
+    description: category.description ?? '',
+    image: category.image ?? '',
+    isActive: category.isActive ?? true,
+    isFeatured: category.isFeatured ?? false,
+    displayOrder: category.displayOrder ?? 0,
+    parentId: category.parentId ?? undefined,
+    metaTitle: category.metaTitle ?? '',
+    metaDescription: category.metaDescription ?? '',
+  };
 }
 
-type ViewMode = 'grid' | 'list';
+function formDataToPayload(data: CategoryFormState): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    name: data.name,
+    isActive: data.isActive,
+    isFeatured: data.isFeatured,
+    displayOrder: data.displayOrder,
+    parentId: data.parentId || null,
+  };
+
+  const slug = data.slug?.trim();
+  if (slug) payload.slug = slug;
+
+  const description = data.description?.trim();
+  if (description) payload.description = description;
+
+  const image = data.image?.trim();
+  if (image) payload.image = image;
+
+  const metaTitle = data.metaTitle?.trim();
+  if (metaTitle) payload.metaTitle = metaTitle;
+
+  const metaDescription = data.metaDescription?.trim();
+  if (metaDescription) payload.metaDescription = metaDescription;
+
+  return payload;
+}
 
 export const useCategories = () => {
-  const [categories, setCategories] = useState<Category[] | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState<PaginationMeta>({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 0,
-  });
-  
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [formData, setFormData] = useState({ name: '' });
+  const [formData, setFormData] = useState<CategoryFormState>(DEFAULT_FORM_DATA);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const saved = localStorage.getItem('categoryViewMode');
-    return (saved as ViewMode) || 'list';
-  });
 
-  const fetchCategories = useCallback(async (page: number = 1, limit: number = 10) => {
+  const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiService(
-        `${API_ROUTES.CATEGORIES.BASE}?page=${page}&limit=${limit}`,
-        { method: 'GET' }
-      ) as { data: Category[]; meta: PaginationMeta };
-      
-      setCategories(response.data);
-      setPagination(response.meta);
+      const response = (await apiService(
+        `${API_ROUTES.CATEGORIES.BASE}?page=1&limit=100`,
+        { method: 'GET' },
+      )) as { data: Category[] };
+      setCategories(response.data ?? []);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
       setCategories([]);
@@ -53,45 +88,56 @@ export const useCategories = () => {
   }, []);
 
   useEffect(() => {
-    fetchCategories(pagination.page, pagination.limit);
-  }, [fetchCategories, pagination.page, pagination.limit]);
+    fetchCategories();
+  }, [fetchCategories]);
 
-  const handlePageChange = (page: number) => {
-    setPagination(prev => ({ ...prev, page }));
-  };
-
-  const handleLimitChange = (limit: number) => {
-    setPagination(prev => ({ ...prev, page: 1, limit }));
-  };
-
-  const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem('categoryViewMode', mode);
-  };
+  const reorderCategories = useCallback(
+    async (payload: CategoryReorderFlatItem[]) => {
+      await apiService(API_ROUTES.CATEGORIES.REORDER, {
+        method: 'PATCH',
+        body: payload,
+      });
+      await fetchCategories();
+    },
+    [fetchCategories],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const endpoint = editingCategory 
+      const endpoint = editingCategory
         ? API_ROUTES.CATEGORIES.BY_ID(editingCategory.id!)
         : API_ROUTES.CATEGORIES.BASE;
-      
+
       const method = editingCategory ? 'PATCH' : 'POST';
 
       await apiService(endpoint, {
         method,
-        body: formData,
+        body: formDataToPayload(formData),
       });
 
       setModalOpen(false);
       setEditingCategory(null);
-      setFormData({ name: '' });
-      fetchCategories(pagination.page, pagination.limit);
+      setFormData(DEFAULT_FORM_DATA);
+      await fetchCategories();
     } catch (error) {
       console.error('Failed to save category:', error);
+      throw error;
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const toggleCategoryActive = async (category: Category) => {
+    try {
+      await apiService(API_ROUTES.CATEGORIES.BY_ID(category.id), {
+        method: 'PATCH',
+        body: { isActive: !(category.isActive !== false) },
+      });
+      await fetchCategories();
+    } catch (error) {
+      console.error('Failed to toggle category status:', error);
     }
   };
 
@@ -106,7 +152,7 @@ export const useCategories = () => {
       await apiService(API_ROUTES.CATEGORIES.BY_ID(deletingId), { method: 'DELETE' });
       setDeleteConfirmOpen(false);
       setDeletingId(null);
-      fetchCategories(pagination.page, pagination.limit);
+      await fetchCategories();
     } catch (error) {
       console.error('Failed to delete category:', error);
     }
@@ -119,20 +165,20 @@ export const useCategories = () => {
 
   const openAddModal = () => {
     setEditingCategory(null);
-    setFormData({ name: '' });
+    setFormData(DEFAULT_FORM_DATA);
     setModalOpen(true);
   };
 
   const openEditModal = (category: Category) => {
     setEditingCategory(category);
-    setFormData({ name: category.name });
+    setFormData(categoryToFormData(category));
     setModalOpen(true);
   };
 
   return {
     categories,
+    availableCategories: categories,
     loading,
-    pagination,
     modalOpen,
     setModalOpen,
     submitting,
@@ -148,10 +194,8 @@ export const useCategories = () => {
     confirmDelete,
     cancelDelete,
     deletingId,
-    viewMode,
-    setViewMode: handleViewModeChange,
-    handlePageChange,
-    handleLimitChange,
-    refresh: () => fetchCategories(pagination.page, pagination.limit),
+    reorderCategories,
+    toggleCategoryActive,
+    refresh: fetchCategories,
   };
 };

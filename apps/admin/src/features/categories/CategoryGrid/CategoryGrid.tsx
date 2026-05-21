@@ -4,6 +4,7 @@ import { Category } from '../schema';
 
 interface CategoryGridProps {
   categories: Category[] | null;
+  allCategories?: Category[];
   loading: boolean;
   onEdit: (category: Category) => void;
   onDelete: (id: string) => void;
@@ -11,6 +12,7 @@ interface CategoryGridProps {
 
 export const CategoryGrid: React.FC<CategoryGridProps> = ({
   categories,
+  allCategories,
   loading,
   onEdit,
   onDelete,
@@ -47,6 +49,7 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
         <CategoryCard
           key={category.id}
           category={category}
+          allCategories={allCategories}
           onEdit={onEdit}
           onDelete={onDelete}
         />

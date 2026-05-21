@@ -34,5 +34,8 @@
     "@playwright/test": "^1.52.0",
     "concurrently": "^9.2.1",
     "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "slugify": "^1.6.9"
   }
 }

@@ -10,6 +10,15 @@ export type BrandFormData = z.infer<typeof BrandFormDataSchema>;
 
 export const CategoryFormDataSchema = z.object({
   name: z.string().min(1, 'Name is required'),
+  slug: z.string().regex(/^[a-z0-9-_]+$/, 'Slug must be alphanumeric/hyphens').optional(),
+  description: z.string().optional(),
+  image: z.string().url().optional(),
+  isActive: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
+  displayOrder: z.number().int().default(0),
+  parentId: z.string().uuid().optional().nullable(),
+  metaTitle: z.string().optional(),
+  metaDescription: z.string().optional(),
 });
 
 export type CategoryFormData = z.infer<typeof CategoryFormDataSchema>;

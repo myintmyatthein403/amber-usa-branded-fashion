@@ -49,6 +49,16 @@ export const ProductSchema = z.object({
 export const CategorySchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, 'Category name is required'),
+  slug: z.string().optional(),
+  description: z.string().optional().nullable(),
+  image: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
+  displayOrder: z.number().int().optional(),
+  parentId: z.string().uuid().optional().nullable(),
+  metaTitle: z.string().optional().nullable(),
+  metaDescription: z.string().optional().nullable(),
+  parent: z.object({ id: z.string(), name: z.string() }).optional().nullable(),
 });
 
 export const BrandSchema = z.object({

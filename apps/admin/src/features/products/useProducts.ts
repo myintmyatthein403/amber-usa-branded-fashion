@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
-import { Product, Variant, Category, Brand, Sale, Meta, Collection, Warehouse, ProductWithRelations } from './schema';
+import type { Category } from '@amber/shared';
+import { Product, Variant, Brand, Sale, Meta, Collection, Warehouse, ProductWithRelations } from './schema';
 
 export const useProducts = () => {
   const [products, setProducts] = useState<ProductWithRelations[]>([]);
@@ -37,7 +38,7 @@ export const useProducts = () => {
     setPage(1);
   }, [filters]);
 
-  const { data: categories } = useFetch<Category>(API_ROUTES.CATEGORIES.BASE);
+  const { data: categories } = useFetch<Category>(`${API_ROUTES.CATEGORIES.BASE}?limit=100`);
   const { data: brands } = useFetch<Brand>(API_ROUTES.BRANDS.BASE);
   const { data: collections } = useFetch<Collection>(API_ROUTES.COLLECTIONS.BASE);
   const { data: warehouses } = useFetch<Warehouse>(API_ROUTES.LOGISTICS.WAREHOUSES);
@@ -96,6 +97,7 @@ export const useProducts = () => {
     metaDescription: '',
     price: '',
     compareAtPrice: '',
+    currency: 'USD' as 'USD' | 'MMK' | 'THB',
     isUsdPrice: true,
     isFeatured: false,
     onSale: false,
@@ -155,6 +157,25 @@ export const useProducts = () => {
       setCurrentVariants(prev => [...prev, variantToAdd]);
     }
     setNewVariant({ sku: '', barcode: '', size: '', color: '', stock: '0', lowStockThreshold: '5', price: '', compareAtPrice: '', weight: '0', images: [], warehouseId: '', isPreOrder: false });
+  };
+
+  const addBulkVariants = (variants: Partial<Variant>[]) => {
+    const variantsToAdd: Variant[] = variants.map(v => ({
+      id: v.id || Math.random().toString(36).substr(2, 9),
+      sku: v.sku || '',
+      barcode: v.barcode,
+      size: v.size || '',
+      color: v.color || '',
+      stock: v.stock || 0,
+      lowStockThreshold: v.lowStockThreshold || 5,
+      price: v.price,
+      compareAtPrice: v.compareAtPrice,
+      weight: v.weight || 0,
+      images: v.images || [],
+      isPreOrder: v.isPreOrder || false,
+      warehouseId: (v as any).warehouseId
+    }));
+    setCurrentVariants(prev => [...prev, ...variantsToAdd]);
   };
 
   const handleEditVariant = (variant: Variant) => {
@@ -291,6 +312,7 @@ export const useProducts = () => {
       metaDescription: product.metaDescription || '',
       price: String(product.price),
       compareAtPrice: String(product.compareAtPrice || ''),
+      currency: (product as any).currency || 'USD',
       isUsdPrice: product.isUsdPrice,
       isFeatured: product.isFeatured,
       onSale: product.onSale,
@@ -373,6 +395,7 @@ export const useProducts = () => {
     newVariant,
     setNewVariant,
     addVariant,
+    addBulkVariants,
     handleEditVariant,
     handleDeleteVariant,
     handleProductSubmit,

@@ -15,8 +15,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { CategorySchema } from '@amber/shared';
-import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
+import {
+  CreateCategoryDto,
+  UpdateCategoryDto,
+  CategoryReorderDto,
+} from './dto/category.dto';
 
 interface PaginationQuery {
   page?: number;
@@ -40,7 +43,7 @@ export class CategoriesController {
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
   create(
-    @Body(new ZodValidationPipe(CategorySchema))
+    @Body(new ZodValidationPipe(CreateCategoryDto))
     createCategoryDto: CreateCategoryDto,
   ) {
     return this.categoriesService.createCategory(createCategoryDto);
@@ -48,10 +51,20 @@ export class CategoriesController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
+  @Patch('reorder')
+  reorder(
+    @Body(new ZodValidationPipe(CategoryReorderDto))
+    reorderDto: CategoryReorderDto,
+  ) {
+    return this.categoriesService.reorderCategories(reorderDto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(CategorySchema.partial()))
+    @Body(new ZodValidationPipe(UpdateCategoryDto))
     updateCategoryDto: UpdateCategoryDto,
   ) {
     return this.categoriesService.updateCategory(id, updateCategoryDto);

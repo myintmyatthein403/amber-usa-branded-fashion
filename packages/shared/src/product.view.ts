@@ -7,6 +7,17 @@ export const VariantViewSchema = VariantBaseSchema.extend({
 
 export const CategoryViewSchema = CategoryBaseSchema.extend({
   id: z.string().uuid(),
+  parent: z
+    .object({
+      id: z.string().uuid(),
+      name: z.string(),
+      slug: z.string().optional(),
+    })
+    .nullable()
+    .optional(),
+  subcategories: z
+    .array(z.object({ id: z.string().uuid(), name: z.string(), slug: z.string().optional() }))
+    .optional(),
 });
 
 export const BrandViewSchema = BrandBaseSchema.extend({

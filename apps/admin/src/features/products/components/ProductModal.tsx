@@ -2,7 +2,9 @@ import React from 'react';
 import { Modal } from '../../../components/admin/Modal';
 import { ProductForm } from './ProductForm';
 import { VariantManager } from './VariantManager';
-import { Variant, Category, Brand, Sale, Warehouse } from '../schema';
+import { useAttributes } from '../../attributes/useAttributes';
+import { Variant, Brand, Sale, Warehouse } from '../schema';
+import type { Category } from '@amber/shared';
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -23,11 +25,14 @@ interface ProductModalProps {
   editingVariant: any;
   setEditingVariant: any;
   addVariant: () => void;
+  addBulkVariants?: (variants: any[]) => void;
   currentVariants: any;
   handleEditVariant: any;
   handleDeleteVariant: any;
   warehouses: any;
+  attributes?: any[];
   onSave: () => void;
+  productSlug?: string;
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({
@@ -48,13 +53,19 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   setNewVariant,
   editingVariant,
   setEditingVariant,
-  addVariant,
-  currentVariants,
-  handleEditVariant,
-  handleDeleteVariant,
-  warehouses,
-  onSave,
-}) => {
+addVariant,
+    addBulkVariants,
+    currentVariants,
+    handleEditVariant,
+    handleDeleteVariant,
+    warehouses,
+    attributes: propAttributes,
+    onSave,
+    productSlug,
+  }) => {
+  const { attributes: fetchedAttributes } = useAttributes();
+  const attributes = propAttributes || fetchedAttributes;
+  
   return (
     <Modal 
       isOpen={isOpen} 
@@ -98,6 +109,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           editingVariant={editingVariant}
           setEditingVariant={setEditingVariant}
           addVariant={addVariant}
+          addBulkVariants={addBulkVariants}
           currentVariants={currentVariants as any}
           handleEditVariant={handleEditVariant as any}
           handleDeleteVariant={handleDeleteVariant as any}
@@ -106,6 +118,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           onSave={onSave}
           submitting={submitting}
           onOpenMedia={onOpenMedia as any}
+          productSlug={productSlug}
+          attributes={attributes}
         />
       )}
     </Modal>

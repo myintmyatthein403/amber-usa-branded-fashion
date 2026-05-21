@@ -1,14 +1,26 @@
 import React from 'react';
 import { Tag, Edit2, Trash2 } from 'lucide-react';
+import { buildCategoryPath } from '@amber/shared';
 import { Category } from '../schema';
 
 interface CategoryCardProps {
   category: Category;
+  allCategories?: Category[];
   onEdit: (category: Category) => void;
   onDelete: (id: string) => void;
 }
 
-export const CategoryCard: React.FC<CategoryCardProps> = ({ category, onEdit, onDelete }) => {
+export const CategoryCard: React.FC<CategoryCardProps> = ({
+  category,
+  allCategories = [],
+  onEdit,
+  onDelete,
+}) => {
+  const breadcrumb =
+    category.parentId && allCategories.length > 0
+      ? buildCategoryPath(allCategories, category.id)
+      : null;
+
   return (
     <div className="group relative bg-card border border-border hover:border-primary/30 transition-all duration-300">
       <div className="aspect-square flex flex-col items-center justify-center p-6">
@@ -18,11 +30,16 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category, onEdit, on
         <span className="text-lg font-serif text-foreground tracking-wide text-center">
           {category.name}
         </span>
+        {breadcrumb && breadcrumb !== category.name && (
+          <span className="text-[10px] text-muted-foreground/60 uppercase tracking-widest text-center mt-1">
+            {breadcrumb}
+          </span>
+        )}
         <span className="text-[10px] font-mono text-muted-foreground/40 uppercase mt-2">
-          {category.id.slice(0, 8)}...
+          {category.slug}
         </span>
       </div>
-      
+
       <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <button
           onClick={() => onEdit(category)}

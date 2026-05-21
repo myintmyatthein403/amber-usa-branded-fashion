@@ -14,6 +14,7 @@ export const VariantBaseSchema = z.object({
   images: z.array(z.string()).default([]),
   isPreOrder: z.boolean().default(false),
   preOrderShippingDate: z.string().optional().nullable(),
+  attributeSelections: z.record(z.string(), z.string()).optional().nullable(),
 });
 
 export const ProductStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
@@ -53,6 +54,15 @@ export const ProductBaseSchema = z.object({
 export const CategoryBaseSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, 'Category name is required'),
+  slug: z.string().regex(/^[a-z0-9-_]+$/, 'Slug must be alphanumeric/hyphens').optional(),
+  description: z.string().optional().nullable(),
+  image: z.string().url().or(z.literal('')).optional().nullable(),
+  isActive: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
+  displayOrder: z.number().int().default(0),
+  parentId: z.string().uuid().optional().nullable(),
+  metaTitle: z.string().optional().nullable(),
+  metaDescription: z.string().optional().nullable(),
 });
 
 export const BrandBaseSchema = z.object({

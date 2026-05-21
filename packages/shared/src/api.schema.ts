@@ -155,14 +155,25 @@ export const PaginatedResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =
     meta: PaginatedMetaSchema,
   });
 
-export const CategoryBaseSchema = z.object({
+export const ApiCategoryBaseSchema = z.object({
   id: z.string(),
   name: z.string(),
+  slug: z.string(),
+  description: z.string().nullable().optional(),
+  image: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
+  displayOrder: z.number().int().optional(),
+  parentId: z.string().nullable().optional(),
+  metaTitle: z.string().nullable().optional(),
+  metaDescription: z.string().nullable().optional(),
+  parent: z.object({ id: z.string(), name: z.string(), slug: z.string().optional() }).nullable().optional(),
+  subcategories: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
 
-export type CategoryBase = z.infer<typeof CategoryBaseSchema>;
+export type ApiCategoryBase = z.infer<typeof ApiCategoryBaseSchema>;
 
-export const PaginatedCategoriesResponse = PaginatedResponseSchema(CategoryBaseSchema);
+export const PaginatedCategoriesResponse = PaginatedResponseSchema(ApiCategoryBaseSchema);
 export type PaginatedCategoriesResponse = z.infer<typeof PaginatedCategoriesResponse>;

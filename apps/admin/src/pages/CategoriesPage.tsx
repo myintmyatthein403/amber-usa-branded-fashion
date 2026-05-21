@@ -1,17 +1,14 @@
 import React from 'react';
-import { Plus, AlertTriangle, LayoutGrid, List } from 'lucide-react';
+import { Plus, AlertTriangle } from 'lucide-react';
 import { Modal } from '../components/admin/Modal';
-import { Pagination } from '../components/admin/Pagination';
 import { useCategories } from '../features/categories/useCategories';
-import { CategoryTable } from '../features/categories/CategoryTable';
-import { CategoryGrid } from '../features/categories/CategoryGrid';
+import { CategoryTree } from '../features/categories/CategoryTree';
 import { CategoryForm } from '../features/categories/CategoryForm';
 
 export const CategoriesPage: React.FC = () => {
   const {
     categories,
     loading,
-    pagination,
     modalOpen,
     setModalOpen,
     submitting,
@@ -25,90 +22,50 @@ export const CategoriesPage: React.FC = () => {
     deleteConfirmOpen,
     confirmDelete,
     cancelDelete,
-    viewMode,
-    setViewMode,
-    handlePageChange,
-    handleLimitChange,
+    availableCategories,
+    reorderCategories,
+    toggleCategoryActive,
   } = useCategories();
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="flex items-end justify-between">
         <div className="space-y-1.5">
-          <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">Taxonomy</span>
+          <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">
+            Taxonomy
+          </span>
           <h2 className="text-4xl font-serif text-foreground tracking-tight">Categories</h2>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center border border-border">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-3 transition-colors duration-300 ${
-                viewMode === 'list'
-                  ? 'bg-foreground text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <List size={18} />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-3 transition-colors duration-300 ${
-                viewMode === 'grid'
-                  ? 'bg-foreground text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <LayoutGrid size={18} />
-            </button>
-          </div>
-          <button 
-            onClick={openAddModal}
-            className="flex items-center gap-3 bg-foreground text-primary-foreground px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-xl shadow-black/5"
-          >
-            <Plus size={18} /> New Category
-          </button>
-        </div>
+        <button
+          onClick={openAddModal}
+          className="flex items-center gap-3 bg-foreground text-primary-foreground px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-xl shadow-black/5"
+        >
+          <Plus size={18} /> New Category
+        </button>
       </div>
 
-      {viewMode === 'grid' ? (
-        <CategoryGrid
-          categories={categories}
-          loading={loading}
-          onEdit={openEditModal}
-          onDelete={handleDelete}
-        />
-      ) : (
-        <CategoryTable 
-          categories={categories}
-          loading={loading}
-          onEdit={openEditModal}
-          onDelete={handleDelete}
-        />
-      )}
+      <CategoryTree
+        categories={categories}
+        loading={loading}
+        onEdit={openEditModal}
+        onDelete={handleDelete}
+        onToggleActive={toggleCategoryActive}
+        onReorder={reorderCategories}
+      />
 
-      {pagination.total > 0 && (
-        <Pagination
-          currentPage={pagination.page}
-          totalPages={pagination.totalPages}
-          total={pagination.total}
-          limit={pagination.limit}
-          onPageChange={handlePageChange}
-          onLimitChange={handleLimitChange}
-        />
-      )}
-
-      <Modal 
-        isOpen={modalOpen} 
-        onClose={() => setModalOpen(false)} 
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
         title={editingCategory ? 'Modify Category' : 'New Category Definition'}
       >
-        <CategoryForm 
-          formData={formData as any}
-          setFormData={setFormData as any}
+        <CategoryForm
+          formData={formData}
+          setFormData={setFormData}
           onSubmit={handleSubmit}
           onCancel={() => setModalOpen(false)}
           submitting={submitting}
           editingCategory={editingCategory}
+          availableCategories={availableCategories}
         />
       </Modal>
 
@@ -125,7 +82,10 @@ export const CategoriesPage: React.FC = () => {
             </div>
             <div className="space-y-2">
               <p className="text-lg font-serif text-foreground">Delete this category?</p>
-              <p className="text-sm text-muted-foreground">This action cannot be undone. Products associated with this category may be affected.</p>
+              <p className="text-sm text-muted-foreground">
+                This action cannot be undone. Products associated with this category may be
+                affected.
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-border">

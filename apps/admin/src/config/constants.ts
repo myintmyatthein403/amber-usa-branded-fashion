@@ -16,6 +16,7 @@ export const API_ROUTES = {
   },
   CATEGORIES: {
     BASE: '/categories',
+    REORDER: '/categories/reorder',
     BY_ID: (id: number | string) => `/categories/${id}`,
   },
   BRANDS: {
@@ -113,7 +114,7 @@ export const API_ROUTES = {
     BULK_PAYMENT_STATUS: '/orders/bulk-payment-status',
     PENDING_COUNT: '/orders/pending-count',
     },
-    LOGISTICS: {
+  LOGISTICS: {
     WAREHOUSES: '/logistics/warehouses',
     INVENTORY: '/logistics/inventory',
     INVENTORY_BY_VARIANT: (variantId: string) => `/logistics/inventory/${variantId}`,
@@ -123,7 +124,7 @@ export const API_ROUTES = {
     CARGO_BY_ID: (id: string) => `/logistics/cargo/${id}`,
     CARGO_STATUS: (id: string) => `/logistics/cargo/${id}/status`,
     },
-MEDIA: {
+  MEDIA: {
     BASE: '/media',
     UPLOAD: '/media/upload',
     BY_ID: (id: string) => `/media/${id}`,

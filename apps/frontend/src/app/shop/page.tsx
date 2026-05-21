@@ -13,7 +13,13 @@ import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Percent, Loader
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
 import Price from "@/components/Price";
-import { Product } from "@amber/shared";
+import {
+  Product,
+  buildCategoryTree,
+  getCategoryScopeIds,
+  type CategoryNode,
+  type CategoryTreeNode,
+} from "@amber/shared";
 
 interface ShopProduct {
   id: string;
@@ -22,6 +28,7 @@ interface ShopProduct {
   originalPrice: number | null;
   isUsdPrice: boolean;
   category: string;
+  categoryId?: string | null;
   brand: string;
   collections: string[];
   image: string;
@@ -57,7 +64,8 @@ function ShopContent() {
   const [loading, setLoading] = useState(true);
 
   const [selectedBrand, setSelectedBrand] = useState("All");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [shopCategories, setShopCategories] = useState<CategoryNode[]>([]);
   const [selectedCollection, setSelectedCollection] = useState(initialCollectionFilter);
   const [selectedColor, setSelectedColor] = useState("All");
   const [selectedSize, setSelectedSize] = useState("All");
@@ -101,7 +109,7 @@ function ShopContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedBrand, selectedCategory, selectedCollection, selectedColor, selectedSize, priceRange, searchQuery, onlyInStock, onlySale, sortBy]);
+  }, [selectedBrand, selectedCategoryId, selectedCollection, selectedColor, selectedSize, priceRange, searchQuery, onlyInStock, onlySale, sortBy]);
 
   const MAX_PRICE_USD = 3000;
   const maxPrice = currency === 'USD' ? MAX_PRICE_USD : MAX_PRICE_USD * exchangeRate;
@@ -145,12 +153,13 @@ function ShopContent() {
     const result = await res.json();
     const data = result?.data || result || [];
 
-    const mappedProducts = data.map((p: { collections?: { name: string }[]; variants?: { stock: number; size?: string; color?: string }[]; category?: { name: string }; brand?: { name: string }; images?: string[] } & Record<string, unknown>) => ({
+    const mappedProducts = data.map((p: { collections?: { name: string }[]; variants?: { stock: number; size?: string; color?: string }[]; category?: { id: string; name: string }; brand?: { name: string }; images?: string[] } & Record<string, unknown>) => ({
       ...p,
       price: parseFloat(String(p.price)),
       originalPrice: p.compareAtPrice ? parseFloat(String(p.compareAtPrice)) : null,
       isUsdPrice: p.isUsdPrice !== false,
       category: p.category?.name || "Uncategorized",
+      categoryId: p.category?.id ?? null,
       brand: p.brand?.name || "Unbranded",
       collections: p.collections?.map((c) => c.name) || [],
       image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
@@ -169,14 +178,36 @@ function ShopContent() {
     fetchProducts();
   }, []);
 
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories?limit=100`);
+        const result = await res.json();
+        const data = (result?.data ?? result ?? []) as CategoryNode[];
+        setShopCategories(
+          data.filter((c) => c.isActive !== false),
+        );
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+        setShopCategories([]);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const categoryTree = useMemo<CategoryTreeNode[]>(
+    () => buildCategoryTree(shopCategories),
+    [shopCategories],
+  );
+
+  const categoryScopeIds = useMemo(() => {
+    if (!selectedCategoryId || shopCategories.length === 0) return null;
+    return new Set(getCategoryScopeIds(shopCategories, selectedCategoryId));
+  }, [selectedCategoryId, shopCategories]);
+
   const brands = useMemo(() => {
     const uniqueBrands = new Set(products.map(p => p.brand).filter(Boolean));
     return ["All", ...Array.from(uniqueBrands).sort()];
-  }, [products]);
-
-  const categories = useMemo(() => {
-    const uniqueCategories = new Set(products.map(p => p.category).filter(Boolean));
-    return ["All", ...Array.from(uniqueCategories).sort()];
   }, [products]);
 
   const collections = useMemo(() => {
@@ -192,7 +223,11 @@ function ShopContent() {
   const filteredProducts = useMemo(() => {
     const results = [...products].filter((product) => {
       const brandMatch = selectedBrand === "All" || product.brand === selectedBrand;
-      const categoryMatch = selectedCategory === "All" || product.category === selectedCategory;
+      const categoryMatch =
+        selectedCategoryId === null ||
+        (categoryScopeIds
+          ? Boolean(product.categoryId && categoryScopeIds.has(product.categoryId))
+          : product.category === selectedCategoryId);
       const collectionMatch = selectedCollection === "All" || product.collections?.includes(selectedCollection);
       const sizeMatch = selectedSize === "All" || product.sizes?.includes(selectedSize);
       
@@ -230,7 +265,7 @@ function ShopContent() {
     }
 
     return results;
-  }, [products, selectedBrand, selectedCategory, selectedCollection, selectedSize, debouncedPriceRange, onlyInStock, onlySale, sortBy, debouncedSearchQuery, currency, exchangeRate]);
+  }, [products, selectedBrand, selectedCategoryId, categoryScopeIds, selectedCollection, selectedSize, debouncedPriceRange, onlyInStock, onlySale, sortBy, debouncedSearchQuery, currency, exchangeRate]);
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
@@ -249,7 +284,7 @@ function ShopContent() {
 
   const handleClearFilters = useCallback(() => {
     setSelectedBrand("All");
-    setSelectedCategory("All");
+    setSelectedCategoryId(null);
     setSelectedCollection("All");
     setSelectedColor("All");
     setSelectedSize("All");
@@ -259,11 +294,11 @@ function ShopContent() {
     setSearchQuery("");
     setMinPriceInput("0");
     setMaxPriceInput(maxPrice.toLocaleString());
-  }, [maxPrice, setSelectedBrand, setSelectedCategory, setSelectedCollection, setSelectedSize, setPriceRange, setOnlyInStock, setOnlySale, setSearchQuery]);
+  }, [maxPrice, setSelectedBrand, setSelectedCategoryId, setSelectedCollection, setSelectedSize, setPriceRange, setOnlyInStock, setOnlySale, setSearchQuery]);
 
   const handleResetFilters = useCallback(() => {
     setSelectedBrand("All");
-    setSelectedCategory("All");
+    setSelectedCategoryId(null);
     setSelectedCollection("All");
     setSelectedColor("All");
     setSelectedSize("All");
@@ -271,7 +306,7 @@ function ShopContent() {
     setOnlyInStock(false);
     setOnlySale(false);
     setSearchQuery("");
-  }, [maxPrice, setSelectedBrand, setSelectedCategory, setSelectedCollection, setSelectedSize, setPriceRange, setOnlyInStock, setOnlySale, setSearchQuery]);
+  }, [maxPrice, setSelectedBrand, setSelectedCategoryId, setSelectedCollection, setSelectedSize, setPriceRange, setOnlyInStock, setOnlySale, setSearchQuery]);
 
   return (
     <>
@@ -307,11 +342,12 @@ function ShopContent() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-<ShopSidebar 
+<ShopSidebar
                 selectedBrand={selectedBrand}
                 setSelectedBrand={setSelectedBrand}
-                selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
+                selectedCategoryId={selectedCategoryId}
+                setSelectedCategoryId={setSelectedCategoryId}
+                categoryTree={categoryTree}
                 selectedCollection={selectedCollection}
                 setSelectedCollection={setSelectedCollection}
                 selectedSize={selectedSize}
@@ -360,11 +396,12 @@ function ShopContent() {
         <div className="flex flex-col md:flex-row gap-12">
           {/* Sidebar Filters - Desktop */}
           <aside className="hidden md:block w-72 shrink-0 border-r border-[#1A1A1A]/5 pr-12">
-            <ShopSidebar 
+            <ShopSidebar
               selectedBrand={selectedBrand}
               setSelectedBrand={setSelectedBrand}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
+              selectedCategoryId={selectedCategoryId}
+              setSelectedCategoryId={setSelectedCategoryId}
+              categoryTree={categoryTree}
               selectedCollection={selectedCollection}
               setSelectedCollection={setSelectedCollection}
               selectedSize={selectedSize}
@@ -559,7 +596,7 @@ function ShopContent() {
                     <button 
                       onClick={() => {
                         setSelectedBrand("All");
-                        setSelectedCategory("All");
+                        setSelectedCategoryId(null);
                         setSelectedCollection("All");
                         setSelectedColor("All");
                         handleResetFilters();

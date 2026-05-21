@@ -86,19 +86,34 @@ async function main() {
   const accessories = await prisma.category.upsert({
     where: { name: 'Accessories' },
     update: {},
-    create: { name: 'Accessories' },
+    create: { 
+      name: 'Accessories',
+      slug: 'accessories',
+      description: 'Fashion accessories',
+      displayOrder: 1
+    },
   });
 
   const apparel = await prisma.category.upsert({
     where: { name: 'Apparel' },
     update: {},
-    create: { name: 'Apparel' },
+    create: { 
+      name: 'Apparel',
+      slug: 'apparel',
+      description: 'Clothing and apparel',
+      displayOrder: 2
+    },
   });
 
   const footwear = await prisma.category.upsert({
     where: { name: 'Footwear' },
     update: {},
-    create: { name: 'Footwear' },
+    create: { 
+      name: 'Footwear',
+      slug: 'footwear',
+      description: 'Shoes and footwear',
+      displayOrder: 3
+    },
   });
 
   const coachBrand = await prisma.brand.upsert({
