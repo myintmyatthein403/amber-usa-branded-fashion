@@ -5,15 +5,19 @@ import { Brand } from '../schema';
 interface BrandGridProps {
   brands: Brand[] | null;
   loading: boolean;
+  emptyMessage: string;
   onEdit: (brand: Brand) => void;
-  onDelete: (id: string) => void;
+  onDelete: (brand: Brand) => void;
+  onViewProducts?: (brandId: string) => void;
 }
 
 export const BrandGrid: React.FC<BrandGridProps> = ({
   brands,
   loading,
+  emptyMessage,
   onEdit,
   onDelete,
+  onViewProducts,
 }) => {
   if (loading) {
     return (
@@ -35,7 +39,7 @@ export const BrandGrid: React.FC<BrandGridProps> = ({
           <div className="w-10 h-10 bg-muted" />
         </div>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest italic">
-          No brands defined.
+          {emptyMessage}
         </p>
       </div>
     );
@@ -49,6 +53,7 @@ export const BrandGrid: React.FC<BrandGridProps> = ({
           brand={brand}
           onEdit={onEdit}
           onDelete={onDelete}
+          onViewProducts={onViewProducts}
         />
       ))}
     </div>

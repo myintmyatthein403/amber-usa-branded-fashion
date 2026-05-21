@@ -1,23 +1,29 @@
 import React from 'react';
-import { Plus, AlertTriangle, LayoutGrid, List } from 'lucide-react';
+import { Plus, AlertTriangle } from 'lucide-react';
 import { Modal } from '../components/admin/Modal';
 import { Pagination } from '../components/admin/Pagination';
 import { MediaSelector } from '../components/admin/MediaSelector';
 import { useBrands } from '../features/brands/useBrands';
+import { BrandSearchBar } from '../features/brands/components/BrandSearchBar';
 import { BrandTable } from '../features/brands/BrandTable';
 import { BrandGrid } from '../features/brands/BrandGrid';
 import { BrandForm } from '../features/brands/BrandForm';
+import { getBrandProductCount } from '../features/brands/schema';
 
 export const BrandsPage: React.FC = () => {
   const {
     brands,
     loading,
     pagination,
+    search,
+    setSearch,
+    hasActiveSearch,
     modalOpen,
     setModalOpen,
     mediaSelectorOpen,
     setMediaSelectorOpen,
     submitting,
+    submitError,
     editingBrand,
     formData,
     setFormData,
@@ -29,64 +35,67 @@ export const BrandsPage: React.FC = () => {
     deleteConfirmOpen,
     confirmDelete,
     cancelDelete,
+    deletingBrand,
+    deleteError,
+    viewBrandProducts,
     viewMode,
     setViewMode,
     handlePageChange,
     handleLimitChange,
   } = useBrands();
 
+  const emptyMessage = hasActiveSearch
+    ? 'No brands match your search.'
+    : 'No brands defined.';
+
+  const deletingProductCount = deletingBrand
+    ? getBrandProductCount(deletingBrand)
+    : 0;
+  const canDelete = deletingProductCount === 0;
+
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="flex items-end justify-between">
         <div className="space-y-1.5">
-          <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">House of Brands</span>
-          <h2 className="text-4xl font-serif text-foreground tracking-tight">Brand Directory</h2>
+          <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">
+            House of Brands
+          </span>
+          <h2 className="text-4xl font-serif text-foreground tracking-tight">
+            Brand Directory
+          </h2>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center border border-border">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-3 transition-colors duration-300 ${
-                viewMode === 'list'
-                  ? 'bg-foreground text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <List size={18} />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-3 transition-colors duration-300 ${
-                viewMode === 'grid'
-                  ? 'bg-foreground text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <LayoutGrid size={18} />
-            </button>
-          </div>
-          <button 
-            onClick={openAddModal}
-            className="flex items-center gap-3 bg-foreground text-primary-foreground px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-xl shadow-black/5"
-          >
-            <Plus size={18} /> New Brand
-          </button>
-        </div>
+        <button
+          onClick={openAddModal}
+          className="flex items-center gap-3 bg-foreground text-primary-foreground px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-xl shadow-black/5"
+        >
+          <Plus size={18} /> New Brand
+        </button>
       </div>
+
+      <BrandSearchBar
+        search={search}
+        onSearchChange={setSearch}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
 
       {viewMode === 'grid' ? (
         <BrandGrid
           brands={brands}
           loading={loading}
+          emptyMessage={emptyMessage}
           onEdit={openEditModal}
           onDelete={handleDelete}
+          onViewProducts={viewBrandProducts}
         />
       ) : (
-        <BrandTable 
+        <BrandTable
           brands={brands}
           loading={loading}
+          emptyMessage={emptyMessage}
           onEdit={openEditModal}
           onDelete={handleDelete}
+          onViewProducts={viewBrandProducts}
         />
       )}
 
@@ -101,12 +110,17 @@ export const BrandsPage: React.FC = () => {
         />
       )}
 
-      <Modal 
-        isOpen={modalOpen} 
-        onClose={() => setModalOpen(false)} 
-        title={editingBrand ? 'Modify Brand Identity' : 'Initialize Brand Profile'}
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={
+          editingBrand ? 'Modify Brand Identity' : 'Initialize Brand Profile'
+        }
       >
-        <BrandForm 
+        {submitError && (
+          <p className="mb-4 text-sm text-destructive">{submitError}</p>
+        )}
+        <BrandForm
           formData={formData as any}
           setFormData={setFormData as any}
           onSubmit={handleSubmit}
@@ -129,8 +143,24 @@ export const BrandsPage: React.FC = () => {
               <AlertTriangle className="w-6 h-6 text-destructive" />
             </div>
             <div className="space-y-2">
-              <p className="text-lg font-serif text-foreground">Delete this brand?</p>
-              <p className="text-sm text-muted-foreground">This action cannot be undone. Products associated with this brand may be affected.</p>
+              <p className="text-lg font-serif text-foreground">
+                Delete {deletingBrand?.name ?? 'this brand'}?
+              </p>
+              {deletingProductCount > 0 ? (
+                <p className="text-sm text-destructive">
+                  This brand has {deletingProductCount}{' '}
+                  {deletingProductCount === 1 ? 'product' : 'products'} assigned.
+                  Reassign or remove those products before deleting this brand.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  This action cannot be undone. No products are linked to this
+                  brand.
+                </p>
+              )}
+              {deleteError && (
+                <p className="text-sm text-destructive">{deleteError}</p>
+              )}
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
@@ -142,7 +172,8 @@ export const BrandsPage: React.FC = () => {
             </button>
             <button
               onClick={confirmDelete}
-              className="px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all duration-300"
+              disabled={!canDelete}
+              className="px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Delete
             </button>
@@ -150,9 +181,9 @@ export const BrandsPage: React.FC = () => {
         </div>
       </Modal>
 
-      <MediaSelector 
-        isOpen={mediaSelectorOpen} 
-        onClose={() => setMediaSelectorOpen(false)} 
+      <MediaSelector
+        isOpen={mediaSelectorOpen}
+        onClose={() => setMediaSelectorOpen(false)}
         onSelect={handleMediaSelect}
         selectedUrls={formData.logo ? [formData.logo] : []}
       />

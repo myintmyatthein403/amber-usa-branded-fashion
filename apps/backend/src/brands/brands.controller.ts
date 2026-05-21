@@ -21,6 +21,7 @@ import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
 interface PaginationQuery {
   page?: number;
   limit?: number;
+  search?: string;
 }
 
 @Controller('brands')
@@ -42,7 +43,11 @@ export class BrandsController {
     const limit = query.limit
       ? Math.max(1, Math.min(100, parseInt(String(query.limit), 10)))
       : 10;
-    return this.brandsService.getAllBrands(page, limit);
+    const search =
+      typeof query.search === 'string' && query.search.trim()
+        ? query.search.trim()
+        : undefined;
+    return this.brandsService.getAllBrands(page, limit, search);
   }
 
   @Get(':id')

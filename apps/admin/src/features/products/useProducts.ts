@@ -38,8 +38,23 @@ export const useProducts = () => {
     setPage(1);
   }, [filters]);
 
+  // Apply brand filter when navigating from Brands page
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('admin-product-filters');
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { brandId?: string };
+      localStorage.removeItem('admin-product-filters');
+      if (parsed.brandId) {
+        setFilters((prev) => ({ ...prev, brandId: parsed.brandId! }));
+      }
+    } catch {
+      localStorage.removeItem('admin-product-filters');
+    }
+  }, []);
+
   const { data: categories } = useFetch<Category>(`${API_ROUTES.CATEGORIES.BASE}?limit=100`);
-  const { data: brands } = useFetch<Brand>(API_ROUTES.BRANDS.BASE);
+  const { data: brands } = useFetch<Brand>(`${API_ROUTES.BRANDS.BASE}?limit=100`);
   const { data: collections } = useFetch<Collection>(API_ROUTES.COLLECTIONS.BASE);
   const { data: warehouses } = useFetch<Warehouse>(API_ROUTES.LOGISTICS.WAREHOUSES);
   const { data: sales } = useFetch<Sale>(API_ROUTES.SALES.BASE);

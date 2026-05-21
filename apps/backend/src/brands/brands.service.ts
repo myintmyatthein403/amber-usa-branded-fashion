@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { BrandsRepository } from './brands.repository';
 import { Brand } from '@prisma/client';
 import { sanitizeData } from '../common/utils/data-sanitizer';
@@ -26,11 +30,12 @@ export class BrandsService {
   async getAllBrands(
     page: number = 1,
     limit: number = 10,
+    search?: string,
   ): Promise<PaginatedBrandsResult> {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
-      this.brandsRepository.findMany(skip, limit),
-      this.brandsRepository.count(),
+      this.brandsRepository.findMany(skip, limit, search),
+      this.brandsRepository.count(search),
     ]);
 
     return {
@@ -56,7 +61,14 @@ export class BrandsService {
   }
 
   async deleteBrand(id: string): Promise<Brand> {
-    await this.getBrandById(id);
+    const brand = await this.getBrandById(id);
+    const productCount =
+      (brand as Brand & { _count?: { products: number } })._count?.products ?? 0;
+    if (productCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete brand: ${productCount} product(s) are still assigned. Reassign them first.`,
+      );
+    }
     return this.brandsRepository.delete(id);
   }
 }
