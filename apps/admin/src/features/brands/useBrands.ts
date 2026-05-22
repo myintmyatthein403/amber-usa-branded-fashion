@@ -3,6 +3,7 @@ import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
 import { useAdminUIStore } from '../../store/useAdminUIStore';
 import { Brand } from './schema';
+import { toast } from '../../store/useToastStore';
 
 interface PaginationMeta {
   total: number;
@@ -115,12 +116,14 @@ export const useBrands = () => {
       setEditingBrand(null);
       setFormData({ name: '', logo: '', note: '' });
       fetchBrands();
+      toast.success(editingBrand ? 'Brand identity refined' : 'Brand profile initialized');
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : 'Failed to save brand. The name may already be in use.';
       setSubmitError(message);
+      toast.error(message);
       console.error('Failed to save brand:', error);
     } finally {
       setSubmitting(false);
@@ -143,12 +146,14 @@ export const useBrands = () => {
       setDeleteConfirmOpen(false);
       setDeletingBrand(null);
       fetchBrands();
+      toast.success('Brand permanently removed');
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : 'Failed to delete brand.';
       setDeleteError(message);
+      toast.error(message);
       console.error('Failed to delete brand:', error);
     }
   };

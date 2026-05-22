@@ -33,6 +33,8 @@ interface OrderDetailsProps {
   updatingStatus: boolean;
   onUpdateTracking?: (id: string, trackingData: { carrier: string; trackingNumber: string }) => void;
   onRefund?: (id: string, amount?: number) => void;
+  onConfirmManualPayment?: (id: string) => void;
+  onRejectManualPayment?: (id: string, reason: string) => void;
 }
 
 export const OrderDetails: React.FC<OrderDetailsProps> = ({
@@ -40,7 +42,9 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
   onUpdateStatus,
   updatingStatus,
   onUpdateTracking,
-  onRefund
+  onRefund,
+  onConfirmManualPayment,
+  onRejectManualPayment,
 }) => {
   const status = STATUS_CONFIG[order.status];
   const payment = PAYMENT_STATUS_CONFIG[order.paymentStatus];
@@ -113,7 +117,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
                   <Mail size={14} /> {order.user?.email || 'No email provided'}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground py-1">
-                  <Phone size={14} /> No phone provided
+                  <Phone size={14} /> {(order as Order & { customerPhone?: string }).customerPhone || order.user?.phone || 'No phone provided'}
                 </div>
               </div>
             </div>
@@ -208,6 +212,79 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
                   {payment.label}
                 </div>
               </div>
+
+              {(order as Order & { paymentReference?: string }).paymentReference && (
+                <div className="flex justify-between items-center">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Transaction ref:</span>
+                  <span className="text-[9px] font-mono font-bold text-foreground">
+                    {(order as Order & { paymentReference?: string }).paymentReference}
+                  </span>
+                </div>
+              )}
+
+              {(order as Order & { paymentProofUrl?: string }).paymentProofUrl && (
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">
+                    Payment proof
+                  </span>
+                  <a
+                    href={(order as Order & { paymentProofUrl?: string }).paymentProofUrl!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block border border-border overflow-hidden"
+                  >
+                    <img
+                      src={(order as Order & { paymentProofUrl?: string }).paymentProofUrl!}
+                      alt="Payment proof"
+                      className="w-full max-h-48 object-contain bg-white"
+                    />
+                  </a>
+                  {(order as Order & { paymentProofUploadedAt?: string }).paymentProofUploadedAt && (
+                    <p className="text-[8px] text-muted-foreground">
+                      Uploaded{' '}
+                      {format(
+                        new Date((order as Order & { paymentProofUploadedAt?: string }).paymentProofUploadedAt!),
+                        'MMM dd, yyyy HH:mm',
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {(order as Order & { manualPaymentRejectionReason?: string }).manualPaymentRejectionReason && (
+                <p className="text-[9px] text-rose-600 border border-rose-500/20 bg-rose-500/5 p-2">
+                  Rejected: {(order as Order & { manualPaymentRejectionReason?: string }).manualPaymentRejectionReason}
+                </p>
+              )}
+
+              {order.paymentStatus === 'PENDING' &&
+                (order as Order & { paymentProofUrl?: string }).paymentProofUrl &&
+                onConfirmManualPayment &&
+                onRejectManualPayment && (
+                <div className="flex flex-col gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => order.id && onConfirmManualPayment(order.id)}
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 text-[9px] font-bold uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all"
+                  >
+                    <CheckCircle2 size={12} />
+                    Confirm payment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const reason = prompt('Rejection reason (shown to customer):');
+                      if (reason?.trim() && order.id) {
+                        onRejectManualPayment(order.id, reason.trim());
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 border border-rose-500/30 text-rose-600 py-3 text-[9px] font-bold uppercase tracking-[0.2em] hover:bg-rose-500/10 transition-all"
+                  >
+                    <XCircle size={12} />
+                    Reject payment
+                  </button>
+                </div>
+              )}
               
               {/* Refund Action */}
               {order.paymentStatus === 'PAID' && onRefund && (

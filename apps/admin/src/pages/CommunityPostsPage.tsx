@@ -1,15 +1,17 @@
 import React from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Users, Loader2 } from 'lucide-react';
 import { Modal } from '../components/admin/Modal';
 import { useCommunity } from '../features/community/useCommunity';
-import { CommunityPostCard } from '../features/community/CommunityPostCard';
+import { CommunityPostGrid } from '../features/community/components/CommunityPostGrid';
+import { CommunityPostTable } from '../features/community/components/CommunityPostTable';
+import { CommunityPostSearchBar } from '../features/community/components/CommunityPostSearchBar';
 import { CommunityPostForm } from '../features/community/CommunityPostForm';
+import { Pagination } from '../components/admin/Pagination';
 
 export const CommunityPostsPage: React.FC = () => {
   const {
     posts,
     loading,
-    refresh,
     modalOpen,
     setModalOpen,
     submitting,
@@ -20,41 +22,84 @@ export const CommunityPostsPage: React.FC = () => {
     handleFileChange,
     handleSubmit,
     handleToggleActive,
+    handleDelete,
     openAddModal,
     openEditModal,
-    handleDelete
+    viewMode,
+    setViewMode,
+    page,
+    totalPages,
+    total,
+    limit,
+    search,
+    handleSearch,
+    handlePageChange,
+    handleLimitChange
   } = useCommunity();
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700">
-      <div className="flex items-end justify-between">
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">Social Influence</span>
-          <h2 className="text-4xl font-serif text-foreground tracking-tight">Community Posts</h2>
+    <div className="space-y-10 pb-20 animate-in fade-in duration-700">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 text-primary">
+            <Users size={20} />
+            <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Social Influence</span>
+          </div>
+          <h1 className="text-4xl font-serif text-foreground tracking-tight">Community Posts</h1>
+          <p className="text-sm text-muted-foreground italic max-w-lg">Curate and manage user-generated content and brand influence posts from our global community.</p>
         </div>
-        <button 
+        
+        <button
           onClick={openAddModal}
-          className="flex items-center gap-3 bg-foreground text-primary-foreground px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-xl shadow-black/5"
+          className="flex items-center gap-3 bg-foreground text-primary-foreground px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-xl shadow-black/5"
         >
-          <Plus size={18} /> Add Post
+          <Plus size={16} />
+          New Post
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      <CommunityPostSearchBar
+        value={search}
+        onChange={handleSearch}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
+
+      <div className="min-h-[400px]">
         {loading ? (
-          <div className="col-span-full py-20 text-center text-xs font-medium text-muted-foreground uppercase tracking-widest italic animate-pulse">Syncing with community...</div>
-        ) : !posts || posts.length === 0 ? (
-          <div className="col-span-full py-20 text-center text-xs font-medium text-muted-foreground uppercase tracking-widest italic">No community posts found.</div>
+          <div className="py-40 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="animate-spin text-primary" size={40} />
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Syncing with community...</p>
+          </div>
         ) : (
-          posts.map((post) => (
-            <CommunityPostCard 
-              key={post.id}
-              post={post}
-              onEdit={openEditModal}
-              onDelete={handleDelete}
-              onToggleActive={handleToggleActive}
-            />
-          ))
+          <>
+            {viewMode === 'table' ? (
+              <CommunityPostTable
+                posts={posts}
+                onEdit={openEditModal}
+                onDelete={handleDelete}
+                onToggleActive={handleToggleActive}
+              />
+            ) : (
+              <CommunityPostGrid
+                posts={posts}
+                onEdit={openEditModal}
+                onDelete={handleDelete}
+                onToggleActive={handleToggleActive}
+              />
+            )}
+
+            <div className="mt-10 border-t border-border pt-8">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={handlePageChange}
+                onLimitChange={handleLimitChange}
+              />
+            </div>
+          </>
         )}
       </div>
 
@@ -62,6 +107,7 @@ export const CommunityPostsPage: React.FC = () => {
         isOpen={modalOpen} 
         onClose={() => setModalOpen(false)} 
         title={editingPost ? 'Refine Post' : 'Initialize Community Post'}
+        size="lg"
       >
         <CommunityPostForm 
           formData={formData as any}

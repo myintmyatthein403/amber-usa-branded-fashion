@@ -3,7 +3,8 @@ import { Modal } from '../../../components/admin/Modal';
 import { ProductForm } from './ProductForm';
 import { VariantManager } from './VariantManager';
 import { useAttributes } from '../../attributes/useAttributes';
-import { Variant, Brand, Sale, Warehouse } from '../schema';
+import { Variant, Brand, Sale, Warehouse, Collection } from '../schema';
+import type { Collection as SharedCollection } from '@amber/shared';
 import type { Category } from '@amber/shared';
 
 interface ProductModalProps {
@@ -16,15 +17,18 @@ interface ProductModalProps {
   setProductForm: any;
   categories: Category[] | null;
   brands: Brand[] | null;
+  collections: Collection[] | null;
   sales: Sale[] | null;
+  editingProduct?: { id?: string } | null;
   onNext: () => void;
   submitting: boolean;
   onOpenMedia: any;
+  onOpenVariantMedia?: () => void;
   newVariant: any;
   setNewVariant: any;
   editingVariant: any;
   setEditingVariant: any;
-  addVariant: () => void;
+  addVariant: (overrides?: Record<string, unknown>) => void;
   addBulkVariants?: (variants: any[]) => void;
   currentVariants: any;
   handleEditVariant: any;
@@ -33,6 +37,7 @@ interface ProductModalProps {
   attributes?: any[];
   onSave: () => void;
   productSlug?: string;
+  submitError?: string | null;
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({
@@ -45,10 +50,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   setProductForm,
   categories,
   brands,
+  collections,
   sales,
+  editingProduct,
   onNext,
   submitting,
   onOpenMedia,
+  onOpenVariantMedia,
   newVariant,
   setNewVariant,
   editingVariant,
@@ -62,6 +70,7 @@ addVariant,
     attributes: propAttributes,
     onSave,
     productSlug,
+    submitError = null,
   }) => {
   const { attributes: fetchedAttributes } = useAttributes();
   const attributes = propAttributes || fetchedAttributes;
@@ -98,9 +107,9 @@ addVariant,
           sales={sales}
           onNext={onNext}
           submitting={submitting}
-          editingProduct={null}
+          editingProduct={editingProduct ?? null}
           onOpenMedia={onOpenMedia}
-          collections={null}
+          collections={(collections || []) as SharedCollection[]}
         />
       ) : (
         <VariantManager 
@@ -117,9 +126,10 @@ addVariant,
           setStep={onStepChange as any}
           onSave={onSave}
           submitting={submitting}
-          onOpenMedia={onOpenMedia as any}
+          onOpenMedia={(onOpenVariantMedia ?? onOpenMedia) as any}
           productSlug={productSlug}
           attributes={attributes}
+          submitError={submitError}
         />
       )}
     </Modal>

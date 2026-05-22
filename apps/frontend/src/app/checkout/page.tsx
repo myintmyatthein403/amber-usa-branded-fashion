@@ -13,9 +13,7 @@ import {
   ShippingForm,
   DeliveryMethodSelector,
   PaymentMethodSelector,
-  ManualPaymentSection,
   OrderSummary,
-  StripePaymentSection,
   ReviewStep,
   type CheckoutFormData,
   type DeliveryMethod,
@@ -23,6 +21,13 @@ import {
   type StockValidationResult,
   type CartItem,
 } from "@/components/checkout";
+import {
+  buildOrderPayload,
+  computeCheckoutTotal,
+  filterDeliveryMethodsByMarket,
+  uploadPaymentProof,
+} from "@/lib/checkout";
+import { getApiUrl } from "@/lib/api";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -38,6 +43,8 @@ export default function CheckoutPage() {
   const [stockError, setStockError] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [isValidatingStock, setIsValidatingStock] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [manualPaymentSubmitted, setManualPaymentSubmitted] = useState(false);
 
   const cartItems: CartItem[] = useStore((state) => state.cartItems);
   const subtotal = useStore((state) => state.getSubtotal());
@@ -45,6 +52,8 @@ export default function CheckoutPage() {
   const formatPrice = useStore((state) => state.formatPrice);
   const currency = useStore((state) => state.currency);
   const exchangeRate = useStore((state) => state.exchangeRate);
+  const market = useStore((state) => state.market);
+  const setMarket = useStore((state) => state.setMarket);
 
   const { user: authUser, token: authToken, isAuthenticated } = useAuthStore();
 
@@ -56,10 +65,14 @@ export default function CheckoutPage() {
     firstName: authUser?.name?.split(" ")[0] || "",
     lastName: authUser?.name?.split(" ").slice(1).join(" ") || "",
     address: authUser?.address || "",
-    city: "Yangon",
+    street: authUser?.address || "",
+    city: market === "US" ? "" : "Yangon",
     phone: authUser?.phone || "",
     shippingMethod: "",
     paymentMethod: "",
+    market,
+    shippingCountry: market === "US" ? "US" : "MM",
+    region: market === "MM" ? "Yangon" : undefined,
   });
 
   useEffect(() => {
@@ -81,19 +94,20 @@ export default function CheckoutPage() {
       }));
     }
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/delivery-methods/active`)
+    fetch(`${getApiUrl()}/delivery-methods/active`)
       .then((res) => res.json())
       .then((result) => {
-        const data = result?.data || result || [];
-        setDeliveryMethods(data);
-        if (data.length > 0) {
-          setBaseFormData((prev) => ({ ...prev, shippingMethod: data[0].id }));
+        const data = (result?.data || result || []) as DeliveryMethod[];
+        const filtered = filterDeliveryMethodsByMarket(data, market);
+        setDeliveryMethods(filtered);
+        if (filtered.length > 0) {
+          setBaseFormData((prev) => ({ ...prev, shippingMethod: filtered[0].id }));
         }
       })
       .catch(console.error)
       .finally(() => setLoadingMethods(false));
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/payment-methods/active`)
+    fetch(`${getApiUrl()}/payment-methods/active?market=${market}`)
       .then((res) => res.json())
       .then((result) => {
         const data = result?.data || result || [];
@@ -104,7 +118,12 @@ export default function CheckoutPage() {
       })
       .catch(console.error)
       .finally(() => setLoadingPayments(false));
-  }, [authUser, isAuthenticated, router]);
+  }, [authUser, isAuthenticated, router, market]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    setMarket(formData.market);
+  }, [formData.market, mounted, setMarket]);
 
   const selectedMethod = deliveryMethods.find((m) => m.id === formData.shippingMethod);
   const selectedPayment = paymentMethods.find((p) => p.name === formData.paymentMethod);
@@ -137,15 +156,15 @@ export default function CheckoutPage() {
   const isShippingUsd = selectedMethod?.isUsdPrice ?? false;
   const getShippingDisplay = (cost: number) => formatPrice(cost, isShippingUsd);
 
-  const calculateTotal = () => {
-    let finalShippingInCurrentCurrency = shippingCost;
-    if (isShippingUsd && currency === "MMK") {
-      finalShippingInCurrentCurrency = shippingCost * exchangeRate;
-    } else if (!isShippingUsd && currency === "USD") {
-      finalShippingInCurrentCurrency = shippingCost / exchangeRate;
-    }
-    return subtotal + finalShippingInCurrentCurrency;
-  };
+  const calculateTotal = () =>
+    computeCheckoutTotal(
+      cartItems,
+      shippingCost,
+      currency,
+      exchangeRate,
+      isShippingUsd,
+      shippingCost,
+    );
 
   const handleCreatePaymentIntent = async () => {
     setIsCreatingIntent(true);
@@ -158,24 +177,15 @@ export default function CheckoutPage() {
         headers["Authorization"] = `Bearer ${authToken}`;
       }
 
-      const orderResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+      const payload = buildOrderPayload(formData, cartItems, currency, shippingCost);
+
+      const orderResponse = await fetch(`${getApiUrl()}/orders`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          shippingAddress: `${formData.firstName} ${formData.lastName}, ${formData.address}, ${formData.city}, ${formData.phone || ''}`.trim(),
+          ...payload,
           paymentMethod: "stripe",
           totalAmount: total,
-          currency: currency,
-          items: cartItems.map((item) => ({
-            productId: item.id,
-            variantId: item.variantId,
-            name: item.name,
-            price: item.price,
-            isUsd: item.isUsdPrice !== false,
-            quantity: item.quantity,
-            image: item.image,
-            size: item.size,
-          })),
         }),
       });
 
@@ -233,7 +243,7 @@ export default function CheckoutPage() {
     setStockError(null);
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/products/validate-stock`,
+        `${getApiUrl()}/products/validate-stock`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -282,6 +292,7 @@ export default function CheckoutPage() {
       const isStockOk = await checkStock();
       if (!isStockOk) return;
     }
+    setStockError(null);
     setStep(step + 1);
   };
 
@@ -291,49 +302,64 @@ export default function CheckoutPage() {
   };
   const handleComplete = async () => {
     if (selectedPayment?.type !== "STRIPE") {
+      if (!formData.receiptFile || !authToken) {
+        setOrderError("Please upload a payment screenshot and ensure you are signed in.");
+        return;
+      }
+      setIsSubmittingOrder(true);
+      setOrderError(null);
       try {
         const total = calculateTotal();
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
         };
-        if (authToken) {
-          headers["Authorization"] = `Bearer ${authToken}`;
-        }
 
-        const orderResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+        const payload = buildOrderPayload(formData, cartItems, currency, shippingCost);
+
+        const orderResponse = await fetch(`${getApiUrl()}/orders`, {
           method: "POST",
           headers,
           body: JSON.stringify({
-            ...formData,
-            shippingAddress: `${formData.firstName} ${formData.lastName}, ${formData.address}, ${formData.city}, ${formData.phone || ''}`.trim(),
+            ...payload,
             totalAmount: total,
-            currency: currency,
-            items: cartItems.map((item) => ({
-              productId: item.id,
-              variantId: item.variantId,
-              name: item.name,
-              price: item.price,
-              isUsd: item.isUsdPrice !== false,
-              quantity: item.quantity,
-              image: item.image,
-              size: item.size,
-            })),
           }),
         });
 
-        if (orderResponse.ok) {
-          const orderResult = await orderResponse.json();
-          const order = orderResult?.data || orderResult;
-          setCurrentOrderId(order.id);
-          clearCart();
-          setIsCompleted(true);
-        } else {
+        if (!orderResponse.ok) {
           const errorData = await orderResponse.json();
-          setOrderError(errorData.message || "Failed to create order. Please try again.");
+          const fieldDetails = Array.isArray(errorData.errors)
+            ? errorData.errors
+                .map((e: { path?: string; message?: string }) =>
+                  e.path ? `${e.path}: ${e.message}` : e.message,
+                )
+                .filter(Boolean)
+                .join("; ")
+            : "";
+          setOrderError(
+            fieldDetails
+              ? `${errorData.message || "Validation failed"} (${fieldDetails})`
+              : errorData.message || "Failed to create order. Please try again.",
+          );
+          return;
         }
+
+        const orderResult = await orderResponse.json();
+        const order = orderResult?.data || orderResult;
+        setCurrentOrderId(order.id);
+
+        await uploadPaymentProof(order.id, formData.receiptFile, authToken);
+
+        clearCart();
+        setManualPaymentSubmitted(true);
+        setIsCompleted(true);
       } catch (error) {
         console.error("Failed to create order:", error);
-        setOrderError("Failed to create order. Please try again.");
+        setOrderError(
+          error instanceof Error ? error.message : "Failed to submit order. Please try again.",
+        );
+      } finally {
+        setIsSubmittingOrder(false);
       }
     } else {
       clearCart();
@@ -363,9 +389,9 @@ export default function CheckoutPage() {
           <div className="space-y-4">
             <h1 className="text-4xl font-serif text-[#1A1A1A]">Order Confirmed</h1>
             <p className="text-[#1A1A1A]/60 text-sm leading-relaxed">
-              Thank you for shopping with Amber. Your order has been received and is
-              being processed. A confirmation email has been sent to{" "}
-              {formData.email}.
+              {manualPaymentSubmitted
+                ? "Thank you for shopping with Amber. Your payment screenshot has been submitted. Our team will verify your KBZPay/Wave payment and confirm your order shortly."
+                : "Thank you for shopping with Amber. Your order has been received and is being processed."}
             </p>
           </div>
           <div className="flex flex-col space-y-4">
@@ -459,7 +485,13 @@ export default function CheckoutPage() {
                   formData={formData}
                   onUpdate={updateFormData}
                   onContinue={handleNext}
+                  submitting={isValidatingStock}
                 />
+                {stockError && (
+                  <p className="text-xs text-red-500 font-medium italic">
+                    {stockError}
+                  </p>
+                )}
               </motion.div>
             )}
 
@@ -481,6 +513,11 @@ export default function CheckoutPage() {
                   onBack={handleBack}
                   onContinue={handleNext}
                 />
+                {stockError && (
+                  <p className="text-xs text-red-500 font-medium italic">
+                    {stockError}
+                  </p>
+                )}
               </motion.div>
             )}
 
@@ -537,6 +574,7 @@ export default function CheckoutPage() {
                   formatPrice={formatPrice}
                   onBack={handleBack}
                   onConfirm={handleComplete}
+                  onUpdateForm={updateFormData}
                   selectedPayment={selectedPayment}
                   selectedMethod={selectedMethod}
                   isStripe={selectedPayment?.type === "STRIPE"}
@@ -544,6 +582,8 @@ export default function CheckoutPage() {
                   isCreatingStripeIntent={isCreatingIntent}
                   stripeError={paymentError}
                   orderId={currentOrderId || undefined}
+                  isSubmittingManual={isSubmittingOrder}
+                  orderError={orderError}
                 />
               </motion.div>
             )}

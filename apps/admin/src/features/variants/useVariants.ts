@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
 import { Variant, VariantProduct } from './schema';
+import { toast } from '../../store/useToastStore';
 
 export const useVariants = () => {
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -80,8 +81,10 @@ export const useVariants = () => {
       setEditingVariant(null);
       resetForm();
       fetchVariants();
+      toast.success(editingVariant ? 'Variant parameters refined' : 'Variant initialized in cluster');
     } catch (error) {
       console.error('Failed to save variant:', error);
+      toast.error('Failed to save variant');
     } finally {
       setSubmitting(false);
     }
@@ -99,8 +102,10 @@ export const useVariants = () => {
         method: 'DELETE'
       });
       fetchVariants();
+      toast.success('Variant removed from registry');
     } catch (error) {
       console.error('Failed to delete variant:', error);
+      toast.error('Failed to delete variant');
     }
   };
 

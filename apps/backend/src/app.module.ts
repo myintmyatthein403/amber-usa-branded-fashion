@@ -38,7 +38,8 @@ import { LogisticsModule } from './logistics/logistics.module';
 import { StatsModule } from './stats/stats.module';
 import { CurrenciesModule } from './currencies/currencies.module';
 import { AttributesModule } from './attributes/attributes.module';
-
+import { WishlistModule } from './wishlist/wishlist.module';
+import { AddressesModule } from './addresses/addresses.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -79,6 +80,8 @@ import { AttributesModule } from './attributes/attributes.module';
     StatsModule,
     CurrenciesModule,
     AttributesModule,
+    WishlistModule,
+    AddressesModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
+import { toast } from '../../store/useToastStore';
 import type { Category } from '@amber/shared';
 import { Product, Variant, Brand, Sale, Meta, Collection, Warehouse, ProductWithRelations } from './schema';
 
@@ -92,8 +93,10 @@ export const useProducts = () => {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [mediaSelectorOpen, setMediaSelectorOpen] = useState(false);
+  const [mediaTarget, setMediaTarget] = useState<'product' | 'variant'>('product');
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -113,7 +116,11 @@ export const useProducts = () => {
     price: '',
     compareAtPrice: '',
     currency: 'USD' as 'USD' | 'MMK' | 'THB',
+    currencyCode: 'USD' as 'USD' | 'MMK' | 'THB',
     isUsdPrice: true,
+    nameMy: '',
+    descriptionMy: '',
+    publishAt: '',
     isFeatured: false,
     onSale: false,
     isNewArrival: false,
@@ -141,6 +148,9 @@ export const useProducts = () => {
     weight: '0',
     images: [] as string[],
     warehouseId: '',
+    buyPrice: '',
+    currencyCode: 'USD' as 'USD' | 'MMK' | 'THB',
+    warehouseAllocations: [] as { warehouseId: string; quantity: number }[],
     isPreOrder: false,
     attributeSelections: {} as Record<string, string>,
   });
@@ -149,22 +159,39 @@ export const useProducts = () => {
 
   const warehouseList = useMemo(() => warehouses || [], [warehouses]);
 
-  const addVariant = () => {
-    const variantData: Variant = {
-      sku: newVariant.sku,
-      barcode: newVariant.barcode,
-      size: newVariant.size,
-      color: newVariant.color,
-      stock: Number(newVariant.stock),
-      lowStockThreshold: Number(newVariant.lowStockThreshold),
-      price: newVariant.price ? Number(newVariant.price) : undefined,
-      compareAtPrice: newVariant.compareAtPrice ? Number(newVariant.compareAtPrice) : undefined,
-      weight: newVariant.weight ? Number(newVariant.weight) : undefined,
-      images: newVariant.images,
-      isPreOrder: newVariant.isPreOrder,
+  const addVariant = (overrides?: Partial<typeof newVariant>) => {
+    const source = { ...newVariant, ...overrides };
+    const allocations =
+      source.warehouseAllocations && source.warehouseAllocations.length > 0
+        ? source.warehouseAllocations
+        : source.warehouseId
+          ? [{ warehouseId: source.warehouseId, quantity: Number(source.stock) || 0 }]
+          : undefined;
+
+    const variantData: Variant & {
+      warehouseId?: string;
+      warehouseAllocations?: { warehouseId: string; quantity: number }[];
+      buyPrice?: number;
+      currencyCode?: string;
+    } = {
+      sku: source.sku,
+      barcode: source.barcode,
+      size: source.size,
+      color: source.color,
+      stock: Number(source.stock),
+      lowStockThreshold: Number(source.lowStockThreshold),
+      price: source.price ? Number(source.price) : undefined,
+      compareAtPrice: source.compareAtPrice ? Number(source.compareAtPrice) : undefined,
+      weight: source.weight ? Number(source.weight) : undefined,
+      images: source.images,
+      isPreOrder: source.isPreOrder,
+      warehouseId: allocations?.length === 1 ? allocations[0].warehouseId : source.warehouseId || undefined,
+      warehouseAllocations: allocations,
+      buyPrice: source.buyPrice ? Number(source.buyPrice) : undefined,
+      currencyCode: source.currencyCode || productForm.currencyCode || productForm.currency,
       attributeSelections:
-        Object.keys(newVariant.attributeSelections || {}).length > 0
-          ? newVariant.attributeSelections
+        Object.keys(source.attributeSelections || {}).length > 0
+          ? source.attributeSelections
           : undefined,
     };
 
@@ -214,7 +241,10 @@ export const useProducts = () => {
       compareAtPrice: variant.compareAtPrice?.toString() || '',
       weight: variant.weight?.toString() || '0',
       images: variant.images || [],
-      warehouseId: '',
+      warehouseId: (variant as { warehouseId?: string }).warehouseId || '',
+      buyPrice: (variant as { buyPrice?: number }).buyPrice?.toString() || '',
+      currencyCode: ((variant as { currencyCode?: string }).currencyCode || productForm.currencyCode || 'USD') as 'USD' | 'MMK' | 'THB',
+      warehouseAllocations: (variant as { warehouseAllocations?: { warehouseId: string; quantity: number }[] }).warehouseAllocations || [],
       isPreOrder: variant.isPreOrder || false,
       attributeSelections: (variant.attributeSelections as Record<string, string>) || {},
     });
@@ -224,6 +254,76 @@ export const useProducts = () => {
     setCurrentVariants(prev => prev.filter(v => v.id !== id));
   };
 
+  const buildProductPayload = useCallback(() => {
+    const currencyCode = (productForm.currencyCode || productForm.currency || 'USD') as 'USD' | 'MMK' | 'THB';
+    return {
+      name: productForm.name,
+      slug: productForm.slug,
+      status: productForm.status || 'DRAFT',
+      brandId: productForm.brandId || undefined,
+      shortDescription: productForm.shortDescription || undefined,
+      description: productForm.description || undefined,
+      note: productForm.note || undefined,
+      tags: productForm.tags || [],
+      metaTitle: productForm.metaTitle || undefined,
+      metaDescription: productForm.metaDescription || undefined,
+      price: productForm.price?.toString(),
+      compareAtPrice: productForm.compareAtPrice?.toString() || undefined,
+      currencyCode,
+      isUsdPrice: currencyCode === 'USD',
+      nameMy: productForm.nameMy || undefined,
+      descriptionMy: productForm.descriptionMy || undefined,
+      publishAt: productForm.publishAt || undefined,
+      isFeatured: productForm.isFeatured ?? false,
+      onSale: productForm.onSale ?? false,
+      isNewArrival: productForm.isNewArrival ?? false,
+      isBestSeller: productForm.isBestSeller ?? false,
+      isPreOrder: productForm.isPreOrder ?? false,
+      preOrderShippingDate: productForm.preOrderShippingDate || undefined,
+      preOrderNote: productForm.preOrderNote || undefined,
+      images: productForm.images || [],
+      categoryId: productForm.categoryId || undefined,
+      saleId: productForm.saleId || undefined,
+      collectionIds: productForm.collectionIds || [],
+      variants: currentVariants.map((v) => {
+        const variant = v as Variant & {
+          warehouseId?: string;
+          warehouseAllocations?: { warehouseId: string; quantity: number }[];
+          buyPrice?: number;
+          currencyCode?: string;
+        };
+        return {
+          ...(variant.id &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(variant.id)
+            ? { id: variant.id }
+            : {}),
+          sku: variant.sku,
+          barcode: variant.barcode || undefined,
+          size: variant.size,
+          color: variant.color,
+          stock: Number(variant.stock),
+          lowStockThreshold: Number(variant.lowStockThreshold || 5),
+          price: variant.price ? Number(variant.price) : undefined,
+          compareAtPrice: variant.compareAtPrice ? Number(variant.compareAtPrice) : undefined,
+          weight: variant.weight ? Number(variant.weight) : undefined,
+          images: variant.images || [],
+          isPreOrder: variant.isPreOrder ?? false,
+          preOrderShippingDate: variant.preOrderShippingDate || undefined,
+          warehouseId: variant.warehouseId || undefined,
+          warehouseAllocations: variant.warehouseAllocations?.length
+            ? variant.warehouseAllocations
+            : undefined,
+          buyPrice: variant.buyPrice != null ? Number(variant.buyPrice) : undefined,
+          currencyCode: variant.currencyCode || currencyCode,
+          attributeSelections:
+            variant.attributeSelections && Object.keys(variant.attributeSelections).length > 0
+              ? variant.attributeSelections
+              : undefined,
+        };
+      }),
+    };
+  }, [productForm, currentVariants]);
+
   // Auto-generate slug
   useEffect(() => {
     if (!editingProduct && productForm.name) {
@@ -232,64 +332,54 @@ export const useProducts = () => {
     }
   }, [productForm.name, editingProduct]);
 
+  // Debounced draft autosave when editing
+  useEffect(() => {
+    if (!editingProduct?.id || !modalOpen) return;
+
+    const productId = editingProduct.id;
+    const timer = setTimeout(async () => {
+      try {
+        await apiService(`${API_ROUTES.PRODUCTS.BY_ID(productId)}?draft=true`, {
+          method: 'PATCH',
+          body: buildProductPayload(),
+        });
+      } catch (error) {
+        console.error('Draft autosave failed:', error);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [productForm, currentVariants, editingProduct?.id, modalOpen, buildProductPayload]);
+
+  const openProductMedia = () => {
+    setMediaTarget('product');
+    setMediaSelectorOpen(true);
+  };
+
+  const openVariantMedia = () => {
+    setMediaTarget('variant');
+    setMediaSelectorOpen(true);
+  };
+
+  const handleMediaSelect = (url: string) => {
+    if (mediaTarget === 'variant') {
+      setNewVariant((prev) => ({ ...prev, images: [...prev.images, url] }));
+    } else {
+      setProductForm((prev) => ({ ...prev, images: [...prev.images, url] }));
+    }
+    setMediaSelectorOpen(false);
+  };
+
   const handleProductSubmit = async () => {
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const endpoint = editingProduct?.id 
         ? API_ROUTES.PRODUCTS.BY_ID(editingProduct.id) 
         : API_ROUTES.PRODUCTS.BASE;
       
       const method = editingProduct ? 'PATCH' : 'POST';
-      
-      // Explicitly pick only fields allowed by the schema to prevent 400 Bad Request
-      const payload = {
-        name: productForm.name,
-        slug: productForm.slug,
-        status: productForm.status || 'DRAFT',
-        brandId: productForm.brandId || undefined,
-        shortDescription: productForm.shortDescription || undefined,
-        description: productForm.description || undefined,
-        note: productForm.note || undefined,
-        tags: productForm.tags || [],
-        metaTitle: productForm.metaTitle || undefined,
-        metaDescription: productForm.metaDescription || undefined,
-        price: productForm.price?.toString(),
-        compareAtPrice: productForm.compareAtPrice?.toString() || undefined,
-        isUsdPrice: productForm.isUsdPrice ?? true,
-        isFeatured: productForm.isFeatured ?? false,
-        onSale: productForm.onSale ?? false,
-        isNewArrival: productForm.isNewArrival ?? false,
-        isBestSeller: productForm.isBestSeller ?? false,
-        isPreOrder: productForm.isPreOrder ?? false,
-        preOrderShippingDate: productForm.preOrderShippingDate || undefined,
-        preOrderNote: productForm.preOrderNote || undefined,
-        images: productForm.images || [],
-        categoryId: productForm.categoryId || undefined,
-        saleId: productForm.saleId || undefined,
-        collectionIds: productForm.collectionIds || [],
-        variants: currentVariants.map(v => ({
-          ...(v.id &&
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.id)
-            ? { id: v.id }
-            : {}),
-          sku: v.sku,
-          barcode: v.barcode || undefined,
-          size: v.size,
-          color: v.color,
-          stock: Number(v.stock),
-          lowStockThreshold: Number(v.lowStockThreshold || 5),
-          price: v.price ? Number(v.price) : undefined,
-          compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
-          weight: v.weight ? Number(v.weight) : undefined,
-          images: v.images || [],
-          isPreOrder: v.isPreOrder ?? false,
-          preOrderShippingDate: v.preOrderShippingDate || undefined,
-          attributeSelections:
-            v.attributeSelections && Object.keys(v.attributeSelections).length > 0
-              ? v.attributeSelections
-              : undefined,
-        }))
-      };
+      const payload = buildProductPayload();
 
       await apiService(endpoint, {
         method,
@@ -299,9 +389,13 @@ export const useProducts = () => {
       setModalOpen(false);
       fetchProducts();
       resetForm();
+      toast.success(editingProduct ? 'Product specifications refined' : 'Product successfully archived');
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to save product';
       console.error('Failed to save product:', error);
-      throw error;
+      setSubmitError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -331,8 +425,16 @@ export const useProducts = () => {
       metaDescription: product.metaDescription || '',
       price: String(product.price),
       compareAtPrice: String(product.compareAtPrice || ''),
-      currency: (product as any).currency || 'USD',
-      isUsdPrice: product.isUsdPrice,
+      currency: (((product as { currencyCode?: string }).currencyCode || 'USD') as 'USD' | 'MMK' | 'THB'),
+      currencyCode: (((product as { currencyCode?: string }).currencyCode || 'USD') as 'USD' | 'MMK' | 'THB'),
+      isUsdPrice: (product as { currencyCode?: string }).currencyCode
+        ? (product as { currencyCode?: string }).currencyCode === 'USD'
+        : product.isUsdPrice,
+      nameMy: (product as { nameMy?: string }).nameMy || '',
+      descriptionMy: (product as { descriptionMy?: string }).descriptionMy || '',
+      publishAt: (product as { publishAt?: string }).publishAt
+        ? new Date((product as { publishAt?: string }).publishAt!).toISOString().slice(0, 16)
+        : '',
       isFeatured: product.isFeatured,
       onSale: product.onSale,
       isNewArrival: product.isNewArrival,
@@ -359,7 +461,10 @@ export const useProducts = () => {
     const success = await deleteItem(deletingId);
     setDeleteConfirmOpen(false);
     setDeletingId(null);
-    if (success) fetchProducts();
+    if (success) {
+      fetchProducts();
+      toast.success('Product permanently removed');
+    }
   };
 
   const cancelDelete = () => {
@@ -401,9 +506,15 @@ export const useProducts = () => {
     setModalOpen,
     mediaSelectorOpen,
     setMediaSelectorOpen,
+    mediaTarget,
+    openProductMedia,
+    openVariantMedia,
+    handleMediaSelect,
     step,
     setStep,
     submitting,
+    submitError,
+    setSubmitError,
     editingProduct,
     productForm,
     setProductForm,

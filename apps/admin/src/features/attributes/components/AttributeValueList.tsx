@@ -56,40 +56,43 @@ function SortableValueChip({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 px-3 py-1.5 bg-secondary border border-border"
+      className="flex items-center gap-3 px-4 py-2 bg-secondary border border-border group/chip hover:border-primary/30 transition-all duration-300"
     >
       <button
         type="button"
-        className="cursor-grab text-muted-foreground hover:text-foreground"
+        className="cursor-grab text-muted-foreground/40 hover:text-primary transition-colors"
         {...attributes}
         {...listeners}
       >
-        <GripVertical size={12} />
+        <GripVertical size={14} />
       </button>
       {attrType === 'color' && val.hexColor && (
         <div
-          className="w-4 h-4 border border-border shrink-0"
+          className="w-4 h-4 border border-border shrink-0 shadow-sm"
           style={{ backgroundColor: val.hexColor }}
         />
       )}
       {attrType === 'image' && val.value.startsWith('http') && (
-        <img src={val.value} alt="" className="w-6 h-6 object-cover border border-border" />
+        <img src={val.value} alt="" className="w-8 h-8 object-cover border border-border group-hover/chip:scale-110 transition-transform" />
       )}
-      <span className="text-xs font-medium text-foreground">{val.value}</span>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="text-muted-foreground hover:text-foreground"
-      >
-        <Edit2 size={12} />
-      </button>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <X size={12} />
-      </button>
+      <span className="text-[11px] font-bold uppercase tracking-wider text-foreground">{val.value}</span>
+      
+      <div className="flex items-center gap-1 ml-2 opacity-0 group-hover/chip:opacity-100 transition-opacity">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Edit2 size={12} />
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+        >
+          <X size={12} />
+        </button>
+      </div>
     </div>
   );
 }

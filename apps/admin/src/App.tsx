@@ -29,11 +29,13 @@ import { CargoPage } from './pages/CargoPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { MediaPage } from './pages/MediaPage';
 import { CurrencyPage } from './pages/CurrencyPage';
+import { AttributePage } from './pages/AttributePage';
 import { useAdminUIStore } from './store/useAdminUIStore';
 import type { User } from '@amber/shared';
 import { apiService } from './services/api.service';
 import { extractRoleString } from './lib/utils';
 import { API_ROUTES } from './config/constants';
+import { ToastContainer } from './components/admin/ToastContainer';
 import { 
   Users, 
   ShoppingBag, 
@@ -71,6 +73,7 @@ const TAB_PERMISSIONS: Record<string, string[]> = {
   'delivery-methods': ['settings:manage'],
   media: ['content:manage'],
   currencies: ['settings:manage'],
+  attributes: ['products:write'],
 };
 
 const AccessDenied = () => (
@@ -155,7 +158,7 @@ function App() {
   // Sync activeTab with URL on mount
   useEffect(() => {
     const path = window.location.pathname.replace(/^\//, '');
-    const validTabs: any[] = ['dashboard', 'products', 'categories', 'brands', 'variants', 'hero', 'mission', 'gift-card-section', 'sale-section', 'footer-section', 'testimonials', 'community-posts', 'collections', 'coupons', 'gift-cards', 'sales', 'reviews', 'orders', 'customers', 'staff', 'roles', 'settings', 'delivery-methods', 'ads', 'warehouses', 'cargo', 'inventory', 'media', 'currencies'];
+    const validTabs: any[] = ['dashboard', 'products', 'categories', 'brands', 'variants', 'hero', 'mission', 'gift-card-section', 'sale-section', 'footer-section', 'testimonials', 'community-posts', 'collections', 'coupons', 'gift-cards', 'sales', 'reviews', 'orders', 'customers', 'staff', 'roles', 'settings', 'delivery-methods', 'ads', 'warehouses', 'cargo', 'inventory', 'media', 'currencies', 'attributes'];
     
     if (validTabs.includes(path)) {
       setActiveTab(path as any);
@@ -221,6 +224,7 @@ function App() {
       case 'roles': return <RolesPage />;
       case 'media': return <MediaPage />;
       case 'currencies': return <CurrencyPage />;
+      case 'attributes': return <AttributePage />;
       default: return <Dashboard />;
     }
   };
@@ -228,6 +232,7 @@ function App() {
   return (
     <AdminLayout>
       {renderActivePage()}
+      <ToastContainer />
     </AdminLayout>
   );
 }

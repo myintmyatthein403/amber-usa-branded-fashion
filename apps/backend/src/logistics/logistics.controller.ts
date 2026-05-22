@@ -92,13 +92,43 @@ export class LogisticsController {
   @Patch('inventory/update')
   @ApiOperation({ summary: 'Update stock level' })
   updateStock(
-    @Body() data: { variantId: string; warehouseId: string; quantity: number },
+    @Body()
+    data: {
+      variantId: string;
+      warehouseId: string;
+      quantity: number;
+      reason?: 'ADJUSTMENT' | 'RECEIVING';
+      note?: string;
+    },
   ) {
     return this.logisticsService.updateStock(
       data.variantId,
       data.warehouseId,
       data.quantity,
+      data.reason,
+      data.note,
     );
+  }
+
+  @Post('inventory/transfer')
+  @ApiOperation({ summary: 'Transfer stock between warehouses' })
+  transferStock(
+    @Body()
+    data: {
+      variantId: string;
+      fromWarehouseId: string;
+      toWarehouseId: string;
+      quantity: number;
+      note?: string;
+    },
+  ) {
+    return this.logisticsService.transferStock(data);
+  }
+
+  @Get('inventory/low-stock')
+  @ApiOperation({ summary: 'Get variants at or below low stock threshold' })
+  getLowStock() {
+    return this.logisticsService.getLowStockVariants();
   }
 
   @Get('cargo')

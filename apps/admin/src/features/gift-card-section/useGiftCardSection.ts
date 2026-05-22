@@ -13,15 +13,15 @@ export const useGiftCardSection = () => {
   const [editingSection, setEditingSection] = useState<GiftCardSection | null>(null);
   
   const initialFormData = {
-    badge: 'The Ultimate Gift',
-    title: 'Share the Luxury',
-    titleSecondary: 'of Authentic Fashion',
-    description: 'Not sure what to pick? Our digital gift cards are the perfect way to give them exactly what they want.',
-    ctaText: 'Purchase a Gift Card',
-    ctaLink: '/gift-cards',
-    cardTitle: 'Amber',
-    cardAmount: '100,000 MMK',
-    cardType: 'Gift Card',
+    badge: '',
+    title: '',
+    titleSecondary: '',
+    description: '',
+    ctaText: '',
+    ctaLink: '',
+    cardTitle: '',
+    cardAmount: '',
+    cardType: '',
     amounts: ['50,000 MMK', '100,000 MMK', '200,000 MMK', '500,000 MMK'],
     isActive: false
   };

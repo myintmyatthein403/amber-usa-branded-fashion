@@ -24,13 +24,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? exception.getResponse()
         : 'Internal server error';
 
-    const errorResponse = {
+    const payload = message as Record<string, unknown>;
+    const errorResponse: Record<string, unknown> = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message: (message as any).message || message || 'Internal server error',
-      error: (message as any).error || (exception as any).name || 'Error',
+      message: (payload?.message as string) || message || 'Internal server error',
+      error: (payload?.error as string) || (exception as any).name || 'Error',
     };
+    if (Array.isArray(payload?.errors)) {
+      errorResponse.errors = payload.errors;
+    }
 
     // Log the error for internal tracking (could use a Logger service here)
     if (status === HttpStatus.INTERNAL_SERVER_ERROR) {

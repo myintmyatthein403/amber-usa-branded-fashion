@@ -14,6 +14,7 @@ interface ReviewStepProps {
   formatPrice: (amount: number, isUsd?: boolean) => string;
   onBack: () => void;
   onConfirm: () => void;
+  onUpdateForm: (updates: Partial<CheckoutFormData>) => void;
   selectedPayment?: PaymentMethod;
   selectedMethod?: DeliveryMethod;
   isStripe?: boolean;
@@ -21,6 +22,8 @@ interface ReviewStepProps {
   isCreatingStripeIntent?: boolean;
   stripeError?: string | null;
   orderId?: string;
+  isSubmittingManual?: boolean;
+  orderError?: string | null;
 }
 
 export default function ReviewStep({
@@ -32,6 +35,7 @@ export default function ReviewStep({
   formatPrice,
   onBack,
   onConfirm,
+  onUpdateForm,
   selectedPayment,
   selectedMethod,
   isStripe,
@@ -39,6 +43,8 @@ export default function ReviewStep({
   isCreatingStripeIntent,
   stripeError,
   orderId,
+  isSubmittingManual,
+  orderError,
 }: ReviewStepProps) {
   // Calculate delivery fee
   const deliveryFee = selectedMethod?.price 
@@ -120,11 +126,21 @@ export default function ReviewStep({
               </button>
             </div>
           ) : selectedPayment ? (
-            <ManualPaymentSection
-              payment={selectedPayment}
-              onBack={onBack}
-              onComplete={onConfirm}
-            />
+            <>
+              {orderError && (
+                <p className="mb-4 text-sm text-red-600 border border-red-200 bg-red-50 p-3">
+                  {orderError}
+                </p>
+              )}
+              <ManualPaymentSection
+                payment={selectedPayment}
+                formData={formData}
+                onUpdate={onUpdateForm}
+                onBack={onBack}
+                onComplete={onConfirm}
+                submitting={isSubmittingManual}
+              />
+            </>
           ) : (
              <p className="text-sm text-red-500">Please go back and select a payment method.</p>
           )}

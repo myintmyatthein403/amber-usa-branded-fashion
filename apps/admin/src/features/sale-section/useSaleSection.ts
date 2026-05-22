@@ -9,31 +9,33 @@ export const useSaleSection = () => {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState('');
   const [totalPages, setTotalPages] = useState(1);
   
   const { deleteItem } = useDelete(API_ROUTES.SALE_SECTION.BASE);
 
-  const fetchSections = async (currentPage = page, currentSearch = search) => {
+  const fetchSections = async (currentPage = page, currentSearch = search, currentLimit = limit) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        limit: limit.toString(),
+        limit: currentLimit.toString(),
       });
       
       if (currentSearch) {
         params.append('search', currentSearch);
       }
       
-      const response = await apiService(`${API_ROUTES.SALE_SECTION.BASE}?${params.toString()}`);
-      const data = (response as any)?.data?.data ?? [];
-      const pagination = (response as any)?.data?.pagination;
+      const response = await apiService<unknown, { data: SaleSectionWithUrl[]; meta?: any; pagination?: any }>(`${API_ROUTES.SALE_SECTION.BASE}?${params.toString()}`);
       
-      setSections(data);
-      setTotal(pagination?.total || 0);
-      setTotalPages(pagination?.totalPages || 1);
+      // Handle array in response.data
+      const items = Array.isArray(response.data) ? response.data : [];
+      const meta = response.meta || response.pagination;
+
+      setSections(items);
+      setTotal(meta?.total || items.length);
+      setTotalPages(meta?.totalPages || 1);
     } catch (error) {
       console.error('Failed to fetch sections:', error);
     } finally {
@@ -46,7 +48,7 @@ export const useSaleSection = () => {
   }, []);
 
   const refresh = () => {
-    fetchSections(page, search);
+    fetchSections(page, search, limit);
   };
   
   const [modalOpen, setModalOpen] = useState(false);
@@ -55,13 +57,13 @@ export const useSaleSection = () => {
   const [editingSection, setEditingSection] = useState<SaleSectionWithUrl | null>(null);
   
   const initialFormData = {
-    badge: 'Limited Time Event',
-    title: 'Thingyan',
-    titleItalic: 'Mega Sale',
-    description: 'Celebrate the Myanmar New Year with authentic USA brands at unprecedented prices.',
+    badge: '',
+    title: '',
+    titleItalic: '',
+    description: '',
     endDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    ctaText: 'Shop the Sale',
-    ctaLink: '/shop',
+    ctaText: '',
+    ctaLink: '',
     imageMain: '',
     imageUrl: '',
     isActive: false
@@ -173,12 +175,18 @@ export const useSaleSection = () => {
   const handleSearch = (value: string) => {
     setSearch(value);
     setPage(1);
-    fetchSections(1, value);
+    fetchSections(1, value, limit);
   };
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    fetchSections(newPage, search);
+    fetchSections(newPage, search, limit);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+    fetchSections(1, search, newLimit);
   };
 
   const handleDelete = async (id: string) => {
@@ -220,9 +228,11 @@ export const useSaleSection = () => {
     page,
     totalPages,
     total,
+    limit,
     search,
     handleSearch,
     handlePageChange,
+    handleLimitChange,
     // Delete modal
     deleteModalOpen,
     setDeleteModalOpen,

@@ -89,6 +89,37 @@ export const useOrders = () => {
     }
   };
 
+  const handleConfirmManualPayment = async (id: string) => {
+    try {
+      await apiService(API_ROUTES.ORDERS.CONFIRM_MANUAL_PAYMENT(id), { method: 'POST' });
+      await fetchOrders();
+      if (selectedOrder?.id === id) {
+        const updated = await apiService<unknown, Order>(API_ROUTES.ORDERS.BY_ID(id));
+        setSelectedOrder((updated as { data?: Order })?.data ?? updated);
+      }
+    } catch (error) {
+      console.error('Failed to confirm payment:', error);
+      alert('Failed to confirm payment. Ensure proof is uploaded.');
+    }
+  };
+
+  const handleRejectManualPayment = async (id: string, reason: string) => {
+    try {
+      await apiService(API_ROUTES.ORDERS.REJECT_MANUAL_PAYMENT(id), {
+        method: 'POST',
+        body: { reason },
+      });
+      await fetchOrders();
+      if (selectedOrder?.id === id) {
+        const updated = await apiService<unknown, Order>(API_ROUTES.ORDERS.BY_ID(id));
+        setSelectedOrder((updated as { data?: Order })?.data ?? updated);
+      }
+    } catch (error) {
+      console.error('Failed to reject payment:', error);
+      alert('Failed to reject payment.');
+    }
+  };
+
   const handleRefund = async (id: string, amount?: number) => {
     try {
       await apiService(`${API_ROUTES.ORDERS.BASE}/${id}/refund`, {
@@ -175,6 +206,8 @@ export const useOrders = () => {
     handleUpdateStatus,
     handleUpdateTracking,
     handleRefund,
+    handleConfirmManualPayment,
+    handleRejectManualPayment,
     handleDelete,
     refresh: fetchOrders
   };

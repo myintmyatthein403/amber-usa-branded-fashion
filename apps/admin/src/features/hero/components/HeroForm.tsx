@@ -59,6 +59,7 @@ export const HeroForm: React.FC<HeroFormProps> = ({
               value={formData.titlePartOne}
               onChange={(e) => setFormData({ ...formData, titlePartOne: e.target.value })}
               className="w-full h-12 border-b border-input bg-transparent text-2xl font-serif focus:border-primary focus:outline-none transition-colors"
+              placeholder="e.g. Global"
             />
           </div>
           <div className="space-y-2">
@@ -68,6 +69,7 @@ export const HeroForm: React.FC<HeroFormProps> = ({
               value={formData.titlePartTwo}
               onChange={(e) => setFormData({ ...formData, titlePartTwo: e.target.value })}
               className="w-full h-12 border-b border-input bg-transparent text-2xl font-serif focus:border-primary focus:outline-none transition-colors"
+              placeholder="e.g. Authenticity"
             />
           </div>
         </div>
@@ -78,25 +80,26 @@ export const HeroForm: React.FC<HeroFormProps> = ({
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             className="w-full h-24 border border-input bg-transparent p-4 text-sm focus:border-primary focus:outline-none transition-colors resize-none"
+            placeholder="Describe the hero section narrative..."
           />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
            <div className="space-y-2">
              <label className="text-[10px] font-bold uppercase text-muted-foreground">Primary CTA</label>
-             <input type="text" value={formData.ctaPrimaryText} onChange={(e) => setFormData({...formData, ctaPrimaryText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" />
+             <input type="text" value={formData.ctaPrimaryText} onChange={(e) => setFormData({...formData, ctaPrimaryText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" placeholder="e.g. Shop Brands" />
            </div>
            <div className="space-y-2">
              <label className="text-[10px] font-bold uppercase text-muted-foreground">Primary Link</label>
-             <input type="text" value={formData.ctaPrimaryLink} onChange={(e) => setFormData({...formData, ctaPrimaryLink: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs font-mono focus:border-primary outline-none" />
+             <input type="text" value={formData.ctaPrimaryLink} onChange={(e) => setFormData({...formData, ctaPrimaryLink: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs font-mono focus:border-primary outline-none" placeholder="/shop" />
            </div>
            <div className="space-y-2">
              <label className="text-[10px] font-bold uppercase text-muted-foreground">Secondary CTA</label>
-             <input type="text" value={formData.ctaSecondaryText} onChange={(e) => setFormData({...formData, ctaSecondaryText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" />
+             <input type="text" value={formData.ctaSecondaryText} onChange={(e) => setFormData({...formData, ctaSecondaryText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" placeholder="e.g. Check Legitimacy" />
            </div>
            <div className="space-y-2">
              <label className="text-[10px] font-bold uppercase text-muted-foreground">Secondary Link</label>
-             <input type="text" value={formData.ctaSecondaryLink} onChange={(e) => setFormData({...formData, ctaSecondaryLink: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs font-mono focus:border-primary outline-none" />
+             <input type="text" value={formData.ctaSecondaryLink} onChange={(e) => setFormData({...formData, ctaSecondaryLink: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs font-mono focus:border-primary outline-none" placeholder="/track" />
            </div>
         </div>
 

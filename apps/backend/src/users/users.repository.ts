@@ -54,6 +54,12 @@ export class UsersRepository {
     });
   }
 
+  async findByUsername(username: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { username },
+    });
+  }
+
   async findByProviderId(providerId: string): Promise<User | null> {
     return this.prisma.user.findUnique({
       where: { providerId },

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
+import { toast } from '../../store/useToastStore';
 import type {
   AttributeWithValues,
   AttributeFormData,
@@ -70,11 +71,13 @@ export const useAttributes = () => {
           body: data,
         });
         await fetchAttributes();
+        toast.success('Attribute initialized');
         return result as AttributeWithValues;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Failed to create attribute';
         setSubmitError(message);
+        toast.error(message);
         throw error;
       } finally {
         setSubmitting(false);
@@ -93,11 +96,13 @@ export const useAttributes = () => {
           body: data,
         });
         await fetchAttributes();
+        toast.success('Attribute parameters refined');
         return result as AttributeWithValues;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Failed to update attribute';
         setSubmitError(message);
+        toast.error(message);
         throw error;
       } finally {
         setSubmitting(false);
@@ -121,10 +126,12 @@ export const useAttributes = () => {
           body: data,
         });
         await fetchAttributes();
+        toast.success('Value added to palette');
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Failed to add value';
         setSubmitError(message);
+        toast.error(message);
         throw error;
       }
     },
@@ -140,10 +147,12 @@ export const useAttributes = () => {
           body: data,
         });
         await fetchAttributes();
+        toast.success('Value refined');
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Failed to update value';
         setSubmitError(message);
+        toast.error(message);
         throw error;
       }
     },
@@ -166,22 +175,32 @@ export const useAttributes = () => {
 
   const reorderAttributes = useCallback(
     async (items: AttributeReorderPayload) => {
-      await apiService(API_ROUTES.ATTRIBUTES.REORDER, {
-        method: 'PATCH',
-        body: items,
-      });
-      await fetchAttributes();
+      try {
+        await apiService(API_ROUTES.ATTRIBUTES.REORDER, {
+          method: 'PATCH',
+          body: items,
+        });
+        await fetchAttributes();
+        toast.success('Attribute priorities synchronized');
+      } catch (error) {
+        toast.error('Failed to update priorities');
+      }
     },
     [fetchAttributes],
   );
 
   const reorderValues = useCallback(
     async (attributeId: string, items: AttributeValueReorderPayload) => {
-      await apiService(API_ROUTES.ATTRIBUTES.VALUES_REORDER(attributeId), {
-        method: 'PATCH',
-        body: items,
-      });
-      await fetchAttributes();
+      try {
+        await apiService(API_ROUTES.ATTRIBUTES.VALUES_REORDER(attributeId), {
+          method: 'PATCH',
+          body: items,
+        });
+        await fetchAttributes();
+        toast.success('Value sequence updated');
+      } catch (error) {
+        toast.error('Failed to update sequence');
+      }
     },
     [fetchAttributes],
   );
@@ -203,10 +222,12 @@ export const useAttributes = () => {
       setDeleteConfirmOpen(false);
       setDeletingTarget(null);
       await fetchAttributes();
+      toast.success(deletingTarget.kind === 'attribute' ? 'Attribute permanently removed' : 'Value removed from palette');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to delete';
       setDeleteError(message);
+      toast.error(message);
     }
   }, [deletingTarget, fetchAttributes]);
 

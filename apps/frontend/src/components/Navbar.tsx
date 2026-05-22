@@ -15,14 +15,20 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [ads, setAds] = useState<any[]>([]);
-  
+  const [avatarError, setAvatarError] = useState(false);
+
   const isSearchOpen = useStore((state) => state.isSearchOpen);
   const setSearchOpen = useStore((state) => state.setSearchOpen);
   const isCartAnimating = useStore((state) => state.isCartAnimating);
   const setCartOpen = useStore((state) => state.setCartOpen);
   const cartCount = useStore((state) => state.getCartCount());
   const setExchangeRate = useStore((state) => state.setExchangeRate);
-  const { user, isAuthenticated } = useAuthStore();
+  const setRateMeta = useStore((state) => state.setRateMeta);
+  const { user, isAuthenticated, hasHydrated } = useAuthStore();
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.avatar]);
 
   useEffect(() => {
     setMounted(true);
@@ -39,6 +45,13 @@ export default function Navbar() {
         if (data.usdToMmkRate) {
           setExchangeRate(parseFloat(data.usdToMmkRate));
         }
+        setRateMeta({
+          rateUpdatedAt: data.rateUpdatedAt ?? null,
+          lockedRateNote:
+            data.rateSource === "exchange_rates"
+              ? "Exchange rate is locked at checkout"
+              : undefined,
+        });
       } catch (error) {
         console.error("Failed to fetch exchange rate:", error);
       }
@@ -126,17 +139,14 @@ export default function Navbar() {
               <Search className="w-5 h-5" />
             </button>
             <Link href="/profile" className="hover:text-[#D4AF37] transition-colors flex items-center gap-2">
-              {isAuthenticated ? (
+              {hasHydrated && isAuthenticated ? (
                 <div className="w-6 h-6 rounded-full overflow-hidden border border-[#D4AF37] flex items-center justify-center bg-[#D4AF37]/10">
-                  {user?.avatar ? (
-                    <img 
-                      src={user.avatar} 
-                      alt={user.name || ""} 
+                  {user?.avatar && !avatarError ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name || ""}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        (e.target as HTMLImageElement).parentElement!.innerHTML = `<span class="text-[10px] font-bold text-[#D4AF37]">${user?.name?.charAt(0) || 'A'}</span>`;
-                      }}
+                      onError={() => setAvatarError(true)}
                     />
                   ) : (
                     <span className="text-[10px] font-bold text-[#D4AF37]">{user?.name?.charAt(0) || "A"}</span>
@@ -145,7 +155,7 @@ export default function Navbar() {
               ) : (
                 <User className="w-5 h-5" />
               )}
-              {isAuthenticated && user?.name && (
+              {hasHydrated && isAuthenticated && user?.name && (
                 <span className="text-[10px] font-bold uppercase tracking-widest hidden lg:block">
                   {user.name.split(' ')[0]}
                 </span>

@@ -6,9 +6,28 @@ import { sanitizeData } from '../common/utils/data-sanitizer';
 import {
   CreateProductDto,
   UpdateProductDto,
-  ProductQueryDto,
   StockValidationItemDto,
 } from './dto/product.dto';
+
+export interface ProductListParams {
+  isFeatured?: boolean;
+  isNewArrival?: boolean;
+  isBestSeller?: boolean;
+  onSale?: boolean;
+  categoryId?: string;
+  brandId?: string;
+  currencyCode?: string;
+  warehouseLocation?: 'USA' | 'MYANMAR';
+  inStock?: boolean;
+  priceMin?: number;
+  priceMax?: number;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  attributeFilters?: Record<string, string>;
+  page?: number;
+  limit?: number;
+  search?: string;
+  publicOnly?: boolean;
+}
 
 @Injectable()
 export class ProductsService {
@@ -31,6 +50,80 @@ export class ProductsService {
     );
   }
 
+  private buildWhere(params: ProductListParams): Prisma.ProductWhereInput {
+    const where: Prisma.ProductWhereInput = {
+      isFeatured: params.isFeatured,
+      isNewArrival: params.isNewArrival,
+      isBestSeller: params.isBestSeller,
+      onSale: params.onSale,
+      categoryId: params.categoryId,
+      brandId: params.brandId,
+    };
+
+    if (params.publicOnly) {
+      where.status = 'PUBLISHED';
+    } else if (params.status) {
+      where.status = params.status;
+    }
+
+    if (params.currencyCode) {
+      where.currencyCode = params.currencyCode;
+    }
+
+    if (params.search) {
+      where.OR = [
+        { name: { contains: params.search, mode: 'insensitive' } },
+        { slug: { contains: params.search, mode: 'insensitive' } },
+        { shortDescription: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (params.priceMin !== undefined || params.priceMax !== undefined) {
+      where.price = {};
+      if (params.priceMin !== undefined) {
+        (where.price as Prisma.DecimalFilter).gte = params.priceMin;
+      }
+      if (params.priceMax !== undefined) {
+        (where.price as Prisma.DecimalFilter).lte = params.priceMax;
+      }
+    }
+
+    const variantFilters: Prisma.VariantWhereInput[] = [];
+
+    if (params.inStock) {
+      variantFilters.push({ stock: { gt: 0 } });
+    }
+
+    if (params.warehouseLocation) {
+      variantFilters.push({
+        inventory: {
+          some: {
+            quantity: { gt: 0 },
+            warehouse: { location: params.warehouseLocation },
+          },
+        },
+      });
+    }
+
+    if (params.attributeFilters) {
+      for (const [attrId, valueId] of Object.entries(params.attributeFilters)) {
+        if (!valueId || valueId === 'All') continue;
+        variantFilters.push({
+          attributeSelections: {
+            path: [attrId],
+            equals: valueId,
+          },
+        });
+      }
+    }
+
+    if (variantFilters.length > 0) {
+      where.variants = { some: { AND: variantFilters } };
+    }
+
+    return where;
+  }
+
   async createProduct(data: CreateProductDto): Promise<Product> {
     const sanitizedData = sanitizeData(data);
     if (sanitizedData.variants) {
@@ -41,60 +134,11 @@ export class ProductsService {
     return this.productsRepository.create(sanitizedData);
   }
 
-  async getAllProducts(
-    params: {
-      isFeatured?: boolean;
-      isNewArrival?: boolean;
-      isBestSeller?: boolean;
-      onSale?: boolean;
-      categoryId?: string;
-      brandId?: string;
-      page?: number;
-      limit?: number;
-      search?: string;
-    } = {},
-  ): Promise<
-    | {
-        data: Product[];
-        meta: {
-          total: number;
-          page: number;
-          limit: number;
-          totalPages: number;
-        };
-      }
-    | Product[]
-  > {
-    const {
-      isFeatured,
-      isNewArrival,
-      isBestSeller,
-      onSale,
-      categoryId,
-      brandId,
-      page,
-      limit,
-      search,
-    } = params;
+  async getAllProducts(params: ProductListParams = {}) {
+    const where = this.buildWhere(params);
+    const { page, limit, search } = params;
 
-    const where: Prisma.ProductWhereInput = {
-      isFeatured,
-      isNewArrival,
-      isBestSeller,
-      onSale,
-      categoryId,
-      brandId,
-    };
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { slug: { contains: search, mode: 'insensitive' } },
-        { shortDescription: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
-    if (!page && !limit && !search) {
+    if (!page && !limit && !search && !params.publicOnly) {
       return this.productsRepository.findAllSimple(where);
     }
 
@@ -119,15 +163,30 @@ export class ProductsService {
     };
   }
 
-  async getProductById(id: string): Promise<Product | null> {
+  async getProductById(id: string, publicOnly = false): Promise<Product | null> {
     const product = await this.productsRepository.findById(id);
     if (!product) throw new NotFoundException('Product not found');
+    if (publicOnly && product.status !== 'PUBLISHED') {
+      throw new NotFoundException('Product not found');
+    }
     return product;
   }
 
-  async updateProduct(id: string, data: UpdateProductDto): Promise<Product> {
+  async getProductBySlug(slug: string): Promise<Product | null> {
+    const product = await this.productsRepository.findBySlug(slug);
+    if (!product || product.status !== 'PUBLISHED') {
+      throw new NotFoundException('Product not found');
+    }
+    return product;
+  }
+
+  async updateProduct(
+    id: string,
+    data: UpdateProductDto,
+    draft = false,
+  ): Promise<Product> {
     const sanitizedData = sanitizeData(data);
-    if (sanitizedData.variants) {
+    if (!draft && sanitizedData.variants) {
       sanitizedData.variants = (await this.normalizeVariants(
         sanitizedData.variants as UpdateProductDto['variants'],
       )) as UpdateProductDto['variants'];
@@ -137,6 +196,10 @@ export class ProductsService {
 
   async deleteProduct(id: string): Promise<Product> {
     return this.productsRepository.delete(id);
+  }
+
+  async publishScheduled(): Promise<number> {
+    return this.productsRepository.publishScheduled();
   }
 
   async validateStock(items: StockValidationItemDto[]) {
@@ -162,10 +225,14 @@ export class ProductsService {
         if (isPreOrder) {
           results.push({ ...item, inStock: true, isPreOrder: true });
         } else {
+          const warehouseStock = variant.inventory?.reduce(
+            (sum, inv) => sum + inv.quantity,
+            0,
+          ) ?? variant.stock;
           results.push({
             ...item,
-            inStock: variant.stock >= item.quantity,
-            available: variant.stock,
+            inStock: warehouseStock >= item.quantity,
+            available: warehouseStock,
             isPreOrder: false,
           });
         }

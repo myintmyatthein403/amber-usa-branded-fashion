@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+export const WarehouseAllocationSchema = z.object({
+  warehouseId: z.string().uuid(),
+  quantity: z.number().min(0),
+});
+
 export const VariantBaseSchema = z.object({
   id: z.string().uuid().optional(),
   sku: z.string().min(1, 'SKU is required'),
@@ -8,13 +13,17 @@ export const VariantBaseSchema = z.object({
   color: z.string().min(1, 'Color is required'),
   stock: z.number().min(0, 'Stock cannot be negative').default(0),
   lowStockThreshold: z.number().min(0).default(5),
+  buyPrice: z.union([z.number(), z.string()]).optional().nullable(),
   price: z.union([z.number(), z.string()]).optional().nullable(),
   compareAtPrice: z.union([z.number(), z.string()]).optional().nullable(),
+  currencyCode: z.enum(['USD', 'MMK', 'THB']).default('USD'),
   weight: z.union([z.number(), z.string()]).optional().nullable(),
   images: z.array(z.string()).default([]),
   isPreOrder: z.boolean().default(false),
   preOrderShippingDate: z.string().optional().nullable(),
   attributeSelections: z.record(z.string(), z.string()).optional().nullable(),
+  warehouseId: z.string().uuid().optional(),
+  warehouseAllocations: z.array(WarehouseAllocationSchema).optional(),
 });
 
 export const ProductStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
@@ -33,7 +42,11 @@ export const ProductBaseSchema = z.object({
     { message: 'Price is required' }
   ),
   compareAtPrice: z.union([z.number(), z.string()]).optional().nullable(),
+  currencyCode: z.enum(['USD', 'MMK', 'THB']).default('USD'),
   isUsdPrice: z.boolean().default(true),
+  nameMy: z.string().optional().nullable(),
+  descriptionMy: z.string().optional().nullable(),
+  publishAt: z.string().optional().nullable(),
   isFeatured: z.boolean().default(false),
   onSale: z.boolean().default(false),
   isNewArrival: z.boolean().default(false),
@@ -79,9 +92,16 @@ export const ProductFiltersBaseSchema = z.object({
   onSale: z.boolean().optional(),
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
+  currencyCode: z.enum(['USD', 'MMK', 'THB']).optional(),
+  warehouseLocation: z.enum(['USA', 'MYANMAR']).optional(),
+  inStock: z.boolean().optional(),
+  priceMin: z.number().optional(),
+  priceMax: z.number().optional(),
+  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
   page: z.number().optional(),
   limit: z.number().optional(),
   search: z.string().optional(),
+  attributeFilters: z.record(z.string(), z.string()).optional(),
 });
 
 export type VariantBase = z.infer<typeof VariantBaseSchema>;

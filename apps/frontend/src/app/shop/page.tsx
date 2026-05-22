@@ -290,6 +290,12 @@ function ShopContent() {
     return ["All", ...Array.from(new Set(allSizes)).sort()];
   }, [products]);
 
+  const sortPrice = (p: ShopProduct) => {
+    if (p.isUsdPrice && currency === "MMK") return p.price * exchangeRate;
+    if (!p.isUsdPrice && currency === "USD") return p.price / exchangeRate;
+    return p.price;
+  };
+
   const filteredProducts = useMemo(() => {
     const results = [...products].filter((product) => {
       const brandMatch = selectedBrand === "All" || product.brand === selectedBrand;
@@ -341,10 +347,10 @@ function ShopContent() {
 
     switch (sortBy) {
       case "price_asc":
-        results.sort((a, b) => a.price - b.price);
+        results.sort((a, b) => sortPrice(a) - sortPrice(b));
         break;
       case "price_desc":
-        results.sort((a, b) => b.price - a.price);
+        results.sort((a, b) => sortPrice(b) - sortPrice(a));
         break;
       case "name_asc":
         results.sort((a, b) => a.name.localeCompare(b.name));
@@ -381,9 +387,14 @@ function ShopContent() {
   const handleAddToCart = (e: React.MouseEvent, product: ShopProduct) => {
     e.stopPropagation();
     e.preventDefault();
+    const hasVariants = Boolean(product.variants && product.variants.length > 0);
+    if (hasVariants) {
+      setQuickViewProduct(product as unknown as Product);
+      return;
+    }
     setAddingId(product.id);
-    addToCart(product as unknown as Product);
-    setTimeout(() => setAddingId(null), 800);
+    const added = addToCart(product as unknown as Product);
+    if (added) setTimeout(() => setAddingId(null), 800);
   };
 
   const resetAttributeFilters = useCallback(() => {

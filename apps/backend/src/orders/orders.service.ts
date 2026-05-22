@@ -9,6 +9,16 @@ import { OrdersRepository } from './orders.repository';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrderStatusChangedEvent } from '../common/events/domain.events';
+import { ExchangeRateHelper } from '../currencies/exchange-rate.helper';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { normalizePrice, toUsd } from '@amber/shared';
+
+const STRIPE_METHOD_NAMES = ['stripe', 'credit card'];
+
+function isManualPaymentMethod(paymentMethod: string): boolean {
+  const lower = paymentMethod.toLowerCase();
+  return !STRIPE_METHOD_NAMES.some((s) => lower.includes(s));
+}
 
 @Injectable()
 export class OrdersService {
@@ -16,6 +26,8 @@ export class OrdersService {
     private ordersRepository: OrdersRepository,
     private prisma: PrismaService,
     private eventEmitter: EventEmitter2,
+    private exchangeRateHelper: ExchangeRateHelper,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   async createOrder(data: {
@@ -28,16 +40,29 @@ export class OrdersService {
     phone: string;
     shippingMethod: string;
     paymentMethod: string;
+    paymentReference?: string;
     totalAmount: number;
     currency: string;
+    market?: string;
+    shippingCountry?: string;
     deliveryFee?: number;
+    deliveryMethodId?: string;
     warehouseId?: string;
+    shippingAddress: string;
+    customerName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    street?: string;
+    state?: string;
+    township?: string;
+    zipCode?: string;
     items: Array<{
       productId: string;
       variantId?: string;
       name: string;
       price: number;
       isUsd: boolean;
+      currencyCode?: string;
       quantity: number;
       image: string;
       size?: string;
@@ -46,8 +71,8 @@ export class OrdersService {
     let warehouseId = data.warehouseId;
     const itemsWithPreOrderInfo = [];
     let calculatedTotal = 0;
+    const orderCurrency = data.currency || 'USD';
 
-    // 1. Resolve Warehouse & Validate Stock/Prices
     if (!warehouseId) {
       const firstItem = data.items.find((item) => item.variantId);
       if (firstItem && firstItem.variantId) {
@@ -69,10 +94,15 @@ export class OrdersService {
       throw new BadRequestException('No fulfillment warehouse available');
     }
 
+    const lockedExchangeRate = await this.exchangeRateHelper.getRateForOrder(
+      orderCurrency,
+    );
+
     for (const item of data.items) {
       let isPreOrder = false;
       let expectedShippingDate = null;
       let dbPrice = 0;
+      let currencyCode = item.currencyCode || (item.isUsd ? 'USD' : 'MMK');
 
       if (item.variantId) {
         const variant = await this.ordersRepository.findVariantForOrder(
@@ -82,6 +112,10 @@ export class OrdersService {
           throw new NotFoundException(`Variant not found: ${item.variantId}`);
 
         dbPrice = Number(variant.price || variant.product.price);
+        currencyCode =
+          (variant as { currencyCode?: string }).currencyCode ||
+          (variant.product as { currencyCode?: string }).currencyCode ||
+          currencyCode;
         isPreOrder = variant.isPreOrder || variant.product.isPreOrder;
         expectedShippingDate =
           variant.preOrderShippingDate || variant.product.preOrderShippingDate;
@@ -93,14 +127,27 @@ export class OrdersService {
           throw new NotFoundException(`Product not found: ${item.productId}`);
 
         dbPrice = Number(product.price);
+        currencyCode =
+          (product as { currencyCode?: string }).currencyCode || currencyCode;
         isPreOrder = product.isPreOrder;
         expectedShippingDate = product.preOrderShippingDate;
       }
 
-      calculatedTotal += dbPrice * item.quantity;
+      const unitPriceUsd = toUsd(dbPrice, currencyCode, lockedExchangeRate);
+      const lineInOrderCurrency = normalizePrice(
+        dbPrice * item.quantity,
+        currencyCode,
+        orderCurrency,
+        lockedExchangeRate,
+      );
+      calculatedTotal += lineInOrderCurrency;
+
       itemsWithPreOrderInfo.push({
         ...item,
         price: dbPrice,
+        currencyCode,
+        unitPriceUsd,
+        isUsd: currencyCode === 'USD',
         isPreOrder,
         expectedShippingDate,
       });
@@ -108,13 +155,115 @@ export class OrdersService {
 
     calculatedTotal += data.deliveryFee || 0;
 
-    // 2. Delegate to Repository for transactional atomic creation
     return this.ordersRepository.create(
       data,
       warehouseId,
       itemsWithPreOrderInfo,
       calculatedTotal,
+      lockedExchangeRate,
     );
+  }
+
+  async uploadPaymentProof(
+    orderId: string,
+    userId: string,
+    file: Express.Multer.File,
+  ) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (order.userId && order.userId !== userId) {
+      throw new ForbiddenException('You can only upload proof for your own orders');
+    }
+
+    if (!isManualPaymentMethod(order.paymentMethod)) {
+      throw new BadRequestException(
+        'Payment proof upload is only for manual payment methods',
+      );
+    }
+
+    if (order.paymentStatus !== 'PENDING' && order.paymentStatus !== 'REJECTED') {
+      throw new BadRequestException(
+        'Payment proof can only be uploaded while payment is pending or after rejection',
+      );
+    }
+
+    const result = await this.cloudinaryService.uploadFile(file, {
+      folder: `amber-brand-fashion/payment-proofs/${orderId}`,
+    });
+
+    const url = (result as { secure_url?: string }).secure_url;
+    if (!url) {
+      throw new BadRequestException('Failed to upload payment proof');
+    }
+
+    return this.ordersRepository.update(orderId, {
+      paymentProofUrl: url,
+      paymentProofUploadedAt: new Date(),
+      paymentStatus: 'PENDING',
+      manualPaymentRejectionReason: null,
+      manualPaymentReviewedAt: null,
+      manualPaymentReviewedBy: null,
+    });
+  }
+
+  async confirmManualPayment(orderId: string, adminUserId: string) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (!isManualPaymentMethod(order.paymentMethod)) {
+      throw new BadRequestException('Not a manual payment order');
+    }
+
+    if (!order.paymentProofUrl) {
+      throw new BadRequestException(
+        'Cannot confirm payment without uploaded proof',
+      );
+    }
+
+    if (order.paymentStatus === 'PAID') {
+      throw new BadRequestException('Order is already paid');
+    }
+
+    await this.ordersRepository.update(orderId, {
+      paymentStatus: 'PAID',
+      status: 'PROCESSING',
+      manualPaymentReviewedAt: new Date(),
+      manualPaymentReviewedBy: adminUserId,
+      manualPaymentRejectionReason: null,
+    });
+
+    const updated = await this.ordersRepository.findById(orderId);
+    if (updated && order.status !== 'PROCESSING') {
+      this.eventEmitter.emit(
+        'order.status_changed',
+        new OrderStatusChangedEvent(orderId, order.status, 'PROCESSING'),
+      );
+    }
+
+    return updated;
+  }
+
+  async rejectManualPayment(
+    orderId: string,
+    adminUserId: string,
+    reason: string,
+  ) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (!isManualPaymentMethod(order.paymentMethod)) {
+      throw new BadRequestException('Not a manual payment order');
+    }
+
+    await this.ordersRepository.update(orderId, {
+      paymentStatus: 'REJECTED',
+      manualPaymentReviewedAt: new Date(),
+      manualPaymentReviewedBy: adminUserId,
+      manualPaymentRejectionReason: reason,
+    });
+
+    return this.ordersRepository.findById(orderId);
   }
 
   async getOrderById(id: string, user?: { userId: string; role: string }) {
@@ -165,7 +314,7 @@ export class OrdersService {
     const order = await this.ordersRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
 
-    const updateData: any = {};
+    const updateData: Record<string, string> = {};
     if (trackingData.carrier) updateData.carrier = trackingData.carrier;
     if (trackingData.trackingNumber)
       updateData.trackingNumber = trackingData.trackingNumber;
@@ -231,6 +380,7 @@ export class OrdersService {
     search?: string;
     status?: OrderStatus;
     paymentStatus?: PaymentStatus;
+    awaitingPaymentReview?: boolean;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   }) {
@@ -240,19 +390,28 @@ export class OrdersService {
       search,
       status,
       paymentStatus,
+      awaitingPaymentReview,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = query;
 
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
+
+    if (awaitingPaymentReview) {
+      where.paymentStatus = 'PENDING';
+      where.paymentProofUrl = { not: null };
+    }
 
     if (search) {
       where.OR = [
         { orderNumber: { contains: search, mode: 'insensitive' } },
         { shippingAddress: { contains: search, mode: 'insensitive' } },
+        { paymentReference: { contains: search, mode: 'insensitive' } },
+        { customerName: { contains: search, mode: 'insensitive' } },
+        { customerPhone: { contains: search, mode: 'insensitive' } },
         { user: { name: { contains: search, mode: 'insensitive' } } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
       ];
@@ -293,9 +452,6 @@ export class OrdersService {
     return this.ordersRepository.countPending();
   }
 
-  /**
-   * Automatically cancel and restock orders that are PENDING and older than 1 hour
-   */
   async cleanupStaleOrders() {
     const oneHourAgo = new Date();
     oneHourAgo.setHours(oneHourAgo.getHours() - 1);
@@ -304,6 +460,7 @@ export class OrdersService {
       where: {
         status: 'PENDING',
         paymentStatus: 'PENDING',
+        paymentProofUrl: null,
         createdAt: { lt: oneHourAgo },
       },
       select: { id: true },
@@ -313,7 +470,6 @@ export class OrdersService {
       try {
         await this.updateOrderStatus(order.id, 'CANCELLED');
       } catch (error) {
-        // Log error but continue with other orders
         console.error(`Failed to cleanup stale order ${order.id}:`, error);
       }
     }

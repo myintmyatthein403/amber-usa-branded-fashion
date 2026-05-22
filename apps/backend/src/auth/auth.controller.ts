@@ -10,6 +10,7 @@ import {
   Request,
   Patch,
   UsePipes,
+  Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -59,5 +60,29 @@ export class AuthController {
     @Body(new ZodValidationPipe(UserSchema.partial())) profileData: any,
   ) {
     return this.authService.updateProfile(req.user.userId, profileData);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('username-available')
+  async checkUsername(
+    @Request() req: any,
+    @Query('username') username: string,
+  ) {
+    return this.authService.isUsernameAvailable(req.user.userId, username);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body('email') email: string) {
+    return this.authService.requestPasswordReset(email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body('token') token: string,
+    @Body('password') password: string,
+  ) {
+    return this.authService.resetPassword(token, password);
   }
 }

@@ -14,15 +14,15 @@ export const useHero = () => {
   const [editingHero, setEditingHero] = useState<HeroSection | null>(null);
   
   const initialFormData: CreateHeroInput = {
-    badge: 'Authentic USA Brands • Myanmar',
-    titlePartOne: 'Global',
-    titlePartTwo: 'Authenticity',
-    titleItalic: true,
-    description: 'Bringing your favorite premium USA brands directly to Myanmar.',
-    ctaPrimaryText: 'Shop Brands',
-    ctaPrimaryLink: '/shop',
-    ctaSecondaryText: 'Check Legitimacy',
-    ctaSecondaryLink: '/track',
+    badge: '',
+    titlePartOne: '',
+    titlePartTwo: '',
+    titleItalic: false,
+    description: '',
+    ctaPrimaryText: '',
+    ctaPrimaryLink: '',
+    ctaSecondaryText: '',
+    ctaSecondaryLink: '',
     imageMain: '',
     imageSecondary: '',
     isActive: false

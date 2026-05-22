@@ -14,12 +14,13 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Plus, AlertTriangle, RefreshCw, Box } from 'lucide-react';
 import type { AttributeFormData, AttributeWithValues } from '@amber/shared';
 import { Modal } from '../components/admin/Modal';
 import { MediaSelector } from '../components/admin/MediaSelector';
+import { PageHeader } from '../components/admin/PageHeader';
+import { DataViewControls } from '../components/admin/DataViewControls';
 import { useAttributes } from '../features/attributes/useAttributes';
-import { AttributeSearchBar } from '../features/attributes/components/AttributeSearchBar';
 import { SortableAttributeCard } from '../features/attributes/components/SortableAttributeCard';
 
 export const AttributePage: React.FC = () => {
@@ -156,34 +157,52 @@ export const AttributePage: React.FC = () => {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
-      <div className="flex items-end justify-between">
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">
-            Product Configuration
-          </span>
-          <h2 className="text-4xl font-serif text-foreground tracking-tight">
-            Attribute Management
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
+      <PageHeader
+        title="Attribute Management"
+        badge="Product Configuration"
+        description="Define and manage the modular properties that differentiate your products, such as sizes, color palettes, and custom specifications."
+        icon={Box}
+        primaryAction={{
+          label: "Add Attribute",
+          onClick: () => {
             resetForm();
             setAttributeModalOpen(true);
-          }}
-          className="flex items-center gap-3 bg-foreground text-primary-foreground px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-xl shadow-black/5"
-        >
-          <Plus size={18} /> Add Attribute
-        </button>
-      </div>
+          }
+        }}
+      />
 
-      <AttributeSearchBar
+      <DataViewControls
         search={search}
         onSearchChange={setSearch}
-        typeFilter={typeFilter}
-        onTypeFilterChange={setTypeFilter}
-        filterableFilter={filterableFilter}
-        onFilterableFilterChange={setFilterableFilter}
+        searchPlaceholder="Search by name, slug, or value…"
+        extraFilters={
+          <>
+            <select
+              value={typeFilter}
+              onChange={(e) =>
+                setTypeFilter(e.target.value as any)
+              }
+              className="bg-transparent border-none text-[10px] font-bold uppercase tracking-widest focus:ring-0 cursor-pointer"
+            >
+              <option value="">All types</option>
+              <option value="text">Text</option>
+              <option value="color">Color</option>
+              <option value="image">Image</option>
+            </select>
+            <div className="w-px h-4 bg-border" />
+            <select
+              value={filterableFilter}
+              onChange={(e) =>
+                setFilterableFilter(e.target.value as any)
+              }
+              className="bg-transparent border-none text-[10px] font-bold uppercase tracking-widest focus:ring-0 cursor-pointer"
+            >
+              <option value="">Visibility: All</option>
+              <option value="true">Filterable Only</option>
+              <option value="false">Non-Filterable</option>
+            </select>
+          </>
+        }
       />
 
       {attributes.length === 0 ? (

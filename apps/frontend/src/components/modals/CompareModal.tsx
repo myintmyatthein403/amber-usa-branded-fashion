@@ -7,7 +7,7 @@ import { useStore } from "@/store/useStore";
 import Price from "@/components/Price";
 
 interface Product {
-  id: number | string;
+  id: string;
   name: string;
   price: number;
   isUsdPrice?: boolean;
@@ -23,7 +23,7 @@ interface CompareModalProps {
   products: Product[];
   isOpen: boolean;
   onClose: () => void;
-  onRemove: (id: number | string) => void;
+  onRemove: (id: string) => void;
 }
 
 export default function CompareModal({ products, isOpen, onClose, onRemove }: CompareModalProps) {

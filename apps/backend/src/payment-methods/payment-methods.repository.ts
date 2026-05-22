@@ -12,11 +12,17 @@ export class PaymentMethodsRepository {
     });
   }
 
-  async findActive(): Promise<PaymentMethod[]> {
-    return this.prisma.paymentMethod.findMany({
+  async findActive(market?: string): Promise<PaymentMethod[]> {
+    const methods = await this.prisma.paymentMethod.findMany({
       where: { isActive: true },
       orderBy: { createdAt: 'asc' },
     });
+    if (!market) return methods;
+    return methods.filter(
+      (m) =>
+        !(m as PaymentMethod & { markets?: string[] }).markets?.length ||
+        (m as PaymentMethod & { markets?: string[] }).markets!.includes(market),
+    );
   }
 
   async findById(id: string): Promise<PaymentMethod | null> {

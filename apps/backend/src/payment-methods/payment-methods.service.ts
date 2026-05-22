@@ -9,8 +9,8 @@ export class PaymentMethodsService {
     return this.repository.findAll();
   }
 
-  async findActive() {
-    return this.repository.findActive();
+  async findActive(market?: string) {
+    return this.repository.findActive(market);
   }
 
   async findOne(id: string) {

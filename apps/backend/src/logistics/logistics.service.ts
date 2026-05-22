@@ -9,6 +9,23 @@ import { CargoStatus, Prisma, Warehouse } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipmentStatusChangedEvent } from '../common/events/domain.events';
 import { sanitizeData } from '../common/utils/data-sanitizer';
+import { PrismaService } from '../prisma/prisma.service';
+
+const CARGO_TRANSITIONS: Record<CargoStatus, CargoStatus[]> = {
+  PREPARING: ['DEPARTED', 'PREPARING'],
+  DEPARTED: ['IN_TRANSIT', 'PREPARING'],
+  IN_TRANSIT: ['ARRIVED_MYANMAR', 'DEPARTED'],
+  ARRIVED_MYANMAR: ['CUSTOMS_CLEARANCE', 'READY_FOR_DISTRIBUTION', 'IN_TRANSIT'],
+  CUSTOMS_CLEARANCE: ['READY_FOR_DISTRIBUTION', 'ARRIVED_MYANMAR'],
+  READY_FOR_DISTRIBUTION: ['COMPLETED', 'CUSTOMS_CLEARANCE'],
+  COMPLETED: ['COMPLETED'],
+};
+
+const DESTINATION_CREDIT_STATUSES: CargoStatus[] = [
+  'ARRIVED_MYANMAR',
+  'READY_FOR_DISTRIBUTION',
+  'COMPLETED',
+];
 
 @Injectable()
 export class LogisticsService {
@@ -17,6 +34,7 @@ export class LogisticsService {
   constructor(
     private logisticsRepository: LogisticsRepository,
     private eventEmitter: EventEmitter2,
+    private prisma: PrismaService,
   ) {}
 
   // --- Warehouse Management ---
@@ -49,13 +67,98 @@ export class LogisticsService {
     );
   }
 
-  async updateStock(variantId: string, warehouseId: string, quantity: number) {
+  async updateStock(
+    variantId: string,
+    warehouseId: string,
+    quantity: number,
+    reason: 'ADJUSTMENT' | 'RECEIVING' = 'ADJUSTMENT',
+    note?: string,
+    userId?: string,
+  ) {
     const safeQuantity = Math.max(0, quantity);
-    return this.logisticsRepository.upsertInventory(
+    const result = await this.logisticsRepository.upsertInventory(
       variantId,
       warehouseId,
       safeQuantity,
     );
+    await this.prisma.stockMovement.create({
+      data: {
+        variantId,
+        toWarehouseId: warehouseId,
+        quantity: safeQuantity,
+        reason,
+        note,
+        userId,
+      },
+    });
+    return result;
+  }
+
+  async transferStock(data: {
+    variantId: string;
+    fromWarehouseId: string;
+    toWarehouseId: string;
+    quantity: number;
+    note?: string;
+    userId?: string;
+  }) {
+    const fromInv = await this.logisticsRepository.findInventory(
+      data.variantId,
+      data.fromWarehouseId,
+    );
+    if (!fromInv || fromInv.quantity < data.quantity) {
+      throw new BadRequestException('Insufficient stock at origin warehouse');
+    }
+
+    const fromWh = await this.prisma.warehouse.findUnique({
+      where: { id: data.fromWarehouseId },
+    });
+    const toWh = await this.prisma.warehouse.findUnique({
+      where: { id: data.toWarehouseId },
+    });
+
+    await this.logisticsRepository.transferInventory(
+      data.variantId,
+      data.fromWarehouseId,
+      data.toWarehouseId,
+      data.quantity,
+    );
+
+    await this.prisma.stockMovement.create({
+      data: {
+        variantId: data.variantId,
+        fromWarehouseId: data.fromWarehouseId,
+        toWarehouseId: data.toWarehouseId,
+        quantity: data.quantity,
+        reason: 'TRANSFER',
+        note: data.note,
+        userId: data.userId,
+      },
+    });
+
+    if (
+      fromWh &&
+      toWh &&
+      fromWh.location !== toWh.location &&
+      fromWh.location === 'USA' &&
+      toWh.location === 'MYANMAR'
+    ) {
+      await this.createCargoShipment({
+        originId: data.fromWarehouseId,
+        destinationId: data.toWarehouseId,
+        notes: `Auto-created from stock transfer. ${data.note ?? ''}`,
+        items: [{ variantId: data.variantId, quantity: data.quantity }],
+      });
+    }
+
+    return { success: true };
+  }
+
+  async getLowStockVariants() {
+    const variants = await this.prisma.variant.findMany({
+      include: { product: true, inventory: { include: { warehouse: true } } },
+    });
+    return variants.filter((v) => v.stock <= v.lowStockThreshold);
   }
 
   // --- Cargo Management ---
@@ -95,6 +198,13 @@ export class LogisticsService {
     const shipment = await this.logisticsRepository.findCargoById(id);
     if (!shipment) throw new NotFoundException('Shipment not found');
 
+    const allowed = CARGO_TRANSITIONS[shipment.status] ?? [];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException(
+        `Invalid status transition from ${shipment.status} to ${status}`,
+      );
+    }
+
     const oldStatus = shipment.status;
     const inventoryUpdates: Array<{
       variantId: string;
@@ -125,8 +235,11 @@ export class LogisticsService {
       cargoUpdateData.departureDate = new Date();
     }
 
-    // 2. Handle Destination Addition (Marking as COMPLETED)
-    if (status === 'COMPLETED' && !shipment.destinationAdded) {
+    // 2. Handle Destination Addition (ARRIVED_MYANMAR, READY_FOR_DISTRIBUTION, or COMPLETED)
+    if (
+      DESTINATION_CREDIT_STATUSES.includes(status) &&
+      !shipment.destinationAdded
+    ) {
       for (const item of shipment.items) {
         inventoryUpdates.push({
           variantId: item.variantId,

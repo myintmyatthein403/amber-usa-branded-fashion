@@ -6,6 +6,8 @@ export { default as OrderSummary } from "./OrderSummary";
 export { default as StripePaymentSection } from "./StripePaymentSection";
 export { default as ReviewStep } from "./ReviewStep";
 
+export type Market = "US" | "MM";
+
 export interface CheckoutFormData {
   email: string;
   firstName: string;
@@ -15,6 +17,15 @@ export interface CheckoutFormData {
   phone: string;
   shippingMethod: string;
   paymentMethod: string;
+  market: Market;
+  shippingCountry: string;
+  street: string;
+  township?: string;
+  region?: string;
+  state?: string;
+  zipCode?: string;
+  transactionRef?: string;
+  receiptFile?: File;
 }
 
 export interface DeliveryMethod {
@@ -26,6 +37,7 @@ export interface DeliveryMethod {
   isDigital: boolean;
   estimatedDays?: string;
   freeOverAmount?: string;
+  locationPrices?: Record<string, number> | null;
 }
 
 export interface PaymentMethod {
@@ -51,5 +63,8 @@ export interface CartItem {
   quantity: number;
   image: string;
   isUsdPrice?: boolean;
+  currencyCode?: string;
   size?: string;
+  category?: string;
+  variantId?: string;
 }

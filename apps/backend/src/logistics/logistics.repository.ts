@@ -254,6 +254,40 @@ export class LogisticsRepository {
     });
   }
 
+  async transferInventory(
+    variantId: string,
+    fromWarehouseId: string,
+    toWarehouseId: string,
+    quantity: number,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.inventory.update({
+        where: {
+          variantId_warehouseId: { variantId, warehouseId: fromWarehouseId },
+        },
+        data: { quantity: { decrement: quantity } },
+      });
+
+      await tx.inventory.upsert({
+        where: {
+          variantId_warehouseId: { variantId, warehouseId: toWarehouseId },
+        },
+        update: { quantity: { increment: quantity } },
+        create: { variantId, warehouseId: toWarehouseId, quantity },
+      });
+
+      const totalStock = await tx.inventory.aggregate({
+        where: { variantId },
+        _sum: { quantity: true },
+      });
+
+      await tx.variant.update({
+        where: { id: variantId },
+        data: { stock: totalStock._sum.quantity || 0 },
+      });
+    });
+  }
+
   async updateCargoWithInventory(
     id: string,
     cargoData: Prisma.CargoShipmentUpdateInput,

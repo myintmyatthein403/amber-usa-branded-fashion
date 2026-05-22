@@ -26,6 +26,14 @@ export const API_ROUTES = {
   VARIANTS: {
     BASE: '/variants',
     BY_ID: (id: number | string) => `/variants/${id}`,
+    UPDATE_STOCK: (id: number | string) => `/variants/${id}/stock`,
+  },
+  WISHLIST: {
+    BASE: '/wishlist',
+  },
+  ADDRESSES: {
+    BASE: '/addresses',
+    BY_ID: (id: string) => `/addresses/${id}`,
   },
   HERO: {
     BASE: '/hero',
@@ -113,6 +121,9 @@ export const API_ROUTES = {
     BULK_STATUS: '/orders/bulk-status',
     BULK_PAYMENT_STATUS: '/orders/bulk-payment-status',
     PENDING_COUNT: '/orders/pending-count',
+    PAYMENT_PROOF: (id: string) => `/orders/${id}/payment-proof`,
+    CONFIRM_MANUAL_PAYMENT: (id: string) => `/orders/${id}/confirm-manual-payment`,
+    REJECT_MANUAL_PAYMENT: (id: string) => `/orders/${id}/reject-manual-payment`,
     },
   LOGISTICS: {
     WAREHOUSES: '/logistics/warehouses',
@@ -120,6 +131,8 @@ export const API_ROUTES = {
     INVENTORY_BY_VARIANT: (variantId: string) => `/logistics/inventory/${variantId}`,
     INVENTORY_BY_WAREHOUSE: (warehouseId: string) => `/logistics/inventory/warehouse/${warehouseId}`,
     UPDATE_STOCK: '/logistics/inventory/update',
+    TRANSFER_STOCK: '/logistics/inventory/transfer',
+    LOW_STOCK: '/logistics/inventory/low-stock',
     CARGO: '/logistics/cargo',
     CARGO_BY_ID: (id: string) => `/logistics/cargo/${id}`,
     CARGO_STATUS: (id: string) => `/logistics/cargo/${id}/status`,
@@ -134,10 +147,6 @@ export const API_ROUTES = {
     BY_ID: (id: string) => `/currencies/${id}`,
     SET_BASE: '/currencies/set-base',
   },
-  EXCHANGE_RATES: {
-    BASE: '/exchange-rates',
-    BY_ID: (id: string) => `/exchange-rates/${id}`,
-  },
   ATTRIBUTES: {
     BASE: '/attributes',
     PUBLIC: '/attributes/public',
@@ -146,6 +155,11 @@ export const API_ROUTES = {
     VALUES: (id: string) => `/attributes/${id}/values`,
     VALUES_REORDER: (id: string) => `/attributes/${id}/values/reorder`,
     VALUE_BY_ID: (id: string) => `/attributes/values/${id}`,
+  },
+  EXCHANGE_RATES: {
+    BASE: '/exchange-rates',
+    BY_ID: (id: string) => `/exchange-rates/${id}`,
+    UPDATE: '/exchange-rates/update',
   },
   STATS: '/stats',
 };

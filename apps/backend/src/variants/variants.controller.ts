@@ -38,6 +38,16 @@ export class VariantsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
+  @Patch(':id/stock')
+  updateStock(
+    @Param('id') id: string,
+    @Body() body: { stock: number },
+  ) {
+    return this.variantsService.updateVariantStock(id, { stock: body.stock });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
   update(
     @Param('id') id: string,

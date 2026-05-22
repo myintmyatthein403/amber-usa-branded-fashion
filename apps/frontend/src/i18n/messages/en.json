@@ -1,0 +1,45 @@
+{
+  "nav": {
+    "shop": "Shop",
+    "giftCards": "Gift Cards",
+    "track": "Track Order",
+    "login": "Sign In",
+    "profile": "Profile"
+  },
+  "cart": {
+    "title": "Your Bag",
+    "empty": "Your bag is empty",
+    "checkout": "Checkout",
+    "continueShopping": "Continue Shopping",
+    "addToBag": "Add to Bag",
+    "added": "Added"
+  },
+  "checkout": {
+    "information": "Information",
+    "shipping": "Shipping",
+    "payment": "Payment",
+    "review": "Review",
+    "contact": "Contact Information",
+    "address": "Shipping Address",
+    "country": "Shipping Country",
+    "countryUs": "United States",
+    "countryMm": "Myanmar",
+    "continueDelivery": "Continue to Delivery",
+    "transactionRef": "Transaction Reference",
+    "uploadReceipt": "Upload Payment Receipt",
+    "completePurchase": "Complete Purchase"
+  },
+  "product": {
+    "selectOptions": "Please select all options",
+    "outOfStock": "Out of Stock",
+    "preOrder": "Pre-Order Now",
+    "addToBag": "Add to Shopping Bag",
+    "fulfillmentUs": "Ships from USA warehouse",
+    "fulfillmentMm": "Ships from Myanmar warehouse",
+    "related": "You May Also Love"
+  },
+  "currency": {
+    "rateUpdated": "Rate updated",
+    "rateLocked": "Exchange rate is locked at checkout"
+  }
+}

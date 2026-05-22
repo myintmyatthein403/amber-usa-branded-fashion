@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { motion } from "motion/react";
 import { Mail, Lock, Loader2, ArrowRight } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { signIn, useSession } from "next-auth/react";
+import { getApiUrl } from "@/lib/api";
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -19,6 +20,8 @@ export default function LoginPage() {
   });
   const [error, setError] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/profile";
   const setAuth = useAuthStore((state) => state.setAuth);
   const isLoggingOut = useAuthStore((state) => state.isLoggingOut);
   const setLoggingOut = useAuthStore((state) => state.setLoggingOut);
@@ -40,7 +43,7 @@ export default function LoginPage() {
       if (status === "authenticated" && (session as any)?.idToken) {
         setGoogleLoading(true);
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
+          const response = await fetch(`${getApiUrl()}/auth/google`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ idToken: (session as any).idToken }),
@@ -48,13 +51,16 @@ export default function LoginPage() {
 
           const data = await response.json();
           if (response.ok) {
-            setAuth(data.user, data.access_token);
-            router.push("/profile");
+            const payload = data.data ?? data;
+            setAuth(payload.user, payload.access_token);
+            router.push(redirectTo);
           } else {
+            console.error("Google login backend error:", data);
             setError(data.message || "Google authentication failed");
           }
         } catch (err) {
-          setError("Failed to sync with backend");
+          console.error("Google login network error:", err);
+          setError("Failed to sync with backend. Check API URL and CORS.");
         } finally {
           setGoogleLoading(false);
         }
@@ -64,11 +70,27 @@ export default function LoginPage() {
     if (status === "authenticated") {
       syncGoogleSession();
     }
-  }, [status, session, setAuth, router]);
+  }, [status, session, isLoggingOut, setAuth, router, redirectTo]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
-    await signIn("google", { redirect: false });
+    setError("");
+    try {
+      const callbackUrl =
+        redirectTo === "/profile"
+          ? "/login"
+          : `/login?redirect=${encodeURIComponent(redirectTo)}`;
+      const result = await signIn("google", { callbackUrl });
+      if (result?.error) {
+        console.error("Google signIn error:", result.error);
+        setError(`Google sign-in failed: ${result.error}`);
+        setGoogleLoading(false);
+      }
+    } catch (err) {
+      console.error("Google signIn exception:", err);
+      setError("Failed to start Google sign-in. Check NextAuth configuration.");
+      setGoogleLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,7 +100,7 @@ export default function LoginPage() {
 
     try {
       const endpoint = isLogin ? "/auth/login" : "/auth/register";
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+      const response = await fetch(`${getApiUrl()}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -91,8 +113,9 @@ export default function LoginPage() {
       }
 
       if (isLogin) {
-        setAuth(data.user, data.access_token);
-        router.push("/profile");
+        const payload = data.data ?? data;
+        setAuth(payload.user, payload.access_token);
+        router.push(redirectTo);
       } else {
         setIsLogin(true);
         setError("Account created successfully. Please login.");

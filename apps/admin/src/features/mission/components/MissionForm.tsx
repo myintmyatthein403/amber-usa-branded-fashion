@@ -104,14 +104,20 @@ export const MissionForm: React.FC<MissionFormProps> = ({
            </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-           <div className="space-y-2 md:col-span-2">
-             <label className="text-[10px] font-bold uppercase text-muted-foreground">Trust Badge Text</label>
-             <input type="text" value={formData.trustBadgeText} onChange={(e) => setFormData({...formData, trustBadgeText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" />
-           </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
            <div className="space-y-2">
-             <label className="text-[10px] font-bold uppercase text-muted-foreground">CTA Text</label>
-             <input type="text" value={formData.ctaText} onChange={(e) => setFormData({...formData, ctaText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" />
+             <label className="text-[10px] font-bold uppercase text-muted-foreground">Trust Badge Text</label>
+             <input type="text" value={formData.trustBadgeText} onChange={(e) => setFormData({...formData, trustBadgeText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" placeholder="e.g. Directly Imported from Official USA Stores." />
+           </div>
+           <div className="grid grid-cols-2 gap-4">
+             <div className="space-y-2">
+               <label className="text-[10px] font-bold uppercase text-muted-foreground">CTA Text</label>
+               <input type="text" value={formData.ctaText} onChange={(e) => setFormData({...formData, ctaText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" placeholder="e.g. Shop Brands" />
+             </div>
+             <div className="space-y-2">
+               <label className="text-[10px] font-bold uppercase text-muted-foreground">CTA Link</label>
+               <input type="text" value={formData.ctaLink} onChange={(e) => setFormData({...formData, ctaLink: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs font-mono focus:border-primary outline-none" placeholder="/shop" />
+             </div>
            </div>
         </div>
 

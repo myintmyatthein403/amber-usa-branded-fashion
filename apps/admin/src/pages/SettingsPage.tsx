@@ -2,7 +2,6 @@ import React from 'react';
 import { Loader2, Info } from 'lucide-react';
 import { useSettings } from '../features/settings/hooks/useSettings';
 import { SettingsHeader } from '../features/settings/components/SettingsHeader';
-import { CurrencySettings } from '../features/settings/components/CurrencySettings';
 import { StripeSettings } from '../features/settings/components/StripeSettings';
 import { PolicySettings } from '../features/settings/components/PolicySettings';
 
@@ -35,22 +34,7 @@ export const SettingsPage: React.FC = () => {
         success={success}
       />
 
-      <div className="flex items-start gap-3 p-4 border border-amber-500/30 bg-amber-500/5 text-sm text-muted-foreground">
-        <Info size={18} className="text-amber-600 shrink-0 mt-0.5" />
-        <p>
-          <strong className="text-foreground">USD/MMK rate:</strong> Prefer{' '}
-          <a href="/currencies" className="text-primary underline">Currency Management</a>{' '}
-          for live exchange rates. The field below syncs from the active USD→MMK pair and is kept for legacy storefront settings.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 gap-12">
-        <CurrencySettings
-          usdToMmkRate={formData.usdToMmkRate}
-          rateUpdatedAt={rateMeta.rateUpdatedAt}
-          isManualOverride={rateMeta.isManualOverride}
-        />
-
         <StripeSettings 
           formData={formData as any}
           onUpdate={updateField}

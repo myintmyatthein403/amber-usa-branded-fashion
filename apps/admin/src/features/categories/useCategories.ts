@@ -3,6 +3,7 @@ import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
 import { CategoryFormData, type CategoryReorderFlatItem } from '@amber/shared';
 import { Category } from './schema';
+import { toast } from '../../store/useToastStore';
 
 export type CategoryFormState = CategoryFormData & { slug?: string };
 
@@ -93,11 +94,16 @@ export const useCategories = () => {
 
   const reorderCategories = useCallback(
     async (payload: CategoryReorderFlatItem[]) => {
-      await apiService(API_ROUTES.CATEGORIES.REORDER, {
-        method: 'PATCH',
-        body: payload,
-      });
-      await fetchCategories();
+      try {
+        await apiService(API_ROUTES.CATEGORIES.REORDER, {
+          method: 'PATCH',
+          body: payload,
+        });
+        await fetchCategories();
+        toast.success('Category hierarchy rebalanced');
+      } catch (error) {
+        toast.error('Failed to update hierarchy');
+      }
     },
     [fetchCategories],
   );
@@ -121,8 +127,10 @@ export const useCategories = () => {
       setEditingCategory(null);
       setFormData(DEFAULT_FORM_DATA);
       await fetchCategories();
+      toast.success(editingCategory ? 'Category definition refined' : 'Category initialized');
     } catch (error) {
       console.error('Failed to save category:', error);
+      toast.error('Failed to save category');
       throw error;
     } finally {
       setSubmitting(false);
@@ -131,13 +139,16 @@ export const useCategories = () => {
 
   const toggleCategoryActive = async (category: Category) => {
     try {
+      const newState = !(category.isActive !== false);
       await apiService(API_ROUTES.CATEGORIES.BY_ID(category.id), {
         method: 'PATCH',
-        body: { isActive: !(category.isActive !== false) },
+        body: { isActive: newState },
       });
       await fetchCategories();
+      toast.success(`Category ${newState ? 'activated' : 'deactivated'}`);
     } catch (error) {
       console.error('Failed to toggle category status:', error);
+      toast.error('Failed to update status');
     }
   };
 
@@ -153,8 +164,10 @@ export const useCategories = () => {
       setDeleteConfirmOpen(false);
       setDeletingId(null);
       await fetchCategories();
+      toast.success('Category permanently removed');
     } catch (error) {
       console.error('Failed to delete category:', error);
+      toast.error('Failed to delete category');
     }
   };
 

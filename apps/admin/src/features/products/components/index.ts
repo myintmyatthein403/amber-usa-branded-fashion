@@ -4,8 +4,6 @@ export { ProductForm } from './ProductForm';
 export { VariantManager } from './VariantManager';
 export { ProductFilters } from './ProductFilters';
 export { ProductTour } from './ProductTour';
-export { ProductPageHeader } from './ProductPageHeader';
-export { ProductSearchBar } from './ProductSearchBar';
 export { ProductPagination } from './ProductPagination';
 export { DeleteConfirmModal } from './DeleteConfirmModal';
 export { ProductModal } from './ProductModal';

@@ -40,6 +40,10 @@ export const OrdersPage: React.FC = () => {
     setModalOpen,
     updatingStatus,
     handleUpdateStatus,
+    handleUpdateTracking,
+    handleRefund,
+    handleConfirmManualPayment,
+    handleRejectManualPayment,
     handleDelete
   } = useOrders();
 
@@ -141,6 +145,8 @@ export const OrdersPage: React.FC = () => {
             updatingStatus={updatingStatus}
             onUpdateTracking={handleUpdateTracking}
             onRefund={handleRefund}
+            onConfirmManualPayment={handleConfirmManualPayment}
+            onRejectManualPayment={handleRejectManualPayment}
           />
         )}
       </Modal>

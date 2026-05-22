@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { PaymentMethodsService } from './payment-methods.service';
@@ -23,8 +24,8 @@ export class PaymentMethodsController {
   }
 
   @Get('active')
-  findActive() {
-    return this.service.findActive();
+  findActive(@Query('market') market?: string) {
+    return this.service.findActive(market);
   }
 
   @Get(':id')

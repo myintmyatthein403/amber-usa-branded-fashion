@@ -1,8 +1,7 @@
 import React from 'react';
+import { ShoppingBag, HelpCircle } from 'lucide-react';
 import { useProducts } from '../features/products/useProducts';
 import {
-  ProductPageHeader,
-  ProductSearchBar,
   ProductFilters,
   ProductViews,
   DeleteConfirmModal,
@@ -10,6 +9,8 @@ import {
   ProductTour,
 } from '../features/products/components';
 import { MediaSelector } from '../components/admin/MediaSelector';
+import { PageHeader } from '../components/admin/PageHeader';
+import { DataViewControls } from '../components/admin/DataViewControls';
 
 export const ProductsPage: React.FC = () => {
   const {
@@ -25,6 +26,7 @@ export const ProductsPage: React.FC = () => {
     clearFilters,
     categories,
     brands,
+    collections,
     warehouseList,
     sales,
     modalOpen,
@@ -34,6 +36,8 @@ export const ProductsPage: React.FC = () => {
     step,
     setStep,
     submitting,
+    submitError,
+    setSubmitError,
     editingProduct,
     productForm,
     setProductForm,
@@ -43,6 +47,7 @@ export const ProductsPage: React.FC = () => {
     newVariant,
     setNewVariant,
     addVariant,
+    addBulkVariants,
     handleEditVariant,
     handleDeleteVariant,
     handleProductSubmit,
@@ -53,36 +58,42 @@ export const ProductsPage: React.FC = () => {
     setDeleteConfirmOpen,
     confirmDelete,
     cancelDelete,
+    openProductMedia,
+    openVariantMedia,
+    handleMediaSelect,
   } = useProducts();
 
-  const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('list');
+  const [viewMode, setViewMode] = React.useState<'grid' | 'table'>('table');
   const [tourOpen, setTourOpen] = React.useState(false);
-
-  const handleMediaSelect = (url: string) => {
-    if (mediaSelectorOpen) {
-      setProductForm((prev) => ({ ...prev, images: [...prev.images, url] }));
-    }
-    setMediaSelectorOpen(false);
-  };
-
-  const openProductMedia = () => setMediaSelectorOpen(true);
-  const openVariantMedia = () => setMediaSelectorOpen(true);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
-      <ProductPageHeader
-        onCreateProduct={() => {
-          resetForm();
-          setModalOpen(true);
+      <PageHeader
+        title="Product Archive"
+        badge="Catalog Management"
+        description="Master repository of all items. Manage inventory, pricing, and editorial content for our USA premium brands."
+        icon={ShoppingBag}
+        primaryAction={{
+          label: "Initialize Product",
+          onClick: () => {
+            resetForm();
+            setModalOpen(true);
+          },
+          dataTour: "init-button"
         }}
-        onOpenTour={() => setTourOpen(true)}
+        secondaryAction={{
+          icon: HelpCircle,
+          onClick: () => setTourOpen(true),
+          title: "Product Tour"
+        }}
       />
 
-      <ProductSearchBar
+      <DataViewControls
         search={search}
         onSearchChange={setSearch}
+        searchPlaceholder="Search by name, SKU, or brand…"
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={(mode) => setViewMode(mode)}
       />
 
       <div data-tour="filters">
@@ -99,7 +110,7 @@ export const ProductsPage: React.FC = () => {
         products={products}
         meta={meta}
         loading={loading}
-        viewMode={viewMode}
+        viewMode={viewMode === 'table' ? 'list' : 'grid'}
         onEdit={openEditModal}
         onDelete={handleDelete}
         page={page}
@@ -114,7 +125,10 @@ export const ProductsPage: React.FC = () => {
 
       <ProductModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setSubmitError(null);
+        }}
         step={step}
         onStepChange={setStep}
         isEditing={!!editingProduct}
@@ -122,27 +136,37 @@ export const ProductsPage: React.FC = () => {
         setProductForm={setProductForm}
         categories={categories}
         brands={brands}
+        collections={collections}
         sales={sales}
+        editingProduct={editingProduct}
         onNext={() => setStep(2)}
         submitting={submitting}
         onOpenMedia={openProductMedia}
+        onOpenVariantMedia={openVariantMedia}
         newVariant={newVariant}
         setNewVariant={setNewVariant}
         editingVariant={editingVariant}
         setEditingVariant={setEditingVariant}
         addVariant={addVariant}
+        addBulkVariants={addBulkVariants}
         currentVariants={currentVariants}
         handleEditVariant={handleEditVariant}
         handleDeleteVariant={handleDeleteVariant}
         warehouses={warehouseList}
         onSave={handleProductSubmit}
+        productSlug={productForm.slug}
+        submitError={submitError}
       />
 
       <MediaSelector 
         isOpen={mediaSelectorOpen} 
         onClose={() => setMediaSelectorOpen(false)} 
         onSelect={handleMediaSelect}
-        selectedUrls={[]}
+        selectedUrls={
+          step === 2
+            ? newVariant.images || []
+            : productForm.images || []
+        }
       />
 
       <ProductTour isOpen={tourOpen} onClose={() => setTourOpen(false)} />
