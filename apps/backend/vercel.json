@@ -1,5 +1,7 @@
 {
   "framework": "nodejs",
   "buildCommand": "npm run prisma:generate && npm run build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "outputDirectory": "dist",
+  "regions": ["iad1"]
 }
