@@ -21,18 +21,20 @@ import {
   Truck,
   Megaphone,
   Lock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  DollarSign
 } from 'lucide-react';
 import { useAdminUIStore } from '../../store/useAdminUIStore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
+import { extractRoleString } from '../../lib/utils';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type Tab = 'dashboard' | 'products' | 'categories' | 'brands' | 'variants' | 'hero' | 'mission' | 'gift-card-section' | 'sale-section' | 'footer-section' | 'testimonials' | 'community-posts' | 'collections' | 'coupons' | 'gift-cards' | 'sales' | 'reviews' | 'orders' | 'customers' | 'staff' | 'roles' | 'settings' | 'delivery-methods' | 'ads' | 'warehouses' | 'cargo' | 'inventory' | 'media';
+type Tab = 'dashboard' | 'products' | 'categories' | 'brands' | 'variants' | 'hero' | 'mission' | 'gift-card-section' | 'sale-section' | 'footer-section' | 'testimonials' | 'community-posts' | 'collections' | 'coupons' | 'gift-cards' | 'sales' | 'reviews' | 'orders' | 'customers' | 'staff' | 'roles' | 'settings' | 'delivery-methods' | 'ads' | 'warehouses' | 'cargo' | 'inventory' | 'media' | 'currencies' | 'attributes';
 
 
 interface SidebarItem {
@@ -56,6 +58,7 @@ const sidebarConfig: SidebarItem[] = [
       { id: 'categories', label: 'Categories', icon: Tag, permissions: ['categories:manage'] },
       { id: 'brands', label: 'Brands', icon: Tag, permissions: ['brands:manage'] },
       { id: 'variants', label: 'Variants', icon: Layers, permissions: ['products:write'] },
+      { id: 'attributes', label: 'Attributes', icon: Tag, permissions: ['products:write'] },
     ]
   },
   { 
@@ -63,9 +66,9 @@ const sidebarConfig: SidebarItem[] = [
     label: 'Logistics', 
     icon: Truck,
     subItems: [
-      { id: 'warehouses', label: 'Warehouses', icon: Box, permissions: ['settings:manage'] },
-      { id: 'inventory', label: 'Inventory Ledger', icon: Layers, permissions: ['settings:manage'] },
-      { id: 'cargo', label: 'Cargo Shipments', icon: Truck, permissions: ['orders:manage'] },
+      { id: 'warehouses', label: 'Warehouses', icon: Box, permissions: ['logistics:manage'] },
+      { id: 'inventory', label: 'Inventory Ledger', icon: Layers, permissions: ['logistics:manage'] },
+      { id: 'cargo', label: 'Cargo Shipments', icon: Truck, permissions: ['logistics:manage'] },
     ]
   },
   { 
@@ -76,6 +79,7 @@ const sidebarConfig: SidebarItem[] = [
       { id: 'orders', label: 'Orders', icon: ShoppingBag, permissions: ['orders:manage'] },
       { id: 'reviews', label: 'Reviews', icon: MessageSquare, permissions: ['reviews:manage'] },
       { id: 'delivery-methods', label: 'Delivery Setup', icon: Truck, permissions: ['settings:manage'] },
+      { id: 'currencies', label: 'Currency Management', icon: DollarSign, permissions: ['settings:manage'] },
       { id: 'customers', label: 'Customers', icon: Users, permissions: ['staff:manage'] },
     ]
   },
@@ -84,11 +88,11 @@ const sidebarConfig: SidebarItem[] = [
     label: 'Marketing', 
     icon: Ticket,
     subItems: [
-      { id: 'sales', label: 'Sales Campaigns', icon: Tag, permissions: ['marketing:manage'] },
-      { id: 'coupons', label: 'Discount Codes', icon: Ticket, permissions: ['marketing:manage'] },
+      { id: 'sales', label: 'Sales Campaigns', icon: Tag, permissions: ['sales:manage'] },
+      { id: 'coupons', label: 'Discount Codes', icon: Ticket, permissions: ['coupons:manage'] },
       { id: 'gift-cards', label: 'Gift Cards', icon: Gift, permissions: ['giftcards:manage'] },
       { id: 'ads', label: 'Ads Management', icon: Megaphone, permissions: ['ads:manage'] },
-      { id: 'collections', label: 'Collections', icon: Layers, permissions: ['marketing:manage'] },
+      { id: 'collections', label: 'Collections', icon: Layers, permissions: ['collections:manage'] },
     ]
   },
   { 
@@ -121,16 +125,29 @@ const sidebarConfig: SidebarItem[] = [
 
 export const Sidebar: React.FC = () => {
   const { isSidebarOpen, toggleSidebar, activeTab, setActiveTab, logout, user, pendingOrdersCount } = useAdminUIStore();
-  const userRole = user?.role;
-  const userPermissions = user?.permissions || user?.role?.permissions || [];
+  
+   const userRole = extractRoleString(user);
+   const userPermissions = user?.permissions || [];
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
-  const checkAccess = (item: { roles?: string[], permissions?: string[] }) => {
-    // Superadmin has access to everything
-    if (userRole === 'SUPERADMIN') return true;
+  useEffect(() => {
+    if (userRole === 'SUPERADMIN') {
+      setExpandedGroups(['catalog', 'logistics', 'operations', 'marketing', 'website', 'system']);
+    } else {
+      setExpandedGroups([]);
+    }
+  }, [userRole]);
+
+  const checkAccess = (item: { id: string, roles?: string[], permissions?: string[] }) => {
+    const isAdmin = userRole?.toUpperCase() === 'SUPERADMIN';
+    if (isAdmin) return true;
 
     // Check Roles if specified
-    if (item.roles && !item.roles.includes(userRole)) return false;
+    if (item.roles) {
+      if (!userRole) return false;
+      const normalizedUserRole = userRole.toUpperCase();
+      return item.roles.some(r => r.toUpperCase() === normalizedUserRole);
+    }
 
     // Check Permissions if specified
     if (item.permissions && item.permissions.length > 0) {
@@ -140,19 +157,22 @@ export const Sidebar: React.FC = () => {
     return true;
   };
 
-  const filteredSidebarConfig = sidebarConfig
-    .filter(item => {
-      // If it's a group, check if it has any accessible subItems
-      if (item.subItems) {
-        const accessibleSubItems = item.subItems.filter(sub => checkAccess(sub));
-        return accessibleSubItems.length > 0;
-      }
-      return checkAccess(item);
-    })
-    .map(item => ({
-      ...item,
-      subItems: item.subItems?.filter(sub => checkAccess(sub))
-    }));
+  const isSuperAdmin = userRole?.toUpperCase() === 'SUPERADMIN';
+  const filteredSidebarConfig = isSuperAdmin 
+    ? sidebarConfig
+    : sidebarConfig
+        .filter(item => {
+          // If it's a group, check if it has any accessible subItems
+          if (item.subItems) {
+            const accessibleSubItems = item.subItems.filter(sub => checkAccess(sub));
+            return accessibleSubItems.length > 0;
+          }
+          return checkAccess(item);
+        })
+        .map(item => ({
+          ...item,
+          subItems: item.subItems?.filter(sub => checkAccess(sub))
+        }));
 
   // Auto-expand group if a sub-item is active
   useEffect(() => {

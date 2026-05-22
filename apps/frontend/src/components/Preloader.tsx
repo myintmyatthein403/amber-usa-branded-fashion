@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from "motion/react";
 import { useEffect, useState } from "react";
 
 export default function Preloader() {
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const hasLoaded = sessionStorage.getItem("amber-preloader-done");
-    
     if (!hasLoaded) {
       setLoading(true);
       const timer = setTimeout(() => {
@@ -18,6 +19,8 @@ export default function Preloader() {
       return () => clearTimeout(timer);
     }
   }, []);
+
+  if (!mounted) return null;
 
   return (
     <AnimatePresence>

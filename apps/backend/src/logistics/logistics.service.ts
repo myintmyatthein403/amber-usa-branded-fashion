@@ -1,70 +1,234 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
+import { LogisticsRepository } from './logistics.repository';
+import { CargoStatus, Prisma, Warehouse } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ShipmentStatusChangedEvent } from '../common/events/domain.events';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 import { PrismaService } from '../prisma/prisma.service';
-import { CargoStatus } from '@prisma/client';
+
+const CARGO_TRANSITIONS: Record<CargoStatus, CargoStatus[]> = {
+  PREPARING: ['DEPARTED', 'PREPARING'],
+  DEPARTED: ['IN_TRANSIT', 'PREPARING'],
+  IN_TRANSIT: ['ARRIVED_MYANMAR', 'DEPARTED'],
+  ARRIVED_MYANMAR: ['CUSTOMS_CLEARANCE', 'READY_FOR_DISTRIBUTION', 'IN_TRANSIT'],
+  CUSTOMS_CLEARANCE: ['READY_FOR_DISTRIBUTION', 'ARRIVED_MYANMAR'],
+  READY_FOR_DISTRIBUTION: ['COMPLETED', 'CUSTOMS_CLEARANCE'],
+  COMPLETED: ['COMPLETED'],
+};
+
+const DESTINATION_CREDIT_STATUSES: CargoStatus[] = [
+  'ARRIVED_MYANMAR',
+  'READY_FOR_DISTRIBUTION',
+  'COMPLETED',
+];
 
 @Injectable()
 export class LogisticsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(LogisticsService.name);
+
+  constructor(
+    private logisticsRepository: LogisticsRepository,
+    private eventEmitter: EventEmitter2,
+    private prisma: PrismaService,
+  ) {}
 
   // --- Warehouse Management ---
   async getAllWarehouses() {
-    return this.prisma.warehouse.findMany({
-      include: {
-        _count: {
-          select: { inventory: true }
-        }
-      }
-    });
+    return this.logisticsRepository.findAllWarehouses();
   }
 
-  async createWarehouse(data: { name: string; location: string; address?: string }) {
-    return this.prisma.warehouse.create({ data });
+  async createWarehouse(data: Record<string, unknown>) {
+    return this.logisticsRepository.createWarehouse(
+      data as unknown as Warehouse,
+    );
+  }
+
+  async updateWarehouse(id: string, data: Record<string, unknown>) {
+    return this.logisticsRepository.updateWarehouse(id, data);
   }
 
   // --- Inventory Management ---
   async getInventoryByVariant(variantId: string) {
-    return this.prisma.inventory.findMany({
-      where: { variantId },
-      include: { warehouse: true }
-    });
+    return this.logisticsRepository.findInventoryByVariant(variantId);
   }
 
-  async getInventoryByWarehouse(warehouseId: string) {
-    return this.prisma.inventory.findMany({
-      where: { warehouseId },
-      include: { 
-        variant: {
-          include: { product: true }
-        }
-      }
-    });
+  async getInventoryByWarehouse(
+    warehouseId: string,
+    options?: { page?: number; limit?: number; search?: string },
+  ) {
+    return this.logisticsRepository.findInventoryByWarehouse(
+      warehouseId,
+      options,
+    );
   }
 
-  async updateStock(variantId: string, warehouseId: string, quantity: number) {
-    // Prevent negative stock (Finding 3)
+  async updateStock(
+    variantId: string,
+    warehouseId: string,
+    quantity: number,
+    reason: 'ADJUSTMENT' | 'RECEIVING' = 'ADJUSTMENT',
+    note?: string,
+    userId?: string,
+  ) {
     const safeQuantity = Math.max(0, quantity);
-
-    // Upsert inventory record
-    const inventory = await this.prisma.inventory.upsert({
-      where: {
-        variantId_warehouseId: { variantId, warehouseId }
+    const result = await this.logisticsRepository.upsertInventory(
+      variantId,
+      warehouseId,
+      safeQuantity,
+    );
+    await this.prisma.stockMovement.create({
+      data: {
+        variantId,
+        toWarehouseId: warehouseId,
+        quantity: safeQuantity,
+        reason,
+        note,
+        userId,
       },
-      update: { quantity: safeQuantity },
-      create: { variantId, warehouseId, quantity: safeQuantity }
+    });
+    return result;
+  }
+
+  async transferStock(data: {
+    variantId: string;
+    fromWarehouseId: string;
+    toWarehouseId: string;
+    quantity: number;
+    note?: string;
+    userId?: string;
+  }) {
+    const fromInv = await this.logisticsRepository.findInventory(
+      data.variantId,
+      data.fromWarehouseId,
+    );
+    if (!fromInv || fromInv.quantity < data.quantity) {
+      throw new BadRequestException('Insufficient stock at origin warehouse');
+    }
+
+    const fromWh = await this.prisma.warehouse.findUnique({
+      where: { id: data.fromWarehouseId },
+    });
+    const toWh = await this.prisma.warehouse.findUnique({
+      where: { id: data.toWarehouseId },
     });
 
-    // Update global stock summary in Variant model
-    const totalStock = await this.prisma.inventory.aggregate({
-      where: { variantId },
-      _sum: { quantity: true }
+    await this.logisticsRepository.transferInventory(
+      data.variantId,
+      data.fromWarehouseId,
+      data.toWarehouseId,
+      data.quantity,
+    );
+
+    await this.prisma.stockMovement.create({
+      data: {
+        variantId: data.variantId,
+        fromWarehouseId: data.fromWarehouseId,
+        toWarehouseId: data.toWarehouseId,
+        quantity: data.quantity,
+        reason: 'TRANSFER',
+        note: data.note,
+        userId: data.userId,
+      },
     });
 
-    await this.prisma.variant.update({
-      where: { id: variantId },
-      data: { stock: totalStock._sum.quantity || 0 }
+    if (
+      fromWh &&
+      toWh &&
+      fromWh.location !== toWh.location &&
+      fromWh.location === 'USA' &&
+      toWh.location === 'MYANMAR'
+    ) {
+      await this.createCargoShipment({
+        originId: data.fromWarehouseId,
+        destinationId: data.toWarehouseId,
+        notes: `Auto-created from stock transfer. ${data.note ?? ''}`,
+        items: [{ variantId: data.variantId, quantity: data.quantity }],
+      });
+    }
+
+    return { success: true };
+  }
+
+  async bulkTransferStock(data: {
+    fromWarehouseId: string;
+    toWarehouseId: string;
+    items: { variantId: string; quantity: number }[];
+    note?: string;
+    userId?: string;
+  }) {
+    const fromWh = await this.prisma.warehouse.findUnique({
+      where: { id: data.fromWarehouseId },
+    });
+    const toWh = await this.prisma.warehouse.findUnique({
+      where: { id: data.toWarehouseId },
     });
 
-    return inventory;
+    if (!fromWh || !toWh) {
+      throw new NotFoundException('One or both warehouses not found');
+    }
+
+    // Verify all stock first
+    for (const item of data.items) {
+      const fromInv = await this.logisticsRepository.findInventory(
+        item.variantId,
+        data.fromWarehouseId,
+      );
+      if (!fromInv || fromInv.quantity < item.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for variant ${item.variantId} at origin warehouse`,
+        );
+      }
+    }
+
+    // Perform transfers
+    for (const item of data.items) {
+      await this.logisticsRepository.transferInventory(
+        item.variantId,
+        data.fromWarehouseId,
+        data.toWarehouseId,
+        item.quantity,
+      );
+
+      await this.prisma.stockMovement.create({
+        data: {
+          variantId: item.variantId,
+          fromWarehouseId: data.fromWarehouseId,
+          toWarehouseId: data.toWarehouseId,
+          quantity: item.quantity,
+          reason: 'TRANSFER',
+          note: data.note,
+          userId: data.userId,
+        },
+      });
+    }
+
+    // Create cargo shipment if international
+    if (
+      fromWh.location !== toWh.location &&
+      fromWh.location === 'USA' &&
+      toWh.location === 'MYANMAR'
+    ) {
+      await this.createCargoShipment({
+        originId: data.fromWarehouseId,
+        destinationId: data.toWarehouseId,
+        notes: `Bulk transfer cargo. ${data.note ?? ''}`,
+        items: data.items,
+      });
+    }
+
+    return { success: true, itemCount: data.items.length };
+  }
+
+  async getLowStockVariants() {
+    const variants = await this.prisma.variant.findMany({
+      include: { product: true, inventory: { include: { warehouse: true } } },
+    });
+    return variants.filter((v) => v.stock <= v.lowStockThreshold);
   }
 
   // --- Cargo Management ---
@@ -73,163 +237,120 @@ export class LogisticsService {
     destinationId: string;
     carrier?: string;
     trackingNumber?: string;
+    notes?: string;
     items: { variantId: string; quantity: number }[];
   }) {
     let retries = 5;
     while (retries > 0) {
       try {
         const shipmentNumber = `CARGO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-        return await this.prisma.cargoShipment.create({
-          data: {
-            shipmentNumber,
-            originId: data.originId,
-            destinationId: data.destinationId,
-            carrier: data.carrier,
-            trackingNumber: data.trackingNumber,
-            items: {
-              create: data.items.map(item => ({
-                variantId: item.variantId,
-                quantity: item.quantity
-              }))
-            }
-          },
-          include: {
-            items: { include: { variant: true } },
-            origin: true,
-            destination: true
-          }
+        return await this.logisticsRepository.createCargoShipment({
+          ...data,
+          shipmentNumber,
         });
       } catch (error) {
-        // Handle unique constraint violation for shipmentNumber (Prisma error P2002)
-        if (error.code === 'P2002' && (error.meta?.target as string[])?.includes('shipmentNumber')) {
+        if (
+          error.code === 'P2002' &&
+          (error.meta?.target as string[])?.includes('shipmentNumber')
+        ) {
           retries--;
-          if (retries === 0) {
-            throw new BadRequestException('Failed to generate a unique shipment number after multiple attempts. Please try again.');
-          }
           continue;
         }
         throw error;
       }
     }
+    throw new BadRequestException(
+      'Failed to generate a unique shipment number',
+    );
   }
 
   async updateCargoStatus(id: string, status: CargoStatus) {
-    const shipment = await this.prisma.cargoShipment.findUnique({
-      where: { id },
-      include: { items: true, destination: true, origin: true }
-    });
-
+    const shipment = await this.logisticsRepository.findCargoById(id);
     if (!shipment) throw new NotFoundException('Shipment not found');
 
-    // Handle origin deduction if moving beyond PREPARING and not already deducted (Finding 2)
-    const isMovingAwayFromPreparing = status !== 'PREPARING' && shipment.status === 'PREPARING';
-    const isDirectlyCompleting = status === 'COMPLETED' && !shipment.originDeducted;
+    const allowed = CARGO_TRANSITIONS[shipment.status] ?? [];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException(
+        `Invalid status transition from ${shipment.status} to ${status}`,
+      );
+    }
 
-    if (isMovingAwayFromPreparing || isDirectlyCompleting) {
-      if (!shipment.originDeducted) {
-        for (const item of shipment.items) {
-          const inventory = await this.prisma.inventory.findUnique({
-            where: { variantId_warehouseId: { variantId: item.variantId, warehouseId: shipment.originId } }
-          });
+    const oldStatus = shipment.status;
+    const inventoryUpdates: Array<{
+      variantId: string;
+      warehouseId: string;
+      quantity: number;
+    }> = [];
+    const cargoUpdateData: Prisma.CargoShipmentUpdateInput = { status };
 
-          if (!inventory || inventory.quantity < item.quantity) {
-            throw new BadRequestException(`Insufficient stock for variant ${item.variantId} in origin warehouse`);
-          }
+    // 1. Handle Origin Deduction (Moving away from PREPARING)
+    if (status !== 'PREPARING' && !shipment.originDeducted) {
+      for (const item of shipment.items) {
+        const inventory = await this.logisticsRepository.findInventory(
+          item.variantId,
+          shipment.originId,
+        );
+        if (!inventory || inventory.quantity < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for variant ${item.variantId} in origin warehouse`,
+          );
         }
-
-        // Deduct from origin
-        for (const item of shipment.items) {
-          await this.addStockToWarehouse(item.variantId, shipment.originId, -item.quantity);
-        }
-
-        // Mark as deducted
-        await this.prisma.cargoShipment.update({
-          where: { id },
-          data: { originDeducted: true }
+        inventoryUpdates.push({
+          variantId: item.variantId,
+          warehouseId: shipment.originId,
+          quantity: -item.quantity,
         });
       }
+      cargoUpdateData.originDeducted = true;
+      cargoUpdateData.departureDate = new Date();
     }
 
-    const updatedShipment = await this.prisma.cargoShipment.update({
-      where: { id },
-      data: { 
-        status,
-        arrivalDate: status === 'COMPLETED' ? new Date() : undefined,
-        departureDate: (status === 'DEPARTED' || (status === 'COMPLETED' && !shipment.departureDate)) ? new Date() : undefined
-      }
-    });
-
-    // If shipment is COMPLETED and not already added to destination (Finding 2)
-    if (status === 'COMPLETED' && !shipment.destinationAdded) {
+    // 2. Handle Destination Addition (ARRIVED_MYANMAR, READY_FOR_DISTRIBUTION, or COMPLETED)
+    if (
+      DESTINATION_CREDIT_STATUSES.includes(status) &&
+      !shipment.destinationAdded
+    ) {
       for (const item of shipment.items) {
-        // Add to destination stock
-        await this.addStockToWarehouse(item.variantId, shipment.destinationId, item.quantity);
+        inventoryUpdates.push({
+          variantId: item.variantId,
+          warehouseId: shipment.destinationId,
+          quantity: item.quantity,
+        });
       }
-
-      // Mark as added
-      await this.prisma.cargoShipment.update({
-        where: { id },
-        data: { destinationAdded: true }
-      });
+      cargoUpdateData.destinationAdded = true;
+      cargoUpdateData.arrivalDate = new Date();
     }
 
-    return updatedShipment;
+    let result: any;
+    if (inventoryUpdates.length > 0) {
+      result = await this.logisticsRepository.updateCargoWithInventory(
+        id,
+        cargoUpdateData,
+        inventoryUpdates,
+      );
+    } else {
+      result = await this.logisticsRepository.updateCargo(id, cargoUpdateData);
+    }
+
+    if (oldStatus !== status) {
+      this.eventEmitter.emit(
+        'shipment.status_changed',
+        new ShipmentStatusChangedEvent(id, oldStatus, status),
+      );
+    }
+
+    return result;
   }
 
   async getInventoryOverview() {
-    const inventory = await this.prisma.inventory.findMany({
-      include: {
-        warehouse: true,
-        variant: {
-          include: {
-            product: true
-          }
-        }
-      },
-      orderBy: [
-        { variant: { productId: 'asc' } },
-        { warehouse: { location: 'asc' } }
-      ]
-    });
-
-    return inventory;
-  }
-
-  private async addStockToWarehouse(variantId: string, warehouseId: string, addQty: number) {
-    const current = await this.prisma.inventory.findUnique({
-      where: { variantId_warehouseId: { variantId, warehouseId } }
-    });
-
-    const newQty = (current?.quantity || 0) + addQty;
-    await this.updateStock(variantId, warehouseId, newQty);
+    return this.logisticsRepository.findAllInventoryWithDetails();
   }
 
   async getAllCargoShipments() {
-    return this.prisma.cargoShipment.findMany({
-      include: {
-        origin: true,
-        destination: true,
-        _count: { select: { items: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    return this.logisticsRepository.findAllCargoShipments();
   }
 
   async getCargoDetails(id: string) {
-    return this.prisma.cargoShipment.findUnique({
-      where: { id },
-      include: {
-        origin: true,
-        destination: true,
-        items: {
-          include: {
-            variant: {
-              include: { product: true }
-            }
-          }
-        }
-      }
-    });
+    return this.logisticsRepository.findCargoById(id);
   }
 }

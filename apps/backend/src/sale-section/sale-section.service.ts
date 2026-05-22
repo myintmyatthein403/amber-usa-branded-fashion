@@ -1,51 +1,62 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { SaleSectionRepository } from './sale-section.repository';
 
 @Injectable()
 export class SaleSectionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private repository: SaleSectionRepository) {}
 
   async create(data: any) {
-    if (data.isActive) {
-      await this.prisma.saleSection.updateMany({
-        where: { isActive: true },
-        data: { isActive: false },
-      });
-    }
-    return this.prisma.saleSection.create({ data });
+    return this.repository.create(data);
   }
 
-  async findAll() {
-    return this.prisma.saleSection.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(page = 1, limit = 10, search?: string) {
+    const skip = (page - 1) * limit;
+    const where = search
+      ? {
+          OR: [
+            { title: { contains: search, mode: 'insensitive' as const } },
+            { description: { contains: search, mode: 'insensitive' as const } },
+            { badge: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    const [items, total] = await Promise.all([
+      this.repository.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.repository.count(where),
+    ]);
+
+    return {
+      data: items,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findActive() {
-    return this.prisma.saleSection.findFirst({
-      where: { isActive: true },
-    });
+    return this.repository.findActive();
+  }
+
+  async findOne(id: string) {
+    const section = await this.repository.findById(id);
+    if (!section) throw new NotFoundException(`Sale section ${id} not found`);
+    return section;
   }
 
   async update(id: string, data: any) {
-    if (data.isActive) {
-      await this.prisma.saleSection.updateMany({
-        where: { 
-          isActive: true,
-          NOT: { id }
-        },
-        data: { isActive: false },
-      });
-    }
-    return this.prisma.saleSection.update({
-      where: { id },
-      data,
-    });
+    return this.repository.update(id, data);
   }
 
   async remove(id: string) {
-    return this.prisma.saleSection.delete({
-      where: { id },
-    });
+    return this.repository.delete(id);
   }
 }

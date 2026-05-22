@@ -2,23 +2,32 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Search, ArrowRight, ShoppingBag, Loader2 } from "lucide-react";
+import { X, Search, ArrowRight, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import Price from "./Price";
+import { useStore } from "@/store/useStore";
+import { Product, Brand } from "@amber/shared";
+
+interface SearchResult extends Product {
+  image: string;
+}
 
 export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
-  const [popularBrands, setPopularBrands] = useState<any[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [popularBrands, setPopularBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const market = useStore((state) => state.market);
 
   useEffect(() => {
     const fetchPopularBrands = async () => {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/brands`);
-        const data = await res.json();
-        setPopularBrands(data.slice(0, 6)); // Display top 6 brands
+        const responseData = await res.json();
+        // Handle potential nested data structure
+        const brands = responseData?.data || responseData || [];
+        setPopularBrands(Array.isArray(brands) ? brands.slice(0, 6) : []);
       } catch (error) {
         console.error("Failed to fetch brands:", error);
       }
@@ -31,18 +40,15 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
       if (query.length > 1) {
         setIsLoading(true);
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
-          const data = await res.json();
-          const filtered = data.filter((p: any) => 
-            p.name.toLowerCase().includes(query.toLowerCase()) || 
-            (p.brand?.name || "").toLowerCase().includes(query.toLowerCase()) ||
-            (p.category?.name || "").toLowerCase().includes(query.toLowerCase())
-          ).map((p: any) => ({
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?market=${market}&search=${encodeURIComponent(query)}&limit=8`);
+          const result = await res.json();
+          const data = result?.data || result || [];
+
+          const filtered: SearchResult[] = (data as unknown as any[]).map((p) => ({
             ...p,
-            category: p.category?.name || "Uncategorized",
             image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
           }));
-          setResults(filtered.slice(0, 8)); // Limit to 8 results for overlay
+          setResults(filtered); 
         } catch (error) {
           console.error("Search failed:", error);
         } finally {
@@ -55,7 +61,7 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
 
     const timeoutId = setTimeout(fetchResults, 300);
     return () => clearTimeout(timeoutId);
-  }, [query]);
+  }, [query, market]);
 
   return (
     <AnimatePresence>
@@ -122,7 +128,7 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
                           <Image src={product.image} alt={product.name} fill className="object-cover transition-transform duration-1000 group-hover:scale-110" />
                         </div>
                         <div className="space-y-1">
-                          <span className="text-[8px] font-bold uppercase tracking-widest text-[#D4AF37]">{product.category}</span>
+                          <span className="text-[8px] font-bold uppercase tracking-widest text-[#D4AF37]">{product.category?.name || "Uncategorized"}</span>
                           <h4 className="text-sm font-serif font-bold text-[#1A1A1A] group-hover:text-[#D4AF37] transition-colors">{product.name}</h4>
                           <Price amount={product.price} isUsdPrice={product.isUsdPrice} className="text-xs font-bold text-[#1A1A1A]/40" />
                         </div>

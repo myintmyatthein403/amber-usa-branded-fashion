@@ -1,27 +1,71 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
 import { apiService } from '../../services/api.service';
-import { SaleSection } from './schema';
+import { SaleSection, SaleSectionWithUrl } from './schema';
 
 export const useSaleSection = () => {
-  const { data: sections, loading, refresh } = useFetch<SaleSection>(API_ROUTES.SALE_SECTION.BASE);
+  const [sections, setSections] = useState<SaleSectionWithUrl[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState('');
+  const [totalPages, setTotalPages] = useState(1);
+  
   const { deleteItem } = useDelete(API_ROUTES.SALE_SECTION.BASE);
+
+  const fetchSections = async (currentPage = page, currentSearch = search, currentLimit = limit) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
+      });
+      
+      if (currentSearch) {
+        params.append('search', currentSearch);
+      }
+      
+      const response = await apiService<unknown, { data: SaleSectionWithUrl[]; meta?: any; pagination?: any }>(`${API_ROUTES.SALE_SECTION.BASE}?${params.toString()}`);
+      
+      // Handle array in response.data
+      const items = Array.isArray(response.data) ? response.data : [];
+      const meta = response.meta || response.pagination;
+
+      setSections(items);
+      setTotal(meta?.total || items.length);
+      setTotalPages(meta?.totalPages || 1);
+    } catch (error) {
+      console.error('Failed to fetch sections:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSections();
+  }, []);
+
+  const refresh = () => {
+    fetchSections(page, search, limit);
+  };
   
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [editingSection, setEditingSection] = useState<SaleSection | null>(null);
+  const [editingSection, setEditingSection] = useState<SaleSectionWithUrl | null>(null);
   
   const initialFormData = {
-    badge: 'Limited Time Event',
-    title: 'Thingyan',
-    titleItalic: 'Mega Sale',
-    description: 'Celebrate the Myanmar New Year with authentic USA brands at unprecedented prices.',
+    badge: '',
+    title: '',
+    titleItalic: '',
+    description: '',
     endDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    ctaText: 'Shop the Sale',
-    ctaLink: '/shop',
+    ctaText: '',
+    ctaLink: '',
     imageMain: '',
+    imageUrl: '',
     isActive: false
   };
 
@@ -32,11 +76,12 @@ export const useSaleSection = () => {
     data.append('file', file);
     setUploading(true);
     try {
-      const response = await apiService(API_ROUTES.UPLOAD, {
+      const response = await apiService<FormData, { url: string }>(API_ROUTES.UPLOAD, {
         method: 'POST',
         body: data,
         isMultipart: true
       });
+      if (!response?.url) return null;
       return `${import.meta.env.VITE_API_URL}${response.url}`;
     } catch (error) {
       console.error('Upload error:', error);
@@ -85,7 +130,7 @@ export const useSaleSection = () => {
     }
   };
 
-  const handleToggleActive = async (section: SaleSection) => {
+  const handleToggleActive = async (section: SaleSectionWithUrl) => {
     try {
       await apiService(API_ROUTES.SALE_SECTION.BY_ID(section.id), {
         method: 'PATCH',
@@ -107,7 +152,7 @@ export const useSaleSection = () => {
     setModalOpen(true);
   };
 
-  const openEditModal = (section: SaleSection) => {
+  const openEditModal = (section: SaleSectionWithUrl) => {
     setEditingSection(section);
     setFormData({ 
       badge: section.badge || '',
@@ -117,15 +162,49 @@ export const useSaleSection = () => {
       endDate: new Date(section.endDate).toISOString().split('T')[0],
       ctaText: section.ctaText || '',
       ctaLink: section.ctaLink || '',
-      imageMain: section.imageMain,
+      imageMain: section.imageMain || '',
+      imageUrl: section.imageUrl || '',
       isActive: section.isActive
     });
     setModalOpen(true);
   };
 
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+    fetchSections(1, value, limit);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchSections(newPage, search, limit);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+    fetchSections(1, search, newLimit);
+  };
+
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Remove this promotional section?');
+    setDeletingId(id);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    const success = await deleteItem(deletingId);
     if (success) refresh();
+    setDeleteModalOpen(false);
+    setDeletingId(null);
+  };
+
+  const cancelDelete = () => {
+    setDeleteModalOpen(false);
+    setDeletingId(null);
   };
 
   return {
@@ -144,6 +223,21 @@ export const useSaleSection = () => {
     handleDelete,
     openAddModal,
     openEditModal,
-    refresh
+    refresh,
+    // Pagination and search
+    page,
+    totalPages,
+    total,
+    limit,
+    search,
+    handleSearch,
+    handlePageChange,
+    handleLimitChange,
+    // Delete modal
+    deleteModalOpen,
+    setDeleteModalOpen,
+    deletingId,
+    confirmDelete,
+    cancelDelete
   };
 };

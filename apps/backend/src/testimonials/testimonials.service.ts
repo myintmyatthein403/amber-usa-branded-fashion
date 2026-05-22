@@ -1,37 +1,44 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Testimonial } from '@prisma/client';
+import { TestimonialsRepository } from './testimonials.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
+import { Testimonial as TestimonialInput } from '@amber/shared';
 
 @Injectable()
 export class TestimonialsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly testimonialsRepository: TestimonialsRepository,
+  ) {}
 
-  async create(data: any) {
-    return this.prisma.testimonial.create({ data });
+  async create(data: TestimonialInput): Promise<Testimonial> {
+    const sanitizedData = sanitizeData(data);
+    return this.testimonialsRepository.create(sanitizedData);
   }
 
-  async findAll() {
-    return this.prisma.testimonial.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(): Promise<Testimonial[]> {
+    return this.testimonialsRepository.findAll();
   }
 
-  async findActive() {
-    return this.prisma.testimonial.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findActive(): Promise<Testimonial[]> {
+    return this.testimonialsRepository.findActive();
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.testimonial.update({
-      where: { id },
-      data,
-    });
+  async findOne(id: string): Promise<Testimonial> {
+    const testimonial = await this.testimonialsRepository.findById(id);
+    if (!testimonial) {
+      throw new NotFoundException(`Testimonial with ID ${id} not found`);
+    }
+    return testimonial;
   }
 
-  async remove(id: string) {
-    return this.prisma.testimonial.delete({
-      where: { id },
-    });
+  async update(id: string, data: TestimonialInput): Promise<Testimonial> {
+    await this.findOne(id);
+    const sanitizedData = sanitizeData(data);
+    return this.testimonialsRepository.update(id, sanitizedData);
+  }
+
+  async remove(id: string): Promise<Testimonial> {
+    await this.findOne(id);
+    return this.testimonialsRepository.delete(id);
   }
 }

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Trash2, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, Check, AlertTriangle } from 'lucide-react';
 import { MediaItem } from '../schema';
 import { cn } from '../../../lib/utils';
 
@@ -18,12 +18,24 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = ({
   onSelect,
   onDelete
 }) => {
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (showConfirm) {
+      onDelete(item.id, e);
+      setShowConfirm(false);
+    } else {
+      setShowConfirm(true);
+    }
   };
 
   return (
@@ -52,6 +64,25 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = ({
           <div className="bg-primary text-white p-2 rounded-full mb-2">
             <Check size={20} />
           </div>
+        ) : showConfirm ? (
+          <div className="flex flex-col items-center gap-3">
+            <AlertTriangle className="w-6 h-6 text-destructive" />
+            <p className="text-white text-[9px] font-bold">Delete?</p>
+            <div className="flex gap-2">
+              <button 
+                onClick={handleDelete}
+                className="px-3 py-1.5 bg-destructive text-white text-[9px] font-bold uppercase tracking-wider hover:bg-destructive/80 transition-colors"
+              >
+                Confirm
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setShowConfirm(false); }}
+                className="px-3 py-1.5 bg-white text-black text-[9px] font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             <p className="text-white text-[10px] font-bold uppercase tracking-widest truncate w-full px-2 mb-1">
@@ -61,7 +92,7 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = ({
               {item.format} • {formatSize(item.size)}
             </p>
             <button 
-              onClick={(e) => onDelete(item.id, e)}
+              onClick={handleDelete}
               className="mt-4 p-2 bg-destructive/80 text-white hover:bg-destructive transition-colors rounded-full"
             >
               <Trash2 size={14} />

@@ -50,8 +50,8 @@ export const GiftCardsPage: React.FC = () => {
         title={editingGiftCard ? 'Modify Gift Certificate' : 'Issue New Gift Certificate'}
       >
         <GiftCardForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           onGenerateCode={generateCode}
           onSubmit={handleSubmit}
           submitting={submitting}

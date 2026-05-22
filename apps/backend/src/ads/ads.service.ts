@@ -1,58 +1,43 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { AdPlacement, AdStatus } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { AdPlacement } from '@prisma/client';
+import { AdsRepository } from './ads.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class AdsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly adsRepository: AdsRepository) {}
 
   async findAll() {
-    return this.prisma.ad.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.adsRepository.findAll();
   }
 
   async findActive(placement?: AdPlacement) {
-    const now = new Date();
-    return this.prisma.ad.findMany({
-      where: {
-        status: AdStatus.ACTIVE,
-        placement: placement,
-        OR: [
-          { startDate: null, endDate: null },
-          { startDate: { lte: now }, endDate: { gte: now } },
-          { startDate: { lte: now }, endDate: null },
-          { startDate: null, endDate: { gte: now } },
-        ],
-      },
-      orderBy: { priority: 'desc' },
-    });
+    return this.adsRepository.findActive(placement);
   }
 
   async findOne(id: string) {
-    return this.prisma.ad.findUnique({
-      where: { id },
-    });
+    const ad = await this.adsRepository.findById(id);
+    if (!ad) throw new NotFoundException(`Ad with ID ${id} not found`);
+    return ad;
   }
 
   async create(data: any) {
-    const sanitizedData = this.prisma.sanitizeData(data);
-    return this.prisma.ad.create({
-      data: sanitizedData,
-    });
+    const sanitizedData = sanitizeData(data);
+    return this.adsRepository.create(sanitizedData);
   }
 
   async update(id: string, data: any) {
-    const sanitizedData = this.prisma.sanitizeData(data);
-    return this.prisma.ad.update({
-      where: { id },
-      data: sanitizedData,
-    });
+    const ad = await this.adsRepository.findById(id);
+    if (!ad) throw new NotFoundException(`Ad with ID ${id} not found`);
+
+    const sanitizedData = sanitizeData(data);
+    return this.adsRepository.update(id, sanitizedData);
   }
 
   async remove(id: string) {
-    return this.prisma.ad.delete({
-      where: { id },
-    });
+    const ad = await this.adsRepository.findById(id);
+    if (!ad) throw new NotFoundException(`Ad with ID ${id} not found`);
+
+    return this.adsRepository.delete(id);
   }
 }

@@ -21,6 +21,7 @@ export const useOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingTracking, setUpdatingTracking] = useState(false);
 
   const { deleteItem } = useDelete(API_ROUTES.ORDERS.BASE);
 
@@ -37,9 +38,9 @@ export const useOrders = () => {
       if (statusFilter) params.append('status', statusFilter);
       if (paymentStatusFilter) params.append('paymentStatus', paymentStatusFilter);
 
-      const response = await apiService(`${API_ROUTES.ORDERS.BASE}?${params.toString()}`);
-      setOrders(response.data);
-      setMeta(response.meta);
+      const response = await apiService<unknown, { data: Order[]; meta: Meta }>(`${API_ROUTES.ORDERS.BASE}?${params.toString()}`);
+      setOrders(response.data || []);
+      setMeta(response.meta || null);
       setSelectedIds([]);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
@@ -55,7 +56,7 @@ export const useOrders = () => {
   const handleUpdateStatus = async (id: string, newStatus: OrderStatus) => {
     setUpdatingStatus(true);
     try {
-      await apiService(API_ROUTES.ORDERS.BY_ID(id), {
+      await apiService(API_ROUTES.ORDERS.UPDATE_STATUS(id), {
         method: 'PATCH',
         body: { status: newStatus },
       });
@@ -67,6 +68,71 @@ export const useOrders = () => {
       console.error('Failed to update order status:', error);
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleUpdateTracking = async (id: string, trackingData: { carrier: string; trackingNumber: string }) => {
+    setUpdatingTracking(true);
+    try {
+      await apiService(API_ROUTES.ORDERS.BY_ID(id) + '/tracking', {
+        method: 'PATCH',
+        body: trackingData,
+      });
+      fetchOrders();
+      if (selectedOrder?.id === id) {
+        setSelectedOrder({ ...selectedOrder, ...trackingData });
+      }
+    } catch (error) {
+      console.error('Failed to update tracking information:', error);
+    } finally {
+      setUpdatingTracking(false);
+    }
+  };
+
+  const handleConfirmManualPayment = async (id: string) => {
+    try {
+      await apiService(API_ROUTES.ORDERS.CONFIRM_MANUAL_PAYMENT(id), { method: 'POST' });
+      await fetchOrders();
+      if (selectedOrder?.id === id) {
+        const updated = await apiService<unknown, Order>(API_ROUTES.ORDERS.BY_ID(id));
+        setSelectedOrder((updated as { data?: Order })?.data ?? updated);
+      }
+    } catch (error) {
+      console.error('Failed to confirm payment:', error);
+      alert('Failed to confirm payment. Ensure proof is uploaded.');
+    }
+  };
+
+  const handleRejectManualPayment = async (id: string, reason: string) => {
+    try {
+      await apiService(API_ROUTES.ORDERS.REJECT_MANUAL_PAYMENT(id), {
+        method: 'POST',
+        body: { reason },
+      });
+      await fetchOrders();
+      if (selectedOrder?.id === id) {
+        const updated = await apiService<unknown, Order>(API_ROUTES.ORDERS.BY_ID(id));
+        setSelectedOrder((updated as { data?: Order })?.data ?? updated);
+      }
+    } catch (error) {
+      console.error('Failed to reject payment:', error);
+      alert('Failed to reject payment.');
+    }
+  };
+
+  const handleRefund = async (id: string, amount?: number) => {
+    try {
+      await apiService(`${API_ROUTES.ORDERS.BASE}/${id}/refund`, {
+        method: 'POST',
+        body: { amount },
+      });
+      fetchOrders();
+      if (selectedOrder?.id === id) {
+        setSelectedOrder({ ...selectedOrder, paymentStatus: 'REFUNDED', status: 'REFUNDED' });
+      }
+    } catch (error) {
+      console.error('Failed to process refund:', error);
+      alert('Refund failed. Please check Stripe logs.');
     }
   };
 
@@ -88,7 +154,9 @@ export const useOrders = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure you want to delete this order? This action cannot be undone.');
+    const confirmed = window.confirm('Are you sure you want to delete this order? This action cannot be undone.');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) fetchOrders();
   };
 
@@ -102,7 +170,7 @@ export const useOrders = () => {
     if (selectedIds.length === orders.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(orders.map(o => o.id));
+      setSelectedIds(orders.map(o => o.id!).filter((id): id is string => !!id));
     }
   };
 
@@ -134,7 +202,12 @@ export const useOrders = () => {
     modalOpen,
     setModalOpen,
     updatingStatus,
+    updatingTracking,
     handleUpdateStatus,
+    handleUpdateTracking,
+    handleRefund,
+    handleConfirmManualPayment,
+    handleRejectManualPayment,
     handleDelete,
     refresh: fetchOrders
   };

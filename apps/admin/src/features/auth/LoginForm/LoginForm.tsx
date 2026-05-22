@@ -1,6 +1,5 @@
 import React from 'react';
 import { ShoppingBag, Lock, Mail, Loader2 } from 'lucide-react';
-import { GoogleLogin } from '@react-oauth/google';
 
 interface LoginFormProps {
   email: string;
@@ -8,10 +7,8 @@ interface LoginFormProps {
   password: string;
   setPassword: (password: string) => void;
   loading: boolean;
-  googleLoading: boolean;
   error: string;
   setError: (error: string) => void;
-  handleGoogleSuccess: (credentialResponse: any) => void;
   handleSubmit: (e: React.FormEvent) => void;
 }
 
@@ -21,10 +18,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   password,
   setPassword,
   loading,
-  googleLoading,
   error,
   setError,
-  handleGoogleSuccess,
   handleSubmit
 }) => {
   return (
@@ -82,28 +77,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
         <button
           type="submit"
-          disabled={loading || googleLoading}
+          disabled={loading}
           className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground h-10 px-4 py-2 rounded-md font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
         </button>
-
-        <div className="relative py-2 flex items-center">
-          <div className="flex-grow border-t border-border"></div>
-          <span className="flex-shrink mx-4 text-xs text-muted-foreground uppercase tracking-widest">Or</span>
-          <div className="flex-grow border-t border-border"></div>
-        </div>
-
-        <div className="flex justify-center">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError('Google Login Failed')}
-            useOneTap
-            theme="outline"
-            shape="rectangular"
-            width="100%"
-          />
-        </div>
       </form>
 
       <p className="text-center text-xs text-muted-foreground">

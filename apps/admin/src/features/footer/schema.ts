@@ -15,4 +15,16 @@ export const FooterSectionSchema = z.object({
 });
 
 export type FooterSection = z.infer<typeof FooterSectionSchema> & { id: string };
-export type CreateFooterInput = z.infer<typeof FooterSectionSchema>;
+
+export type CreateFooterInput = {
+  companyName: string;
+  companySubtitle: string;
+  companyDescription: string;
+  instagramUrl?: string;
+  facebookUrl?: string;
+  contactAddress?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  copyrightText?: string;
+  isActive: boolean;
+};

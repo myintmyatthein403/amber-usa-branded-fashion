@@ -1,144 +1,168 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Product, Prisma } from '@prisma/client';
+import { ProductsRepository } from './products.repository';
+import { AttributesService } from '../attributes/attributes.service';
+import { sanitizeData } from '../common/utils/data-sanitizer';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  StockValidationItemDto,
+} from './dto/product.dto';
+
+export interface ProductListParams {
+  isFeatured?: boolean;
+  isNewArrival?: boolean;
+  isBestSeller?: boolean;
+  onSale?: boolean;
+  categoryId?: string;
+  brandId?: string;
+  currencyCode?: string;
+  market?: 'US' | 'MM';
+  warehouseLocation?: 'USA' | 'MYANMAR';
+  inStock?: boolean;
+  priceMin?: number;
+  priceMax?: number;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  attributeFilters?: Record<string, string>;
+  page?: number;
+  limit?: number;
+  search?: string;
+  publicOnly?: boolean;
+}
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private productsRepository: ProductsRepository,
+    private attributesService: AttributesService,
+  ) {}
 
-  async createProduct(data: any): Promise<Product> {
-    const sanitizedData = this.prisma.sanitizeData(data);
-    const { variants, ...productData } = sanitizedData;
-
-    return this.prisma.$transaction(async (tx) => {
-      const product = await tx.product.create({
-        data: {
-          ...productData,
-        },
-      });
-
-      if (variants && variants.length > 0) {
-        // Find a default warehouse for initial stock (Finding 1 & 2)
-        const defaultWarehouse = await tx.warehouse.findFirst({
-          where: { location: 'USA' }
-        }) || await tx.warehouse.findFirst();
-
-        for (const v of variants) {
-          const variant = await tx.variant.create({
-            data: {
-              sku: v.sku,
-              barcode: v.barcode,
-              size: v.size,
-              color: v.color,
-              stock: Number(v.stock) || 0,
-              lowStockThreshold: Number(v.lowStockThreshold) || 5,
-              price: v.price ? Number(v.price) : undefined,
-              compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
-              weight: Number(v.weight) || 0,
-              images: v.images || [],
-              isPreOrder: v.isPreOrder || false,
-              preOrderShippingDate: v.preOrderShippingDate,
-              productId: product.id
-            }
-          });
-
-          if (defaultWarehouse && variant.stock > 0) {
-            await tx.inventory.create({
-              data: {
-                variantId: variant.id,
-                warehouseId: defaultWarehouse.id,
-                quantity: variant.stock
-              }
-            });
-          }
-        }
-      }
-
-      return tx.product.findUnique({
-        where: { id: product.id },
-        include: {
-          category: true,
-          brand: true,
-          variants: true,
-          sale: true,
-        }
-      });
-    }) as Promise<Product>;
+  private async normalizeVariants<T extends { attributeSelections?: unknown }>(
+    variants?: T[],
+  ): Promise<T[] | undefined> {
+    if (!variants?.length) return variants;
+    return Promise.all(
+      variants.map(async (variant) => ({
+        ...variant,
+        attributeSelections: await this.attributesService.validateSelections(
+          variant.attributeSelections as Record<string, string> | null,
+        ),
+      })),
+    );
   }
 
-  async getAllProducts(params: {
-    isFeatured?: boolean;
-    isNewArrival?: boolean;
-    isBestSeller?: boolean;
-    onSale?: boolean;
-    categoryId?: string;
-    brandId?: string;
-    page?: number;
-    limit?: number;
-    search?: string;
-  } = {}): Promise<any> {
-    const { 
-      isFeatured, 
-      isNewArrival, 
-      isBestSeller, 
-      onSale, 
-      categoryId, 
-      brandId,
-      page,
-      limit,
-      search
-    } = params;
-    
+  private buildWhere(params: ProductListParams): Prisma.ProductWhereInput {
     const where: Prisma.ProductWhereInput = {
-      isFeatured,
-      isNewArrival,
-      isBestSeller,
-      onSale,
-      categoryId,
-      brandId,
+      isFeatured: params.isFeatured,
+      isNewArrival: params.isNewArrival,
+      isBestSeller: params.isBestSeller,
+      onSale: params.onSale,
+      categoryId: params.categoryId,
+      brandId: params.brandId,
     };
 
-    if (search) {
+    if (params.publicOnly) {
+      where.status = 'PUBLISHED';
+    } else if (params.status) {
+      where.status = params.status;
+    }
+
+    if (params.market) {
+      const allowedVisibilities: any[] = ['BOTH'];
+      if (params.market === 'US') {
+        allowedVisibilities.push('USA');
+      } else {
+        allowedVisibilities.push('MYANMAR');
+        allowedVisibilities.push('PRE_ORDER_ONLY');
+      }
+      where.visibility = { in: allowedVisibilities };
+    }
+
+    if (params.currencyCode) {
+      where.currencyCode = params.currencyCode;
+    }
+
+    if (params.search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { slug: { contains: search, mode: 'insensitive' } },
-        { shortDescription: { contains: search, mode: 'insensitive' } },
+        { name: { contains: params.search, mode: 'insensitive' } },
+        { slug: { contains: params.search, mode: 'insensitive' } },
+        { shortDescription: { contains: params.search, mode: 'insensitive' } },
       ];
     }
 
-    // Backward compatibility: if no pagination or search, return full list
-    if (!page && !limit && !search) {
-      return this.prisma.product.findMany({
-        where,
-        include: {
-          category: true,
-          brand: true,
-          variants: true,
-          sale: true,
+    if (params.priceMin !== undefined || params.priceMax !== undefined) {
+      where.price = {};
+      if (params.priceMin !== undefined) {
+        (where.price as Prisma.DecimalFilter).gte = params.priceMin;
+      }
+      if (params.priceMax !== undefined) {
+        (where.price as Prisma.DecimalFilter).lte = params.priceMax;
+      }
+    }
+
+    const variantFilters: Prisma.VariantWhereInput[] = [];
+
+    if (params.inStock) {
+      variantFilters.push({ stock: { gt: 0 } });
+    }
+
+    if (params.warehouseLocation) {
+      variantFilters.push({
+        inventory: {
+          some: {
+            quantity: { gt: 0 },
+            warehouse: { location: params.warehouseLocation },
+          },
         },
-        orderBy: { createdAt: 'desc' },
       });
     }
-    
+
+    if (params.attributeFilters) {
+      for (const [attrId, valueId] of Object.entries(params.attributeFilters)) {
+        if (!valueId || valueId === 'All') continue;
+        variantFilters.push({
+          attributeSelections: {
+            path: [attrId],
+            equals: valueId,
+          },
+        });
+      }
+    }
+
+    if (variantFilters.length > 0) {
+      where.variants = { some: { AND: variantFilters } };
+    }
+
+    return where;
+  }
+
+  async createProduct(data: CreateProductDto): Promise<Product> {
+    const sanitizedData = sanitizeData(data);
+    if (sanitizedData.variants) {
+      sanitizedData.variants = (await this.normalizeVariants(
+        sanitizedData.variants as CreateProductDto['variants'],
+      )) as CreateProductDto['variants'];
+    }
+    return this.productsRepository.create(sanitizedData);
+  }
+
+  async getAllProducts(params: ProductListParams = {}) {
+    const where = this.buildWhere(params);
+    const { page, limit, search } = params;
+
+    if (!page && !limit && !search && !params.publicOnly) {
+      return this.productsRepository.findAllSimple(where);
+    }
+
     const currentPage = Number(page) || 1;
     const currentLimit = Number(limit) || 20;
     const skip = (currentPage - 1) * currentLimit;
-    
-    const [data, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        include: {
-          category: true,
-          brand: true,
-          variants: true,
-          sale: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: currentLimit,
-      }),
-      this.prisma.product.count({ where }),
-    ]);
+
+    const [data, total] = await this.productsRepository.findAll(
+      where,
+      skip,
+      currentLimit,
+    );
 
     return {
       data,
@@ -147,242 +171,115 @@ export class ProductsService {
         page: currentPage,
         limit: currentLimit,
         totalPages: Math.ceil(total / currentLimit),
-      }
+      },
     };
   }
 
-  async getProductById(id: string): Promise<Product | null> {
-    return this.prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-        brand: true,
-        variants: true,
-        sale: true,
-        reviews: {
-          where: { isApproved: true },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
+  async getProductById(id: string, publicOnly = false): Promise<Product | null> {
+    const product = await this.productsRepository.findById(id);
+    if (!product) throw new NotFoundException('Product not found');
+    if (publicOnly && product.status !== 'PUBLISHED') {
+      throw new NotFoundException('Product not found');
+    }
+    return product;
   }
 
-  async updateProduct(id: string, data: any): Promise<Product> {
-    const sanitizedData = this.prisma.sanitizeData(data);
-    const { variants, ...productData } = sanitizedData;
+  async getProductBySlug(slug: string): Promise<Product | null> {
+    const product = await this.productsRepository.findBySlug(slug);
+    if (!product || product.status !== 'PUBLISHED') {
+      throw new NotFoundException('Product not found');
+    }
+    return product;
+  }
 
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Update the core product data
-      const product = await tx.product.update({
-        where: { id },
-        data: productData,
-      });
-
-      // 2. Sync variants if provided
-      if (variants) {
-        // Get existing variant IDs for this product
-        const existingVariants = await tx.variant.findMany({
-          where: { productId: id },
-          select: { id: true, sku: true }
-        });
-        const existingIds = existingVariants.map(v => v.id);
-        
-        // Identify variants to delete (those in DB but NOT in incoming request)
-        // Note: For variants, we usually rely on IDs or SKU for matching
-        const incomingIds = variants.map((v: any) => v.id).filter(Boolean);
-        let idsToDelete = existingIds.filter(eid => !incomingIds.includes(eid));
-
-        // Safety check: Don't delete variants that are referenced in orders
-        if (idsToDelete.length > 0) {
-          const referencedVariants = await tx.orderItem.findMany({
-            where: { variantId: { in: idsToDelete } },
-            select: { variantId: true }
-          });
-          const referencedIds = referencedVariants.map(rv => rv.variantId as string);
-          idsToDelete = idsToDelete.filter(id => !referencedIds.includes(id));
-        }
-
-        // Delete removed variants that are NOT referenced
-        if (idsToDelete.length > 0) {
-          await tx.variant.deleteMany({
-            where: { id: { in: idsToDelete } }
-          });
-        }
-
-        // Upsert incoming variants
-        for (const v of variants) {
-          const variantData = {
-            sku: v.sku,
-            barcode: v.barcode,
-            size: v.size,
-            color: v.color,
-            stock: Number(v.stock) || 0,
-            lowStockThreshold: Number(v.lowStockThreshold) || 5,
-            price: v.price ? Number(v.price) : undefined,
-            compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : undefined,
-            weight: Number(v.weight) || 0,
-            images: v.images || [],
-            isPreOrder: v.isPreOrder || false,
-            preOrderShippingDate: v.preOrderShippingDate,
-            productId: id
-          };
-
-          // If it has an ID and that ID exists in this product's variants, update it
-          if (v.id && existingIds.includes(v.id)) {
-            const variant = await tx.variant.findUnique({
-              where: { id: v.id },
-              include: { inventory: true }
-            });
-
-            if (variant && variantData.stock !== undefined) {
-              // Reconcile stock with Inventory (Finding 1)
-              if (variant.inventory.length > 1) {
-                // To avoid corruption, we don't allow direct stock updates if multiple warehouses are involved
-                // But for bulk product update, we might want to just update the first one or skip it.
-                // Given the risk, let's only update if exactly one record exists.
-                delete (variantData as any).stock; 
-              } else if (variant.inventory.length === 1) {
-                await tx.inventory.update({
-                  where: { id: variant.inventory[0].id },
-                  data: { quantity: variantData.stock }
-                });
-              } else {
-                // Create a default inventory record if none exists
-                const defaultWarehouse = await tx.warehouse.findFirst({
-                  where: { location: 'USA' }
-                }) || await tx.warehouse.findFirst();
-                
-                if (defaultWarehouse) {
-                  await tx.inventory.create({
-                    data: {
-                      variantId: variant.id,
-                      warehouseId: defaultWarehouse.id,
-                      quantity: variantData.stock
-                    }
-                  });
-                }
-              }
-            }
-
-            await tx.variant.update({
-              where: { id: v.id },
-              data: variantData
-            });
-          } else {
-            // Check if SKU or Barcode already exists globally to avoid unique constraint error
-            const existingVariant = await tx.variant.findFirst({
-               where: { 
-                 OR: [
-                   { sku: v.sku },
-                   ...(variantData.barcode ? [{ barcode: variantData.barcode }] : [])
-                 ]
-               }
-            });
-
-            if (existingVariant) {
-               // If it exists but belongs to this product, update it
-               if (existingVariant.productId === id) {
-                  await tx.variant.update({
-                    where: { id: existingVariant.id },
-                    data: variantData
-                  });
-               } else {
-                 // Error: SKU/Barcode belongs to another product
-                 const conflictField = existingVariant.sku === v.sku ? 'SKU' : 'Barcode';
-                 const conflictValue = existingVariant.sku === v.sku ? v.sku : variantData.barcode;
-                 throw new Error(`${conflictField} "${conflictValue}" already exists for another product.`);
-               }
-            } else {
-              // Create new
-              const newVariant = await tx.variant.create({
-                data: variantData
-              });
-
-              // Create inventory record (Finding 1 & 2)
-              if (newVariant.stock > 0) {
-                const defaultWarehouse = await tx.warehouse.findFirst({
-                  where: { location: 'USA' }
-                }) || await tx.warehouse.findFirst();
-
-                if (defaultWarehouse) {
-                  await tx.inventory.create({
-                    data: {
-                      variantId: newVariant.id,
-                      warehouseId: defaultWarehouse.id,
-                      quantity: newVariant.stock
-                    }
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-
-      return tx.product.findUnique({
-        where: { id },
-        include: {
-          category: true,
-          brand: true,
-          variants: true,
-          sale: true
-        }
-      });
-    }) as Promise<Product>;
+  async updateProduct(
+    id: string,
+    data: UpdateProductDto,
+    draft = false,
+  ): Promise<Product> {
+    const sanitizedData = sanitizeData(data);
+    if (!draft && sanitizedData.variants) {
+      sanitizedData.variants = (await this.normalizeVariants(
+        sanitizedData.variants as UpdateProductDto['variants'],
+      )) as UpdateProductDto['variants'];
+    }
+    return this.productsRepository.update(id, sanitizedData);
   }
 
   async deleteProduct(id: string): Promise<Product> {
-    return this.prisma.product.delete({
-      where: { id },
-    });
+    return this.productsRepository.delete(id);
   }
 
-  async validateStock(items: Array<{ productId: string; variantId?: string; quantity: number }>) {
+  async publishScheduled(): Promise<number> {
+    return this.productsRepository.publishScheduled();
+  }
+
+  async validateStock(items: StockValidationItemDto[]) {
     const results = [];
 
     for (const item of items) {
       if (item.variantId) {
-        const variant = await this.prisma.variant.findUnique({
-          where: { id: item.variantId },
-          include: { product: true }
-        });
+        const variant = await this.productsRepository.findVariantById(
+          item.variantId,
+        );
 
         if (!variant) {
-          results.push({ ...item, inStock: false, available: 0, error: 'Variant not found' });
+          results.push({
+            ...item,
+            inStock: false,
+            available: 0,
+            error: 'Variant not found',
+          });
           continue;
         }
 
-        const isPreOrder = variant.isPreOrder || variant.product.isPreOrder;
+        const isPreOrder =
+          variant.isPreOrder ||
+          variant.product.isPreOrder ||
+          variant.product.visibility === 'PRE_ORDER_ONLY';
         if (isPreOrder) {
           results.push({ ...item, inStock: true, isPreOrder: true });
         } else {
+          const warehouseStock = variant.inventory?.reduce(
+            (sum, inv) => sum + inv.quantity,
+            0,
+          ) ?? variant.stock;
           results.push({
             ...item,
-            inStock: variant.stock >= item.quantity,
-            available: variant.stock,
-            isPreOrder: false
+            inStock: warehouseStock >= item.quantity,
+            available: warehouseStock,
+            isPreOrder: false,
           });
         }
       } else {
-        const product = await this.prisma.product.findUnique({
-          where: { id: item.productId }
-        });
+        const product = await this.productsRepository.findProductSimpleById(
+          item.productId,
+        );
 
         if (!product) {
-          results.push({ ...item, inStock: false, available: 0, error: 'Product not found' });
+          results.push({
+            ...item,
+            inStock: false,
+            available: 0,
+            error: 'Product not found',
+          });
           continue;
         }
 
-        // For digital items (Gift Cards), category is 'Gift Card' and they don't have variants in this system
-        // We assume they are always in stock.
-        const isDigital = product.name.includes('Gift Card'); // Simple check for now
-        
+        const isDigital = product.name.includes('Gift Card');
+
         results.push({
           ...item,
-          inStock: isDigital || product.isPreOrder ? true : (product.stock >= item.quantity),
+          inStock:
+            isDigital ||
+            product.isPreOrder ||
+            product.visibility === 'PRE_ORDER_ONLY'
+              ? true
+              : product.stock >= item.quantity,
           available: product.stock,
-          isPreOrder: product.isPreOrder,
-          isDigital
+          isPreOrder:
+            product.isPreOrder || product.visibility === 'PRE_ORDER_ONLY',
+          isDigital,
         });
       }
     }

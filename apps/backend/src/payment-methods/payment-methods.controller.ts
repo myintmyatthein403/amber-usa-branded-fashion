@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { PaymentMethodsService } from './payment-methods.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -14,8 +24,8 @@ export class PaymentMethodsController {
   }
 
   @Get('active')
-  findActive() {
-    return this.service.findActive();
+  findActive(@Query('market') market?: string) {
+    return this.service.findActive(market);
   }
 
   @Get(':id')

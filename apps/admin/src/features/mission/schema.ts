@@ -20,4 +20,21 @@ export const MissionSectionSchema = z.object({
 });
 
 export type MissionSection = z.infer<typeof MissionSectionSchema> & { id: string };
-export type CreateMissionInput = z.infer<typeof MissionSectionSchema>;
+
+export type CreateMissionInput = {
+  badge?: string;
+  title: string;
+  titleItalic?: string;
+  description: string;
+  descriptionSecondary?: string;
+  featureOneTitle?: string;
+  featureOneDescription?: string;
+  featureTwoTitle?: string;
+  featureTwoDescription?: string;
+  trustBadgeText?: string;
+  imageMain: string;
+  imageSecondary?: string;
+  ctaText?: string;
+  ctaLink?: string;
+  isActive: boolean;
+};

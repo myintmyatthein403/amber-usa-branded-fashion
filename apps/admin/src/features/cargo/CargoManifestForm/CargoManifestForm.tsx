@@ -1,11 +1,18 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import type { Warehouse, Variant } from '../schema';
 
 interface CargoManifestFormProps {
-  warehouses: any[] | null;
-  variants: any[] | null;
-  formData: any;
-  setFormData: (data: any) => void;
+  warehouses: Warehouse[] | null;
+  variants: Variant[] | null;
+  formData: {
+    originId: string;
+    destinationId: string;
+    carrier: string;
+    trackingNumber: string;
+    items: { variantId: string; quantity: number }[];
+  };
+  setFormData: (data: CargoManifestFormProps['formData']) => void;
   selectedVariantId: string;
   setSelectedVariantId: (id: string) => void;
   selectedQuantity: number;
@@ -44,7 +51,7 @@ export const CargoManifestForm: React.FC<CargoManifestFormProps> = ({
             className="w-full h-12 border-b border-gray-200 bg-transparent px-0 py-2 text-base font-medium focus:border-primary focus:outline-none transition-colors rounded-none"
           >
             <option value="">Select Origin</option>
-            {warehouses?.map((w: any) => (
+            {warehouses?.map((w: Warehouse) => (
               <option key={w.id} value={w.id}>{w.name} ({w.location})</option>
             ))}
           </select>
@@ -58,7 +65,7 @@ export const CargoManifestForm: React.FC<CargoManifestFormProps> = ({
             className="w-full h-12 border-b border-gray-200 bg-transparent px-0 py-2 text-base font-medium focus:border-primary focus:outline-none transition-colors rounded-none"
           >
             <option value="">Select Destination</option>
-            {warehouses?.map((w: any) => (
+            {warehouses?.map((w: Warehouse) => (
               <option key={w.id} value={w.id}>{w.name} ({w.location})</option>
             ))}
           </select>
@@ -99,9 +106,9 @@ export const CargoManifestForm: React.FC<CargoManifestFormProps> = ({
                  className="w-full h-10 bg-white border border-border px-3 text-xs focus:border-primary focus:outline-none"
                >
                  <option value="">Select Variant</option>
-                 {variants?.map((v: any) => (
-                   <option key={v.id} value={v.id}>{v.product.name} - {v.size} / {v.color} ({v.sku})</option>
-                 ))}
+                  {variants?.map((v: Variant) => (
+                    <option key={v.id} value={v.id}>{v.product?.name ?? 'Unknown Product'} - {v.size} / {v.color} ({v.sku})</option>
+                  ))}
                </select>
             </div>
             <div className="w-24 space-y-2">
@@ -135,8 +142,8 @@ export const CargoManifestForm: React.FC<CargoManifestFormProps> = ({
                <tbody className="divide-y divide-border">
                   {formData.items.length === 0 ? (
                     <tr><td colSpan={3} className="px-4 py-8 text-center text-[10px] text-muted-foreground italic">Manifest is currently empty.</td></tr>
-                  ) : formData.items.map((item: any) => {
-                    const v = variants?.find((v: any) => v.id === item.variantId);
+) : formData.items.map((item: { variantId: string; quantity: number }) => {
+                     const v = variants?.find((v: Variant) => v.id === item.variantId);
                     return (
                       <tr key={item.variantId}>
                          <td className="px-4 py-3">

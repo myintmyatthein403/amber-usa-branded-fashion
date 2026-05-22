@@ -32,7 +32,7 @@ export const RoleCard: React.FC<RoleCardProps> = ({
           <div className="flex items-center gap-1.5 px-3 py-1 bg-secondary rounded-full border border-border">
             <Users size={10} className="text-muted-foreground" />
             <span className="text-[10px] font-bold text-foreground">
-              {role._count?.users || 0}
+              {(role as any)._count?.users || 0}
             </span>
           </div>
         </div>

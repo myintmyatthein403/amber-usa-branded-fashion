@@ -1,7 +1,7 @@
 export const APP_CONFIG = {
   NAME: 'Amber Brand Fashion',
   DESCRIPTION: 'Myanmar Heritage Management Portal',
-  API_BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  API_BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:5050',
   DATE_FORMAT: 'MMM dd, yyyy',
 };
 
@@ -16,6 +16,7 @@ export const API_ROUTES = {
   },
   CATEGORIES: {
     BASE: '/categories',
+    REORDER: '/categories/reorder',
     BY_ID: (id: number | string) => `/categories/${id}`,
   },
   BRANDS: {
@@ -25,6 +26,14 @@ export const API_ROUTES = {
   VARIANTS: {
     BASE: '/variants',
     BY_ID: (id: number | string) => `/variants/${id}`,
+    UPDATE_STOCK: (id: number | string) => `/variants/${id}/stock`,
+  },
+  WISHLIST: {
+    BASE: '/wishlist',
+  },
+  ADDRESSES: {
+    BASE: '/addresses',
+    BY_ID: (id: string) => `/addresses/${id}`,
   },
   HERO: {
     BASE: '/hero',
@@ -112,21 +121,47 @@ export const API_ROUTES = {
     BULK_STATUS: '/orders/bulk-status',
     BULK_PAYMENT_STATUS: '/orders/bulk-payment-status',
     PENDING_COUNT: '/orders/pending-count',
+    PAYMENT_PROOF: (id: string) => `/orders/${id}/payment-proof`,
+    CONFIRM_MANUAL_PAYMENT: (id: string) => `/orders/${id}/confirm-manual-payment`,
+    REJECT_MANUAL_PAYMENT: (id: string) => `/orders/${id}/reject-manual-payment`,
     },
-    LOGISTICS: {
+  LOGISTICS: {
     WAREHOUSES: '/logistics/warehouses',
     INVENTORY: '/logistics/inventory',
     INVENTORY_BY_VARIANT: (variantId: string) => `/logistics/inventory/${variantId}`,
     INVENTORY_BY_WAREHOUSE: (warehouseId: string) => `/logistics/inventory/warehouse/${warehouseId}`,
     UPDATE_STOCK: '/logistics/inventory/update',
+    TRANSFER_STOCK: '/logistics/inventory/transfer',
+    BULK_TRANSFER: '/logistics/inventory/bulk-transfer',
+    LOW_STOCK: '/logistics/inventory/low-stock',
     CARGO: '/logistics/cargo',
     CARGO_BY_ID: (id: string) => `/logistics/cargo/${id}`,
     CARGO_STATUS: (id: string) => `/logistics/cargo/${id}/status`,
     },
-    MEDIA: {
+  MEDIA: {
     BASE: '/media',
     UPLOAD: '/media/upload',
     BY_ID: (id: string) => `/media/${id}`,
-    },
-    };
+  },
+  CURRENCIES: {
+    BASE: '/currencies',
+    BY_ID: (id: string) => `/currencies/${id}`,
+    SET_BASE: '/currencies/set-base',
+  },
+  ATTRIBUTES: {
+    BASE: '/attributes',
+    PUBLIC: '/attributes/public',
+    REORDER: '/attributes/reorder',
+    BY_ID: (id: string) => `/attributes/${id}`,
+    VALUES: (id: string) => `/attributes/${id}/values`,
+    VALUES_REORDER: (id: string) => `/attributes/${id}/values/reorder`,
+    VALUE_BY_ID: (id: string) => `/attributes/values/${id}`,
+  },
+  EXCHANGE_RATES: {
+    BASE: '/exchange-rates',
+    BY_ID: (id: string) => `/exchange-rates/${id}`,
+    UPDATE: '/exchange-rates/update',
+  },
+  STATS: '/stats',
+};
 

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -76,7 +81,9 @@ export class RolesService {
     }
 
     if (role._count.users > 0) {
-      throw new ForbiddenException('Cannot delete a role that is assigned to users');
+      throw new ForbiddenException(
+        'Cannot delete a role that is assigned to users',
+      );
     }
 
     return this.prisma.role.delete({

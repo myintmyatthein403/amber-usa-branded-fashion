@@ -2,7 +2,6 @@ import React from 'react';
 import { Loader2, Info } from 'lucide-react';
 import { useSettings } from '../features/settings/hooks/useSettings';
 import { SettingsHeader } from '../features/settings/components/SettingsHeader';
-import { CurrencySettings } from '../features/settings/components/CurrencySettings';
 import { StripeSettings } from '../features/settings/components/StripeSettings';
 import { PolicySettings } from '../features/settings/components/PolicySettings';
 
@@ -12,6 +11,7 @@ export const SettingsPage: React.FC = () => {
     submitting,
     success,
     formData,
+    rateMeta,
     updateField,
     handleSubmit,
     quillModules,
@@ -35,13 +35,8 @@ export const SettingsPage: React.FC = () => {
       />
 
       <div className="grid grid-cols-1 gap-12">
-        <CurrencySettings 
-          usdToMmkRate={formData.usdToMmkRate}
-          onUpdate={(val) => updateField('usdToMmkRate', val)}
-        />
-
         <StripeSettings 
-          formData={formData}
+          formData={formData as any}
           onUpdate={updateField}
         />
 

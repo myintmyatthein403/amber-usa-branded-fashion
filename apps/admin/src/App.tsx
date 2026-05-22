@@ -28,9 +28,14 @@ import { WarehousesPage } from './pages/WarehousesPage';
 import { CargoPage } from './pages/CargoPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { MediaPage } from './pages/MediaPage';
+import { CurrencyPage } from './pages/CurrencyPage';
+import { AttributePage } from './pages/AttributePage';
 import { useAdminUIStore } from './store/useAdminUIStore';
+import type { User } from '@amber/shared';
 import { apiService } from './services/api.service';
+import { extractRoleString } from './lib/utils';
 import { API_ROUTES } from './config/constants';
+import { ToastContainer } from './components/admin/ToastContainer';
 import { 
   Users, 
   ShoppingBag, 
@@ -46,15 +51,15 @@ const TAB_PERMISSIONS: Record<string, string[]> = {
   brands: ['brands:manage'],
   variants: ['products:write'],
   orders: ['orders:manage'],
-  warehouses: ['settings:manage'],
-  inventory: ['settings:manage'],
-  cargo: ['orders:manage'],
+  warehouses: ['logistics:manage'],
+  inventory: ['logistics:manage'],
+  cargo: ['logistics:manage'],
   reviews: ['reviews:manage'],
-  sales: ['marketing:manage'],
-  coupons: ['marketing:manage'],
+  sales: ['sales:manage'],
+  coupons: ['coupons:manage'],
   giftcards: ['giftcards:manage'],
   ads: ['ads:manage'],
-  collections: ['marketing:manage'],
+  collections: ['collections:manage'],
   hero: ['content:manage'],
   mission: ['content:manage'],
   'gift-card-section': ['content:manage'],
@@ -67,6 +72,8 @@ const TAB_PERMISSIONS: Record<string, string[]> = {
   settings: ['settings:manage'],
   'delivery-methods': ['settings:manage'],
   media: ['content:manage'],
+  currencies: ['settings:manage'],
+  attributes: ['products:write'],
 };
 
 const AccessDenied = () => (
@@ -98,14 +105,16 @@ function App() {
     }
   }, [pendingOrdersCount]);
 
-  const hasAccess = (tab: string): boolean => {
+    const hasAccess = (tab: string): boolean => {
     if (!user) return false;
-    if (user.role === 'SUPERADMIN') return true;
+    
+    const userRole = extractRoleString(user);
+    if (userRole?.toUpperCase() === 'SUPERADMIN') return true;
     
     const required = TAB_PERMISSIONS[tab];
-    if (!required) return true; // Public tabs like dashboard
+    if (!required) return true;
     
-    const userPerms = user.permissions || user.role?.permissions || [];
+    const userPerms = user?.permissions || [];
     return required.some(p => userPerms.includes(p));
   };
 
@@ -117,18 +126,19 @@ function App() {
         return;
       }
 
-      try {
-        const profile = await apiService(API_ROUTES.AUTH.PROFILE);
-        updateUser(profile);
-        
-        // Only fetch pending count if user is admin/superadmin (Finding 5)
-        if (profile && ['ADMIN', 'SUPERADMIN'].includes(profile.role)) {
-          const pendingCount = await apiService(API_ROUTES.ORDERS.PENDING_COUNT);
-          setPendingOrdersCount(pendingCount);
-        } else {
-          setPendingOrdersCount(0);
-        }
-      } catch (error) {
+       try {
+         const response = await apiService<null, { data: User }>(API_ROUTES.AUTH.PROFILE);
+         const profile = response.data;
+         updateUser(profile);
+         
+         // Only fetch pending count if user is admin/superadmin (Finding 5)
+         if (profile && profile.role && ['ADMIN', 'SUPERADMIN'].includes(extractRoleString(profile) || '')) {
+           const pendingResponse = await apiService<null, { data: { count: number } }>(API_ROUTES.ORDERS.PENDING_COUNT);
+           setPendingOrdersCount(pendingResponse.data.count);
+         } else {
+           setPendingOrdersCount(0);
+         }
+       } catch (error) {
         console.error('Failed to sync backend data:', error);
         if ((error as any).message?.includes('401')) {
           logout();
@@ -148,7 +158,7 @@ function App() {
   // Sync activeTab with URL on mount
   useEffect(() => {
     const path = window.location.pathname.replace(/^\//, '');
-    const validTabs: any[] = ['dashboard', 'products', 'categories', 'brands', 'variants', 'hero', 'mission', 'gift-card-section', 'sale-section', 'footer-section', 'testimonials', 'community-posts', 'collections', 'coupons', 'gift-cards', 'sales', 'reviews', 'orders', 'customers', 'staff', 'roles', 'settings', 'delivery-methods', 'ads', 'warehouses', 'cargo', 'inventory', 'media'];
+    const validTabs: any[] = ['dashboard', 'products', 'categories', 'brands', 'variants', 'hero', 'mission', 'gift-card-section', 'sale-section', 'footer-section', 'testimonials', 'community-posts', 'collections', 'coupons', 'gift-cards', 'sales', 'reviews', 'orders', 'customers', 'staff', 'roles', 'settings', 'delivery-methods', 'ads', 'warehouses', 'cargo', 'inventory', 'media', 'currencies', 'attributes'];
     
     if (validTabs.includes(path)) {
       setActiveTab(path as any);
@@ -213,6 +223,8 @@ function App() {
       case 'staff': return <UsersPage mode="staff" />;
       case 'roles': return <RolesPage />;
       case 'media': return <MediaPage />;
+      case 'currencies': return <CurrencyPage />;
+      case 'attributes': return <AttributePage />;
       default: return <Dashboard />;
     }
   };
@@ -220,6 +232,7 @@ function App() {
   return (
     <AdminLayout>
       {renderActivePage()}
+      <ToastContainer />
     </AdminLayout>
   );
 }

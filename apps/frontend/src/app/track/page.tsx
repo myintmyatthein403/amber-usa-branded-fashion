@@ -1,62 +1,120 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import { motion, AnimatePresence } from "motion/react";
 import { Search, Package, Truck, CheckCircle2, Clock, MapPin, ArrowRight, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 
-const MOCK_TRACKING_DATA: Record<string, any> = {
-  "AMB-2026-0892": {
-    status: "In Transit",
-    currentLocation: "Yangon Sorting Center",
-    estimatedDelivery: "March 2, 2026",
-    timeline: [
-      { status: "Order Placed", date: "Feb 28, 2026, 10:30 AM", completed: true },
-      { status: "Processing", date: "Feb 28, 2026, 02:15 PM", completed: true },
-      { status: "Shipped", date: "March 1, 2026, 09:00 AM", completed: true },
-      { status: "In Transit", date: "March 1, 2026, 04:30 PM", completed: false },
-      { status: "Delivered", date: "Expected March 2, 2026", completed: false },
-    ]
-  }
-};
+interface TimelineItem {
+  status: string;
+  date: string;
+  completed: boolean;
+}
+
+interface TrackingInfo {
+  status: string;
+  currentLocation: string;
+  estimatedDelivery: string;
+  timeline: TimelineItem[];
+}
 
 function TrackingContent() {
   const searchParams = useSearchParams();
-  const [orderId, setOrderId] = useState(searchParams.get("id") || "");
   const [trackingInfo, setTrackingInfo] = useState<any>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState("");
+  const [localOrderId, setLocalOrderId] = useState(searchParams.get("id") || "");
 
-  const performTrack = (id: string) => {
+  const formatTimelineDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getTimeline = (order: { createdAt: string; updatedAt: string; status: string; paymentStatus: string }) => {
+    const timeline = [
+      { status: "Order Placed", date: formatTimelineDate(order.createdAt), completed: true },
+    ];
+
+    if (order.paymentStatus === 'PAID') {
+      timeline.push({ status: "Payment Verified", date: formatTimelineDate(order.updatedAt), completed: true });
+    } else {
+      timeline.push({ status: "Awaiting Payment", date: "Pending verification", completed: false });
+    }
+
+    const statusMap: Record<string, { label: string, weight: number }> = {
+      'PENDING': { label: 'Processing', weight: 1 },
+      'PROCESSING': { label: 'Preparing for shipment', weight: 2 },
+      'DELIVERING': { label: 'Shipped', weight: 3 },
+      'COMPLETED': { label: 'Delivered', weight: 4 },
+      'CANCELLED': { label: 'Cancelled', weight: 0 },
+      'REFUNDED': { label: 'Refunded', weight: 0 }
+    };
+
+    const currentStatus = statusMap[order.status] || { label: order.status, weight: 1 };
+    
+    if (order.status !== 'CANCELLED' && order.status !== 'REFUNDED') {
+      timeline.push({ 
+        status: currentStatus.label, 
+        date: order.status === 'PENDING' ? "Processing your items" : formatTimelineDate(order.updatedAt), 
+        completed: currentStatus.weight >= 2 
+      });
+
+      timeline.push({ 
+        status: "Delivered", 
+        date: order.status === 'COMPLETED' ? formatTimelineDate(order.updatedAt) : "Expected soon", 
+        completed: order.status === 'COMPLETED' 
+      });
+    } else {
+      timeline.push({ status: order.status, date: formatTimelineDate(order.updatedAt), completed: true });
+    }
+
+    return timeline;
+  };
+
+  const performTrack = useCallback(async (id: string) => {
+    if (!id) return;
     setIsSearching(true);
     setError("");
     
-    // Simulate API delay
-    setTimeout(() => {
-      const data = MOCK_TRACKING_DATA[id.toUpperCase()];
-      if (data) {
-        setTrackingInfo(data);
-      } else {
-        setError("Order ID not found. Please check and try again.");
-        setTrackingInfo(null);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/track/${id}`);
+      if (!response.ok) {
+        throw new Error("Order not found");
       }
+      const json = await response.json();
+      const order = json.data;
+      
+      setTrackingInfo({
+        status: order.status,
+        currentLocation: order.status === 'DELIVERING' ? "In transit to destination" : "Amber Facility",
+        estimatedDelivery: order.status === 'COMPLETED' ? "Delivered" : "3-5 Business Days",
+        timeline: getTimeline(order)
+      });
+    } catch (err) {
+      setError("Order ID not found. Please check and try again.");
+      setTrackingInfo(null);
+    } finally {
       setIsSearching(false);
-    }, 1000);
-  };
+    }
+  }, []);
 
   useEffect(() => {
     const id = searchParams.get("id");
     if (id) {
-      setOrderId(id);
       performTrack(id);
     }
-  }, [searchParams]);
+  }, [searchParams, performTrack]);
 
   const handleTrack = (e: React.FormEvent) => {
     e.preventDefault();
-    performTrack(orderId);
+    performTrack(localOrderId);
   };
 
   return (
@@ -78,14 +136,14 @@ function TrackingContent() {
         <div className="relative group">
           <input 
             type="text" 
-            placeholder="Enter Order ID (e.g. AMB-2026-0892)" 
-            className="w-full p-6 bg-white border border-[#1A1A1A]/5 shadow-xl outline-none focus:border-[#D4AF37] transition-all font-serif text-lg text-center"
-            value={orderId}
-            onChange={(e) => setOrderId(e.target.value)}
+            placeholder="Enter Order Number (e.g. AMB-2026-...)" 
+            className="w-full p-6 bg-white border border-[#1A1A1A]/5 shadow-xl outline-none focus:border-[#D4AF37] transition-all font-serif text-lg text-center uppercase"
+            value={localOrderId}
+            onChange={(e) => setLocalOrderId(e.target.value)}
           />
           <button 
             type="submit"
-            disabled={!orderId || isSearching}
+            disabled={!localOrderId || isSearching}
             className="absolute right-4 top-1/2 -translate-y-1/2 p-4 bg-[#1A1A1A] text-white hover:bg-[#D4AF37] transition-all disabled:opacity-50"
           >
             {isSearching ? (
@@ -137,7 +195,7 @@ function TrackingContent() {
             <div className="bg-[#F5F0E1]/30 p-12 md:p-20 relative overflow-hidden">
               <div className="absolute inset-0 acheik-pattern opacity-10" />
               <div className="relative z-10 space-y-12 max-w-md mx-auto">
-                {trackingInfo.timeline.map((item: any, idx: number) => (
+                {trackingInfo.timeline.map((item: TimelineItem, idx: number) => (
                   <div key={idx} className="flex space-x-8 relative group">
                     {/* Vertical Line */}
                     {idx !== trackingInfo.timeline.length - 1 && (

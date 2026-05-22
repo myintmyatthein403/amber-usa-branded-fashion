@@ -1,87 +1,86 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { Collection, Prisma } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { CollectionsRepository } from './collections.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
+import { Collection } from '@amber/shared';
+
+interface CollectionInput extends Omit<Collection, 'id'> {
+  productIds?: string[];
+}
 
 @Injectable()
 export class CollectionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly collectionsRepository: CollectionsRepository) {}
 
-  async create(data: any) {
-    const { productIds, ...rest } = data;
-    return this.prisma.collection.create({
-      data: {
-        ...rest,
-        products: {
-          connect: productIds?.map((id: string) => ({ id })),
-        },
-      },
-      include: {
-        products: true,
-      },
-    });
+  async create(data: CollectionInput) {
+    const sanitizedData = sanitizeData(
+      data as unknown as Record<string, unknown>,
+    );
+    const productIds = (sanitizedData.productIds || []) as string[];
+    const { productIds: _p, name, slug, ...rest } = sanitizedData;
+
+    const createData: Prisma.CollectionCreateInput = {
+      name: name as string,
+      slug: slug as string,
+      ...(rest as Record<string, unknown>),
+      products:
+        productIds.length > 0
+          ? {
+              connect: productIds.map((id: string) => ({ id })),
+            }
+          : undefined,
+    };
+
+    return this.collectionsRepository.create(createData as any);
   }
 
   async findAll() {
-    return this.prisma.collection.findMany({
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    return this.collectionsRepository.findAll();
   }
 
   async findOne(id: string) {
-    return this.prisma.collection.findUnique({
-      where: { id },
-      include: {
-        products: {
-          include: {
-            brand: true,
-            category: true,
-          }
-        },
-      },
-    });
+    const collection = await this.collectionsRepository.findById(id);
+    if (!collection)
+      throw new NotFoundException(`Collection with ID ${id} not found`);
+    return collection;
   }
 
   async findBySlug(slug: string) {
-    return this.prisma.collection.findUnique({
-      where: { slug },
-      include: {
-        products: {
-          include: {
-            brand: true,
-            category: true,
-          }
-        },
-      },
-    });
+    const collection = await this.collectionsRepository.findBySlug(slug);
+    if (!collection)
+      throw new NotFoundException(`Collection with slug ${slug} not found`);
+    return collection;
   }
 
-  async update(id: string, data: any) {
-    const { productIds, ...rest } = data;
-    
-    const updateData: Prisma.CollectionUpdateInput = { ...rest };
+  async update(id: string, data: CollectionInput) {
+    const collection = await this.collectionsRepository.findById(id);
+    if (!collection)
+      throw new NotFoundException(`Collection with ID ${id} not found`);
 
-    if (productIds !== undefined) {
+    const sanitizedData = sanitizeData(
+      data as unknown as Record<string, unknown>,
+    );
+    const productIds = sanitizedData.productIds as string[] | undefined;
+    const { productIds: _p, ...rest } = sanitizedData;
+
+    const updateData: Prisma.CollectionUpdateInput = {
+      ...(rest as Record<string, unknown>),
+    };
+
+    if (productIds !== undefined && productIds !== null) {
       updateData.products = {
         set: productIds.map((pid: string) => ({ id: pid })),
       };
     }
 
-    return this.prisma.collection.update({
-      where: { id },
-      data: updateData,
-      include: {
-        products: true,
-      },
-    });
+    return this.collectionsRepository.update(id, updateData as any);
   }
 
   async remove(id: string) {
-    return this.prisma.collection.delete({
-      where: { id },
-    });
+    const collection = await this.collectionsRepository.findById(id);
+    if (!collection)
+      throw new NotFoundException(`Collection with ID ${id} not found`);
+
+    return this.collectionsRepository.delete(id);
   }
 }

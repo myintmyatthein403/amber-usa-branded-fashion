@@ -1,9 +1,10 @@
 import React from 'react';
 import { Trash2, Loader2 } from 'lucide-react';
+import type { GiftCardSectionFormData } from '@amber/shared';
 
 interface GiftCardSectionFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: GiftCardSectionFormData;
+  setFormData: (data: GiftCardSectionFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
   editingSection: any;
@@ -35,6 +36,7 @@ export const GiftCardSectionForm: React.FC<GiftCardSectionFormProps> = ({
               value={formData.badge}
               onChange={(e) => setFormData({ ...formData, badge: e.target.value })}
               className="w-full h-10 border-b border-input bg-transparent text-sm focus:border-primary focus:outline-none transition-colors"
+              placeholder="e.g. The Ultimate Gift"
             />
           </div>
         </div>
@@ -48,6 +50,7 @@ export const GiftCardSectionForm: React.FC<GiftCardSectionFormProps> = ({
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full h-12 border-b border-input bg-transparent text-2xl font-serif focus:border-primary focus:outline-none transition-colors"
+              placeholder="e.g. Share the Luxury"
             />
           </div>
           <div className="space-y-2">
@@ -57,6 +60,7 @@ export const GiftCardSectionForm: React.FC<GiftCardSectionFormProps> = ({
               value={formData.titleSecondary}
               onChange={(e) => setFormData({ ...formData, titleSecondary: e.target.value })}
               className="w-full h-12 border-b border-input bg-transparent text-2xl font-serif focus:border-primary focus:outline-none transition-colors"
+              placeholder="e.g. of Authentic Fashion"
             />
           </div>
         </div>
@@ -67,17 +71,18 @@ export const GiftCardSectionForm: React.FC<GiftCardSectionFormProps> = ({
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             className="w-full h-24 border border-input bg-transparent p-4 text-sm focus:border-primary focus:outline-none transition-colors resize-none"
+            placeholder="Describe the gift card section narrative..."
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
            <div className="space-y-2">
              <label className="text-[10px] font-bold uppercase text-muted-foreground">CTA Text</label>
-             <input type="text" value={formData.ctaText} onChange={(e) => setFormData({...formData, ctaText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" />
+             <input type="text" value={formData.ctaText} onChange={(e) => setFormData({...formData, ctaText: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs focus:border-primary outline-none" placeholder="e.g. Purchase a Gift Card" />
            </div>
            <div className="space-y-2">
              <label className="text-[10px] font-bold uppercase text-muted-foreground">CTA Link</label>
-             <input type="text" value={formData.ctaLink} onChange={(e) => setFormData({...formData, ctaLink: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs font-mono focus:border-primary outline-none" />
+             <input type="text" value={formData.ctaLink} onChange={(e) => setFormData({...formData, ctaLink: e.target.value})} className="w-full border-b border-border bg-transparent p-1 text-xs font-mono focus:border-primary outline-none" placeholder="/gift-cards" />
            </div>
         </div>
 
@@ -86,15 +91,15 @@ export const GiftCardSectionForm: React.FC<GiftCardSectionFormProps> = ({
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
              <div className="space-y-2">
                <label className="text-[10px] uppercase font-bold text-muted-foreground">Card Title</label>
-               <input type="text" value={formData.cardTitle} onChange={(e) => setFormData({...formData, cardTitle: e.target.value})} className="w-full border-b border-border bg-transparent text-sm focus:border-primary outline-none" />
+               <input type="text" value={formData.cardTitle} onChange={(e) => setFormData({...formData, cardTitle: e.target.value})} className="w-full border-b border-border bg-transparent text-sm focus:border-primary outline-none" placeholder="e.g. Amber" />
              </div>
              <div className="space-y-2">
                <label className="text-[10px] uppercase font-bold text-muted-foreground">Card Amount</label>
-               <input type="text" value={formData.cardAmount} onChange={(e) => setFormData({...formData, cardAmount: e.target.value})} className="w-full border-b border-border bg-transparent text-sm focus:border-primary outline-none" />
+               <input type="text" value={formData.cardAmount} onChange={(e) => setFormData({...formData, cardAmount: e.target.value})} className="w-full border-b border-border bg-transparent text-sm focus:border-primary outline-none" placeholder="e.g. 100,000 MMK" />
              </div>
              <div className="space-y-2">
                <label className="text-[10px] uppercase font-bold text-muted-foreground">Card Type Label</label>
-               <input type="text" value={formData.cardType} onChange={(e) => setFormData({...formData, cardType: e.target.value})} className="w-full border-b border-border bg-transparent text-sm focus:border-primary outline-none" />
+               <input type="text" value={formData.cardType} onChange={(e) => setFormData({...formData, cardType: e.target.value})} className="w-full border-b border-border bg-transparent text-sm focus:border-primary outline-none" placeholder="e.g. Gift Card" />
              </div>
            </div>
         </div>

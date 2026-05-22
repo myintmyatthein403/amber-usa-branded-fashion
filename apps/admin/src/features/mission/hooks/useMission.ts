@@ -14,20 +14,20 @@ export const useMission = () => {
   const [editingMission, setEditingMission] = useState<MissionSection | null>(null);
   
   const initialFormData: CreateMissionInput = {
-    badge: 'Our Mission',
-    title: 'Real Brands.',
-    titleItalic: 'Fair Price.',
-    description: 'Amber Premium was born from a simple need: access to genuine international brands in Myanmar without the sky-high markups.',
-    descriptionSecondary: 'We bridge the gap between global fashion and our local community. Every item in our shop is sourced directly from brand outlets and authorized retailers in the USA, ensuring you get exactly what you pay for.',
-    featureOneTitle: 'Direct Import',
-    featureOneDescription: 'Sourced directly from USA Brand Outlets.',
-    featureTwoTitle: 'Fair Pricing',
-    featureTwoDescription: 'Transparent costs with no hidden fees.',
-    trustBadgeText: 'Directly Imported from Official USA Stores. 100% Legit.',
+    badge: '',
+    title: '',
+    titleItalic: '',
+    description: '',
+    descriptionSecondary: '',
+    featureOneTitle: '',
+    featureOneDescription: '',
+    featureTwoTitle: '',
+    featureTwoDescription: '',
+    trustBadgeText: '',
     imageMain: '',
     imageSecondary: '',
-    ctaText: 'Shop All Authentic Brands',
-    ctaLink: '/shop',
+    ctaText: '',
+    ctaLink: '',
     isActive: false
   };
 
@@ -38,12 +38,12 @@ export const useMission = () => {
     data.append('file', file);
     setUploading(true);
     try {
-      const response = await apiService(API_ROUTES.UPLOAD, {
+      const response = await apiService<FormData, { url: string }>(API_ROUTES.UPLOAD, {
         method: 'POST',
         body: data,
         isMultipart: true
       });
-      // Cloudinary returns absolute URL, so check before prepending
+      if (!response?.url) return null;
       return response.url.startsWith('http') ? response.url : `${import.meta.env.VITE_API_URL}${response.url}`;
     } catch (error) {
       console.error('Upload error:', error);

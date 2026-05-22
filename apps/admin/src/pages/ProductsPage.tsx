@@ -1,20 +1,16 @@
 import React from 'react';
-import { 
-  Plus, 
-  Loader2, 
-  LayoutGrid, 
-  List, 
-  Search, 
-  ChevronLeft, 
-  ChevronRight 
-} from 'lucide-react';
-import { Modal } from '../components/admin/Modal';
-import { MediaSelector } from '../components/admin/MediaSelector';
+import { ShoppingBag, HelpCircle } from 'lucide-react';
 import { useProducts } from '../features/products/useProducts';
-import { ProductTable as ProductGridView } from '../features/products/components/ProductTable';
-import { ProductListView } from '../features/products/components/ProductListView';
-import { ProductForm } from '../features/products/components/ProductForm';
-import { VariantManager } from '../features/products/components/VariantManager';
+import {
+  ProductFilters,
+  ProductViews,
+  DeleteConfirmModal,
+  ProductModal,
+  ProductTour,
+} from '../features/products/components';
+import { MediaSelector } from '../components/admin/MediaSelector';
+import { PageHeader } from '../components/admin/PageHeader';
+import { DataViewControls } from '../components/admin/DataViewControls';
 
 export const ProductsPage: React.FC = () => {
   const {
@@ -25,9 +21,13 @@ export const ProductsPage: React.FC = () => {
     setPage,
     search,
     setSearch,
+    filters,
+    setFilters,
+    clearFilters,
     categories,
     brands,
-    warehouses,
+    collections,
+    warehouseList,
     sales,
     modalOpen,
     setModalOpen,
@@ -36,6 +36,8 @@ export const ProductsPage: React.FC = () => {
     step,
     setStep,
     submitting,
+    submitError,
+    setSubmitError,
     editingProduct,
     productForm,
     setProductForm,
@@ -45,208 +47,129 @@ export const ProductsPage: React.FC = () => {
     newVariant,
     setNewVariant,
     addVariant,
+    addBulkVariants,
     handleEditVariant,
     handleDeleteVariant,
     handleProductSubmit,
     handleDelete,
     openEditModal,
-    resetForm
+    resetForm,
+    deleteConfirmOpen,
+    setDeleteConfirmOpen,
+    confirmDelete,
+    cancelDelete,
+    openProductMedia,
+    openVariantMedia,
+    handleMediaSelect,
   } = useProducts();
 
-  const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
-  const [mediaTarget, setMediaTarget] = React.useState<'product' | 'variant'>('product');
-  const [replacingImageIndex, setReplacingImageIndex] = React.useState<number | null>(null);
-
-  const handleMediaSelect = (url: string) => {
-    if (mediaTarget === 'product') {
-      setProductForm((prev: any) => {
-        const newImages = [...prev.images];
-        if (replacingImageIndex !== null) {
-          newImages[replacingImageIndex] = url;
-        } else {
-          newImages.push(url);
-        }
-        return { ...prev, images: newImages };
-      });
-    } else {
-      setNewVariant((prev: any) => ({
-        ...prev,
-        images: [...(prev.images || []), url]
-      }));
-    }
-    setReplacingImageIndex(null);
-  };
-
-  const openProductMedia = (index?: number) => {
-    setMediaTarget('product');
-    setReplacingImageIndex(index !== undefined ? index : null);
-    setMediaSelectorOpen(true);
-  };
-
-  const openVariantMedia = () => {
-    setMediaTarget('variant');
-    setMediaSelectorOpen(true);
-  };
+  const [viewMode, setViewMode] = React.useState<'grid' | 'table'>('table');
+  const [tourOpen, setTourOpen] = React.useState(false);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
-      <div className="flex items-end justify-between">
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-bold tracking-[0.3em] text-primary uppercase leading-none">Catalog Management</span>
-          <h2 className="text-4xl font-serif text-foreground tracking-tight">Product Archive</h2>
-        </div>
-        <button 
-          onClick={() => {
+      <PageHeader
+        title="Product Archive"
+        badge="Catalog Management"
+        description="Master repository of all items. Manage inventory, pricing, and editorial content for our USA premium brands."
+        icon={ShoppingBag}
+        primaryAction={{
+          label: "Initialize Product",
+          onClick: () => {
             resetForm();
             setModalOpen(true);
-          }}
-          className="flex items-center gap-3 bg-foreground text-primary-foreground px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary transition-all duration-300 shadow-xl shadow-black/5"
-        >
-          <Plus size={18} /> Initialize Product
-        </button>
+          },
+          dataTour: "init-button"
+        }}
+        secondaryAction={{
+          icon: HelpCircle,
+          onClick: () => setTourOpen(true),
+          title: "Product Tour"
+        }}
+      />
+
+      <DataViewControls
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by name, SKU, or brand…"
+        viewMode={viewMode}
+        onViewModeChange={(mode) => setViewMode(mode)}
+      />
+
+      <div data-tour="filters">
+        <ProductFilters 
+          filters={filters}
+          setFilters={setFilters}
+          clearFilters={clearFilters}
+          categories={categories}
+          brands={brands}
+        />
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 items-center justify-between bg-card border border-border p-6">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-          <input 
-            type="text"
-            placeholder="Search catalog by name, slug..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-secondary/50 border border-border pl-12 pr-4 py-3 text-xs font-medium focus:outline-none focus:border-primary transition-colors"
-          />
-        </div>
+      <ProductViews
+        products={products}
+        meta={meta}
+        loading={loading}
+        viewMode={viewMode === 'table' ? 'list' : 'grid'}
+        onEdit={openEditModal}
+        onDelete={handleDelete}
+        page={page}
+        onPageChange={setPage}
+      />
 
-        <div className="flex items-center gap-2 border border-border p-1 bg-secondary/30">
-          <button 
-            onClick={() => setViewMode('grid')}
-            className={`p-2 transition-all duration-300 ${viewMode === 'grid' ? 'bg-foreground text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            title="Grid View"
-          >
-            <LayoutGrid size={18} />
-          </button>
-          <button 
-            onClick={() => setViewMode('list')}
-            className={`p-2 transition-all duration-300 ${viewMode === 'list' ? 'bg-foreground text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            title="List View"
-          >
-            <List size={18} />
-          </button>
-        </div>
-      </div>
+      <DeleteConfirmModal
+        isOpen={deleteConfirmOpen}
+        onClose={cancelDelete}
+        onConfirm={confirmDelete}
+      />
 
-      {loading ? (
-        <div className="py-40 flex flex-col items-center justify-center gap-4">
-          <Loader2 className="animate-spin text-primary" size={40} />
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Accessing Inventory...</p>
-        </div>
-      ) : (
-        <div className="space-y-10">
-          {viewMode === 'grid' ? (
-            <ProductGridView 
-              products={products} 
-              onEdit={openEditModal} 
-              onDelete={handleDelete} 
-            />
-          ) : (
-            <ProductListView 
-              products={products} 
-              onEdit={openEditModal} 
-              onDelete={handleDelete} 
-            />
-          )}
-
-          {/* Pagination */}
-          {meta && meta.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-10 border-t border-border">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Showing {products.length} of {meta.total} Products
-              </span>
-              <div className="flex items-center gap-4">
-                <button 
-                  disabled={page === 1}
-                  onClick={() => setPage(page - 1)}
-                  className="p-2 border border-border hover:border-primary disabled:opacity-30 transition-colors"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <span className="text-xs font-mono font-bold">{page} / {meta.totalPages}</span>
-                <button 
-                  disabled={page === meta.totalPages}
-                  onClick={() => setPage(page + 1)}
-                  className="p-2 border border-border hover:border-primary disabled:opacity-30 transition-colors"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <Modal 
-        isOpen={modalOpen} 
-        onClose={() => setModalOpen(false)} 
-        title={editingProduct ? "Refine Product SKUs" : "Initialize New Product"}
-        size="xl"
-      >
-        <div className="flex gap-10 mb-10 border-b border-border">
-          <button 
-            onClick={() => setStep(1)}
-            className={`pb-4 text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-300 border-b-2 ${step === 1 ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground'}`}
-          >
-            01. Core Definition
-          </button>
-          <button 
-            disabled={!editingProduct && step === 1}
-            onClick={() => setStep(2)}
-            className={`pb-4 text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-300 border-b-2 ${step === 2 ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground'} disabled:opacity-20`}
-          >
-            02. Variant Architecture
-          </button>
-        </div>
-
-        {step === 1 ? (
-          <ProductForm 
-            productForm={productForm}
-            setProductForm={setProductForm}
-            categories={categories}
-            brands={brands}
-            sales={sales}
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleProductSubmit();
-            }}
-            submitting={submitting}
-            editingProduct={editingProduct}
-            onOpenMedia={openProductMedia}
-          />
-        ) : (
-          <VariantManager 
-            newVariant={newVariant}
-            setNewVariant={setNewVariant}
-            editingVariant={editingVariant}
-            setEditingVariant={setEditingVariant}
-            addVariant={addVariant}
-            currentVariants={currentVariants}
-            handleEditVariant={handleEditVariant}
-            handleDeleteVariant={handleDeleteVariant}
-            warehouses={warehouses}
-            setStep={setStep}
-            onSave={handleProductSubmit}
-            submitting={submitting}
-            onOpenMedia={openVariantMedia}
-          />
-        )}
-      </Modal>
+      <ProductModal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setSubmitError(null);
+        }}
+        step={step}
+        onStepChange={setStep}
+        isEditing={!!editingProduct}
+        productForm={productForm}
+        setProductForm={setProductForm}
+        categories={categories}
+        brands={brands}
+        collections={collections}
+        sales={sales}
+        editingProduct={editingProduct}
+        onNext={() => setStep(2)}
+        submitting={submitting}
+        onOpenMedia={openProductMedia}
+        onOpenVariantMedia={openVariantMedia}
+        newVariant={newVariant}
+        setNewVariant={setNewVariant}
+        editingVariant={editingVariant}
+        setEditingVariant={setEditingVariant}
+        addVariant={addVariant}
+        addBulkVariants={addBulkVariants}
+        currentVariants={currentVariants}
+        handleEditVariant={handleEditVariant}
+        handleDeleteVariant={handleDeleteVariant}
+        warehouses={warehouseList}
+        onSave={handleProductSubmit}
+        productSlug={productForm.slug}
+        submitError={submitError}
+      />
 
       <MediaSelector 
         isOpen={mediaSelectorOpen} 
         onClose={() => setMediaSelectorOpen(false)} 
         onSelect={handleMediaSelect}
-        selectedUrls={mediaTarget === 'product' ? productForm.images : newVariant.images}
+        selectedUrls={
+          step === 2
+            ? newVariant.images || []
+            : productForm.images || []
+        }
       />
+
+      <ProductTour isOpen={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 };

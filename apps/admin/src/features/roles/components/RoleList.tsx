@@ -25,7 +25,7 @@ export const RoleList: React.FC<RoleListProps> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      {roles?.map((role) => (
+      {(roles || []).map((role) => (
         <RoleCard
           key={role.id}
           role={role}

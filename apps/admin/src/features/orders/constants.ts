@@ -23,4 +23,5 @@ export const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; icon:
   PAID: { label: 'Paid', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-600/10', border: 'border-emerald-600/20' },
   FAILED: { label: 'Failed', icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-600/10', border: 'border-rose-600/20' },
   REFUNDED: { label: 'Refunded', icon: ArrowRight, color: 'text-slate-600', bg: 'bg-slate-600/10', border: 'border-slate-600/20' },
+  REJECTED: { label: 'Rejected', icon: XCircle, color: 'text-rose-600', bg: 'bg-rose-600/10', border: 'border-rose-600/20' },
 };

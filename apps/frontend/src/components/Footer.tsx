@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Instagram, Facebook, Mail, MapPin, Phone } from "lucide-react";
+import CurrencySwitcher from "@/components/CurrencySwitcher";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 interface FooterData {
   companyName: string;
@@ -96,8 +98,12 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="pt-16 border-t border-white/5 flex flex-col md:flex-row justify-between items-center space-y-8 md:space-y-0">
+        <div className="pt-16 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-8">
           <p className="text-[10px] uppercase tracking-[0.3em] text-white/20 font-bold">{data.copyrightText}</p>
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <LanguageSwitcher />
+            <CurrencySwitcher compact />
+          </div>
           <div className="flex space-x-12 text-[10px] uppercase tracking-[0.3em] text-white/20 font-bold">
             <Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms-and-conditions" className="hover:text-white transition-colors">Terms of Service</Link>

@@ -41,8 +41,8 @@ export const FooterSectionPage: React.FC = () => {
         title={editingSection ? 'Refine Footer Composition' : 'Initialize Footer Section'}
       >
         <FooterForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           submitting={submitting}
           editingSection={editingSection}
           onSubmit={handleSubmit}

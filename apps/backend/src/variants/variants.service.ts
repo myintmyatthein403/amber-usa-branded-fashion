@@ -1,92 +1,89 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { VariantsRepository } from './variants.repository';
+import { Variant } from '@prisma/client';
+import { sanitizeData } from '../common/utils/data-sanitizer';
+import {
+  CreateVariantDto,
+  UpdateVariantDto,
+  VariantStockUpdateDto,
+} from './dto/variant.dto';
 
 @Injectable()
 export class VariantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private variantsRepository: VariantsRepository) {}
 
-  async createVariant(data: any) {
-    const sanitizedData = this.prisma.sanitizeData(data);
-    const { warehouseId, ...variantData } = sanitizedData;
-    
-    // Use transaction to ensure data integrity (Finding 2)
-    return this.prisma.$transaction(async (tx) => {
-      const variant = await tx.variant.create({ 
-        data: {
-          ...variantData,
-          stock: variantData.stock || 0
-        }
-      });
-
-      // If a warehouse was selected, create the initial inventory record
-      if (warehouseId && variant.stock > 0) {
-        await tx.inventory.create({
-          data: {
-            variantId: variant.id,
-            warehouseId: warehouseId,
-            quantity: variant.stock
-          }
-        });
-      }
-
-      return variant;
-    });
+  async createVariant(data: CreateVariantDto): Promise<Variant> {
+    const sanitizedData = sanitizeData(data);
+    return this.variantsRepository.create(sanitizedData);
   }
 
-  async getAllVariants(productId?: string) {
-    if (productId) {
-      return this.prisma.variant.findMany({ where: { productId } });
-    }
-    return this.prisma.variant.findMany({ include: { product: true } });
+  async getAllVariants(productId?: string): Promise<Variant[]> {
+    return this.variantsRepository.findAll(productId);
   }
 
-  async updateVariant(id: string, data: any) {
-    const sanitizedData = this.prisma.sanitizeData(data);
+  async updateVariant(id: string, data: UpdateVariantDto): Promise<Variant> {
+    const sanitizedData = sanitizeData(data);
     const { stock, ...rest } = sanitizedData;
 
-    return this.prisma.$transaction(async (tx) => {
-      const variant = await tx.variant.findUnique({ 
-        where: { id },
-        include: { inventory: true }
-      });
+    const variant = await this.variantsRepository.findById(id);
+    if (!variant) throw new NotFoundException('Variant not found');
 
-      if (!variant) throw new NotFoundException('Variant not found');
-
-      // If stock is being updated directly, we need to decide how to reconcile with Inventory.
-      // For simplicity and to satisfy Finding 1, we prevent direct stock updates 
-      // or at least ensure they are handled via Logistics if multiple warehouses exist.
-      // If the variant only has one inventory record, we can update it.
-      if (stock !== undefined) {
-        if (variant.inventory.length > 1) {
-          throw new BadRequestException('Cannot update stock directly for variants with multiple warehouse inventories. Use Logistics Management instead.');
-        }
-
-        if (variant.inventory.length === 1) {
-          await tx.inventory.update({
-            where: { id: variant.inventory[0].id },
-            data: { quantity: stock }
-          });
-        } else {
-          // If no inventory records exist but stock is provided, 
-          // we might want to create a default inventory record if we knew which warehouse.
-          // For now, just allow updating the cached stock field but warn it's not ideal.
-          // Better: block it and force logistics.
-          throw new BadRequestException('No inventory record found for this variant. Please add stock via Logistics Management.');
-        }
+    if (stock !== undefined) {
+      if (variant.inventory.length > 1) {
+        throw new BadRequestException(
+          'Cannot update stock directly for variants with multiple warehouse inventories. Use Logistics Management instead.',
+        );
       }
 
-      return tx.variant.update({ 
-        where: { id }, 
-        data: {
-          ...rest,
-          ...(stock !== undefined ? { stock } : {})
-        } 
-      });
-    });
+      if (variant.inventory.length === 1) {
+        return this.variantsRepository.updateWithInventory(
+          id,
+          rest,
+          variant.inventory[0].id,
+          stock,
+        );
+      } else {
+        throw new BadRequestException(
+          'No inventory record found for this variant. Please add stock via Logistics Management.',
+        );
+      }
+    }
+
+    return this.variantsRepository.update(id, sanitizedData);
   }
 
-  async deleteVariant(id: string) {
-    return this.prisma.variant.delete({ where: { id } });
+  async updateVariantStock(
+    id: string,
+    data: VariantStockUpdateDto,
+  ): Promise<Variant> {
+    const variant = await this.variantsRepository.findById(id);
+    if (!variant) throw new NotFoundException('Variant not found');
+
+    if (variant.inventory.length > 1) {
+      throw new BadRequestException(
+        'Cannot update stock directly for variants with multiple warehouse inventories. Use Logistics Management instead.',
+      );
+    }
+
+    if (variant.inventory.length === 1) {
+      return this.variantsRepository.updateWithInventory(
+        id,
+        {},
+        variant.inventory[0].id,
+        data.stock,
+      );
+    } else {
+      throw new BadRequestException(
+        'No inventory record found for this variant. Please add stock via Logistics Management.',
+      );
+    }
+  }
+
+  async deleteVariant(id: string): Promise<Variant> {
+    return this.variantsRepository.delete(id);
   }
 }

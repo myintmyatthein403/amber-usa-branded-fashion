@@ -1,39 +1,37 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { GiftCard, Prisma } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { GiftCard } from '@prisma/client';
+import { GiftCardsRepository } from './gift-cards.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class GiftCardsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly giftCardsRepository: GiftCardsRepository) {}
 
-  async create(data: Prisma.GiftCardCreateInput): Promise<GiftCard> {
-    return this.prisma.giftCard.create({
-      data,
-    });
+  async create(data: any): Promise<GiftCard> {
+    const sanitizedData = sanitizeData(data);
+    return this.giftCardsRepository.create(sanitizedData);
   }
 
   async findAll(): Promise<GiftCard[]> {
-    return this.prisma.giftCard.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.giftCardsRepository.findAll();
   }
 
-  async findOne(id: string): Promise<GiftCard | null> {
-    return this.prisma.giftCard.findUnique({
-      where: { id },
-    });
+  async findOne(id: string): Promise<GiftCard> {
+    const giftCard = await this.giftCardsRepository.findById(id);
+    if (!giftCard) {
+      throw new NotFoundException(`Gift card with ID ${id} not found`);
+    }
+    return giftCard;
   }
 
-  async update(id: string, data: Prisma.GiftCardUpdateInput): Promise<GiftCard> {
-    return this.prisma.giftCard.update({
-      where: { id },
-      data,
-    });
+  async update(id: string, data: any): Promise<GiftCard> {
+    await this.findOne(id);
+    const sanitizedData = sanitizeData(data);
+    return this.giftCardsRepository.update(id, sanitizedData);
   }
 
   async remove(id: string): Promise<GiftCard> {
-    return this.prisma.giftCard.delete({
-      where: { id },
-    });
+    await this.findOne(id);
+    return this.giftCardsRepository.delete(id);
   }
 }

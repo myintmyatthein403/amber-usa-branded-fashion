@@ -9,11 +9,7 @@ import { useState, useEffect } from "react";
 import Price from "./Price";
 
 export default function CompareDrawer() {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [mounted, setMounted] = useState(typeof window !== 'undefined');
 
   const compareList = useStore((state) => state.compareList);
   const isCompareDrawerOpen = useStore((state) => state.isCompareDrawerOpen);
@@ -28,7 +24,7 @@ export default function CompareDrawer() {
   return (
     <>
       <CompareModal 
-        products={compareList}
+        products={compareList as any}
         isOpen={isCompareModalOpen}
         onClose={() => setCompareModalOpen(false)}
         onRemove={removeFromCompare}
@@ -70,15 +66,15 @@ export default function CompareDrawer() {
                 {compareList.map((product) => (
                   <div key={product.id} className="relative group flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 p-4 border border-[#1A1A1A]/5 bg-[#F5F0E1]/30">
                     <div className="relative w-16 h-20 shrink-0 bg-white shadow-sm overflow-hidden">
-                      <Image src={product.image} alt={product.name} fill className="object-cover" />
+                      <Image src={product.images[0]} alt={product.name} fill className="object-cover" />
                     </div>
                     <div className="flex-1 space-y-1">
                       <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A] line-clamp-1">{product.name}</h4>
                       <Price amount={product.price} isUsdPrice={product.isUsdPrice} className="text-[10px] text-[#D4AF37] font-bold" />
-                      <p className="text-[9px] text-[#1A1A1A]/40 uppercase tracking-widest">{product.category}</p>
+                      <p className="text-[9px] text-[#1A1A1A]/40 uppercase tracking-widest">{(product as any).category?.name}</p>
                     </div>
                     <button 
-                      onClick={() => removeFromCompare(product.id)}
+                      onClick={() => removeFromCompare(product.id as any)}
                       className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                     >
                       <X className="w-3 h-3" />

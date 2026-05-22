@@ -1,22 +1,19 @@
-import { z } from 'zod';
 import { Package, Truck, MapPin, ShieldCheck, CheckCircle2, Clock, ExternalLink } from 'lucide-react';
+import { z } from 'zod';
+import { CargoStatusSchema, VariantSchema, WarehouseSchema, type LogisticVariant as Variant } from '@amber/shared';
+import type { CargoStatus, Warehouse, CargoShipment } from '@amber/shared';
 
-export type CargoStatus = 'PREPARING' | 'DEPARTED' | 'IN_TRANSIT' | 'ARRIVED_MYANMAR' | 'CUSTOMS_CLEARANCE' | 'READY_FOR_DISTRIBUTION' | 'COMPLETED';
+export { CargoStatusSchema, VariantSchema, WarehouseSchema };
+export type { CargoStatus, Variant, Warehouse, CargoShipment };
 
-export interface CargoShipment {
-  id: string;
-  shipmentNumber: string;
-  status: CargoStatus;
-  carrier?: string;
-  trackingNumber?: string;
-  origin: { name: string; location: string };
-  destination: { name: string; location: string };
-  items?: any[];
-  _count: { items: number };
-  createdAt: string;
+export interface GroupedInventory {
+  variant: Variant & { id: string };
+  product: { id: string; name: string; images: string[] };
+  warehouses: { warehouseId: string; warehouseName: string; quantity: number }[];
+  totalStock: number;
 }
 
-export const STATUS_CONFIG: Record<CargoStatus, { label: string; icon: any; color: string; bg: string; border: string }> = {
+export const STATUS_CONFIG: Record<CargoStatus, { label: string; icon: typeof Package; color: string; bg: string; border: string }> = {
   PREPARING: { label: 'Preparing', icon: Package, color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
   DEPARTED: { label: 'Departed USA', icon: ExternalLink, color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
   IN_TRANSIT: { label: 'In Transit', icon: Truck, color: 'text-indigo-500', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' },

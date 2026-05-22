@@ -11,9 +11,26 @@ import Link from "next/link";
 import Price from "@/components/Price";
 import { useAuthStore } from "@/store/useAuthStore";
 import { signOut } from "next-auth/react";
+import { getApiUrl, unwrapApiResponse } from "@/lib/api";
+import {
+  isUsernameFormatValid,
+  normalizeUsername,
+} from "@amber/shared";
+
+type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
+
+interface ProfileOrder {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  status: string;
+  totalAmount: number;
+  currency: string;
+  items: { id: string; name: string; price: number; image: string; size?: string; quantity: number; isUsd: boolean }[];
+}
 
 export default function ProfilePage() {
-  const { user, token, isAuthenticated, logout, updateUser } = useAuthStore();
+  const { user, token, isAuthenticated, hasHydrated, logout, updateUser } = useAuthStore();
   const setLoggingOut = useAuthStore((state) => state.setLoggingOut);
   const router = useRouter();
   
@@ -47,7 +64,9 @@ export default function ProfilePage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
+
   const [formData, setFormData] = useState({
     name: "",
     username: "",
@@ -58,19 +77,20 @@ export default function ProfilePage() {
   const fetchProfile = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+      const response = await fetch(`${getApiUrl()}/auth/profile`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
       if (response.ok) {
-        const data = await response.json();
-        updateUser(data);
+        const json = await response.json();
+        const profile = unwrapApiResponse<typeof user>(json);
+        updateUser(profile as NonNullable<typeof user>);
         setFormData({
-          name: data.name || "",
-          username: data.username || "",
-          phone: data.phone || "",
-          address: data.address || "",
+          name: profile?.name || "",
+          username: profile?.username || "",
+          phone: profile?.phone || "",
+          address: profile?.address || "",
         });
       } else if (response.status === 401) {
         logout();
@@ -84,38 +104,110 @@ export default function ProfilePage() {
   }, [token, updateUser, logout, router]);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.push("/login");
-    } else {
-      fetchProfile();
+      return;
     }
-  }, [isAuthenticated, router, fetchProfile]);
+    fetchProfile();
+  }, [hasHydrated, isAuthenticated, router, fetchProfile]);
+
+  useEffect(() => {
+    if (!isEditModalOpen || !token) return;
+
+    const normalized = normalizeUsername(formData.username);
+
+    if (!normalized) {
+      setUsernameStatus("idle");
+      return;
+    }
+
+    if (normalized === user?.username) {
+      setUsernameStatus("available");
+      return;
+    }
+
+    if (!isUsernameFormatValid(normalized)) {
+      setUsernameStatus("invalid");
+      return;
+    }
+
+    setUsernameStatus("checking");
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${getApiUrl()}/auth/username-available?username=${encodeURIComponent(formData.username)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const json = await res.json();
+        if (!res.ok) {
+          setUsernameStatus("invalid");
+          return;
+        }
+        const result = unwrapApiResponse<{
+          available: boolean;
+          reason?: string;
+        }>(json);
+        setUsernameStatus(result.available ? "available" : "taken");
+      } catch {
+        setUsernameStatus("idle");
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formData.username, isEditModalOpen, token, user?.username]);
+
+  const usernameSaveBlocked =
+    usernameStatus === "checking" ||
+    usernameStatus === "taken" ||
+    usernameStatus === "invalid";
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (usernameSaveBlocked) return;
+
+    setModalError(null);
     setSubmitting(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+      const body = {
+        ...formData,
+        username: formData.username.trim()
+          ? normalizeUsername(formData.username)
+          : null,
+      };
+      const response = await fetch(`${getApiUrl()}/auth/profile`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       });
-      if (response.ok) {
-        const data = await response.json();
-        updateUser(data);
-        setIsEditModalOpen(false);
+      const json = await response.json();
+      if (!response.ok) {
+        setModalError(
+          (json as { message?: string })?.message ?? "Failed to save profile",
+        );
+        return;
       }
+      const profile = unwrapApiResponse<typeof user>(json);
+      updateUser(profile as NonNullable<typeof user>);
+      setFormData({
+        name: profile?.name || "",
+        username: profile?.username || "",
+        phone: profile?.phone || "",
+        address: profile?.address || "",
+      });
+      setIsEditModalOpen(false);
     } catch (error) {
       console.error("Failed to update profile:", error);
+      setModalError("Failed to save profile");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (!isAuthenticated || loading) {
+  if (!hasHydrated || (!isAuthenticated && hasHydrated) || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
@@ -209,6 +301,20 @@ export default function ProfilePage() {
                   <ChevronRight className={cn("w-3 h-3", activeTab === item.id ? "opacity-100" : "opacity-0")} />
                 </button>
               ))}
+              <Link
+                href="/account/addresses"
+                className="flex items-center justify-between p-4 text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/60 hover:bg-[#F5F0E1]/50 transition-all"
+              >
+                <span>Saved Addresses</span>
+                <ChevronRight className="w-3 h-3" />
+              </Link>
+              <Link
+                href="/account/wishlist"
+                className="flex items-center justify-between p-4 text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/60 hover:bg-[#F5F0E1]/50 transition-all"
+              >
+                <span>Wishlist</span>
+                <ChevronRight className="w-3 h-3" />
+              </Link>
               <button 
                 onClick={handleLogout}
                 className="flex items-center space-x-4 p-4 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all"
@@ -234,7 +340,11 @@ export default function ProfilePage() {
                     <div className="flex justify-between items-end border-b border-[#1A1A1A]/5 pb-6">
                       <h3 className="text-3xl font-serif">Profile Information</h3>
                       <button 
-                        onClick={() => setIsEditModalOpen(true)}
+                        onClick={() => {
+                          setModalError(null);
+                          setUsernameStatus("idle");
+                          setIsEditModalOpen(true);
+                        }}
                         className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] border-b border-[#D4AF37]"
                       >
                         Edit
@@ -294,7 +404,7 @@ export default function ProfilePage() {
                       {!user?.orders || user.orders.length === 0 ? (
                         <p className="text-sm text-[#1A1A1A]/40 italic">No orders found.</p>
                       ) : (
-                        user.orders.map((order: any) => (
+                        (user.orders as unknown as ProfileOrder[]).map((order) => (
                           <div key={order.id} className="p-6 border border-[#1A1A1A]/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-[#D4AF37] transition-all group">
                             <div className="space-y-1">
                               <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Order Number</p>
@@ -302,7 +412,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="space-y-1">
                               <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Date</p>
-                              <p className="text-sm font-medium">{new Date(order.date).toLocaleDateString()}</p>
+                              <p className="text-sm font-medium">{new Date(order.createdAt).toLocaleDateString()}</p>
                             </div>
                             <div className="space-y-1">
                               <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Status</p>
@@ -356,7 +466,7 @@ export default function ProfilePage() {
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1A1A1A]/5 pb-8">
                       <div className="space-y-2">
                         <h3 className="text-3xl font-serif">Order {selectedOrder.orderNumber}</h3>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Placed on {new Date(selectedOrder.date).toLocaleDateString()}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Placed on {new Date(selectedOrder.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div className="flex gap-4">
                         {selectedOrder.status === "COMPLETED" && (
@@ -379,7 +489,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-8">
-                      {selectedOrder.items?.map((item: any) => (
+                      {selectedOrder.items?.map((item: ProfileOrder["items"][number]) => (
                         <div key={item.id} className="flex space-x-6 items-center">
                           <div className="relative w-20 aspect-[3/4] bg-[#F5F0E1] overflow-hidden rounded-sm">
                             <Image src={item.image} alt={item.name} fill className="object-cover" />
@@ -473,11 +583,41 @@ export default function ProfilePage() {
                     <input 
                       type="text"
                       value={formData.username}
-                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      onChange={(e) => {
+                        setModalError(null);
+                        setFormData({ ...formData, username: e.target.value });
+                      }}
                       className="w-full p-4 bg-[#F5F0E1]/30 border border-[#1A1A1A]/5 outline-none focus:border-[#D4AF37] text-sm"
+                      autoComplete="username"
                     />
+                    {formData.username.trim() && (
+                      <p
+                        className={cn(
+                          "text-[10px] font-medium",
+                          usernameStatus === "available" && "text-green-600",
+                          usernameStatus === "taken" && "text-red-500",
+                          usernameStatus === "invalid" && "text-red-500",
+                          usernameStatus === "checking" && "text-[#1A1A1A]/40",
+                        )}
+                      >
+                        {usernameStatus === "checking" && (
+                          <span className="inline-flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Checking availability...
+                          </span>
+                        )}
+                        {usernameStatus === "available" && "Username is available"}
+                        {usernameStatus === "taken" && "That username is already taken"}
+                        {usernameStatus === "invalid" &&
+                          "Use 3–30 lowercase letters, numbers, dot or underscore"}
+                      </p>
+                    )}
                   </div>
                 </div>
+
+                {modalError && (
+                  <p className="text-xs text-red-500 font-medium italic">{modalError}</p>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]">Phone Number</label>
@@ -509,8 +649,8 @@ export default function ProfilePage() {
                   </button>
                   <button 
                     type="submit"
-                    disabled={submitting}
-                    className="flex-[2] py-4 bg-[#1A1A1A] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all shadow-xl shadow-black/10"
+                    disabled={submitting || usernameSaveBlocked}
+                    className="flex-[2] py-4 bg-[#1A1A1A] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all shadow-xl shadow-black/10 disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Save Changes"}
                   </button>

@@ -1,9 +1,10 @@
 import React from 'react';
 import { Percent, Banknote, Calendar, Hash, FileText, Loader2 } from 'lucide-react';
+import type { CouponFormData } from '@amber/shared';
 
 interface CouponFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: CouponFormData;
+  setFormData: (data: CouponFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
   editingCoupon: any;

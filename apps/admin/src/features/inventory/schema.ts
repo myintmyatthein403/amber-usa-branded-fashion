@@ -1,39 +1,13 @@
 import { z } from 'zod';
+import { InventorySchema, WarehouseSchema, VariantSchema, type LogisticVariant as Variant } from '@amber/shared';
+import type { Inventory, Warehouse } from '@amber/shared';
 
-export const InventoryItemSchema = z.object({
-  id: z.string(),
-  variantId: z.string(),
-  warehouseId: z.string(),
-  quantity: z.number(),
-  warehouse: z.object({
-    id: z.string(),
-    name: z.string(),
-    location: z.string(),
-  }),
-  variant: z.object({
-    id: z.string(),
-    sku: z.string(),
-    size: z.string(),
-    color: z.string(),
-    stock: z.number(),
-    product: z.object({
-      id: z.string(),
-      name: z.string(),
-      images: z.array(z.string()),
-    }),
-  }),
-});
-
-export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+export { InventorySchema, WarehouseSchema, VariantSchema };
+export type { Inventory, Warehouse, Variant };
 
 export interface GroupedInventory {
-  variant: InventoryItem['variant'];
+  variant: Variant & { id: string };
+  product: { id: string; name: string; images: string[] };
   stocks: Record<string, number>;
-  total: number;
-}
-
-export interface Warehouse {
-  id: string;
-  name: string;
-  location: string;
+  totalStock: number;
 }

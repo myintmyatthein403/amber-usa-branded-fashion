@@ -8,54 +8,66 @@ import QuickViewModal from "@/components/modals/QuickViewModal";
 import { useStore } from "@/store/useStore";
 import { cn } from "@/lib/utils";
 import Price from "./Price";
+import { Product } from "@amber/shared";
 
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: string;
-  compareAtPrice?: string;
-  isUsdPrice?: boolean;
-  onSale: boolean;
-  isFeatured: boolean;
-  image?: string;
+interface ExtendedProduct extends Product {
+  data?: {
+    brand?: { name: string };
+    category?: { name: string };
+  };
+  image: string;
   secondaryImage?: string;
-  category?: { name: string };
-  brand?: { name: string; logo?: string };
-  inStock?: boolean;
+  inStock: boolean;
+  sizes: string[];
+  colors: string[];
+}
+
+interface ResponseData {
+  data: ExtendedProduct[];
 }
 
 export default function ProductGrid({ title, filter }: { title: string, filter?: Record<string, string | boolean> }) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ResponseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   
   const selectedQuickViewProduct = useStore((state) => state.selectedQuickViewProduct);
   const setQuickViewProduct = useStore((state) => state.setQuickViewProduct);
   const addToCart = useStore((state) => state.addToCart);
+  const market = useStore((state) => state.market);
   const [addingId, setAddingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const queryParams = new URLSearchParams();
+        queryParams.append('market', market);
         if (filter) {
           Object.entries(filter).forEach(([key, value]) => {
             queryParams.append(key, value.toString());
           });
         }
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?${queryParams.toString()}`);
-        const data = await response.json();
-        // Add placeholder images and derive sizes/colors from variants
-        const productsWithImages = data.map((p: any) => ({
-          ...p,
-          inStock: p.variants?.some((v: any) => v.stock > 0) ?? true,
-          image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
-          secondaryImage: p.images?.[1] || p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
-          sizes: Array.from(new Set(p.variants?.map((v: any) => v.size) || [])),
-          colors: Array.from(new Set(p.variants?.map((v: any) => v.color) || [])),
-        }));
-        setProducts(productsWithImages);
+        const result = await response.json();
+        
+        // Handle nested data structure { data: [...] }
+        const data: Product[] = Array.isArray(result) ? result : (result?.data || []);
+        
+        const productsWithImages = data.map((p: any) => {
+          const hasVariantStock = p.variants?.some((v: any) => v.stock > 0);
+          const hasProductStock = p.stock !== undefined && p.stock > 0;
+          const inStock = hasVariantStock || (hasProductStock && (!p.variants || p.variants.length === 0));
+          
+          return {
+            ...p,
+            inStock,
+            image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
+            secondaryImage: p.images?.[1] || p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
+            sizes: Array.from(new Set(p.variants?.map((v: any) => v.size) || [])),
+            colors: Array.from(new Set(p.variants?.map((v: any) => v.color) || [])),
+          };
+        });
+        setProducts({ data: productsWithImages });
       } catch (error) {
         console.error('Failed to fetch products:', error);
       } finally {
@@ -63,17 +75,15 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
       }
     };
     fetchProducts();
-  }, [filter]);
+  }, [filter, market]);
 
-  const handleAddToCart = (e: React.MouseEvent, product: any) => {
+  const handleAddToCart = (e: React.MouseEvent, product: ExtendedProduct) => {
     e.stopPropagation();
     e.preventDefault();
-    setAddingId(product.id);
-    addToCart({
-      ...product,
-      price: parseFloat(product.price),
-      isUsdPrice: product.isUsdPrice !== false,
-    });
+    setAddingId(product.id!);
+    addToCart(
+      product,
+    );
     setTimeout(() => setAddingId(null), 1000);
   };
 
@@ -99,16 +109,16 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {loading ? (
             <div className="col-span-full py-20 text-center text-muted-foreground italic">Loading products from Myanmar Heritage...</div>
-          ) : products.length === 0 ? (
+          ) : !products || products.data.length === 0 ? (
              <div className="col-span-full py-20 text-center text-muted-foreground italic">No products available at the moment.</div>
-          ) : products.map((product, idx) => (
+          ) : products.data.map((product, idx) => (
             <motion.div
               key={product.id}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: idx * 0.1 }}
-              onMouseEnter={() => setHoveredProduct(product.id)}
+              onMouseEnter={() => setHoveredProduct(product.id!)}
               onMouseLeave={() => setHoveredProduct(null)}
               className="group cursor-pointer"
             >
@@ -120,10 +130,8 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
                   className="object-cover transition-transform duration-1000 group-hover:scale-110"
                 />
 
-                {/* Overlays */}
                 <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 
-                {/* Floating Actions */}
                 <div className="absolute bottom-4 left-4 right-4 flex space-x-2 translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                   <button 
                     disabled={!product.inStock || addingId === product.id}
@@ -146,10 +154,9 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
                   </button>
                 </div>
 
-                {/* Brand Badge */}
                 <div className="absolute top-4 left-4 flex items-center space-x-2">
                   <span className="bg-amber-gold backdrop-blur-md text-white text-[8px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-none">
-                    {product.brand?.name || product.category?.name || "Authentic"}
+                    {product.data?.brand?.name || product.data?.category?.name || "Authentic"}
                   </span>
                 </div>
 
@@ -157,6 +164,14 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
                   <div className="absolute top-4 right-4">
                     <span className="bg-red-500 text-white text-[8px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-none shadow-lg">
                       Sale
+                    </span>
+                  </div>
+                )}
+
+                {!product.inStock && (
+                  <div className="absolute top-4 left-4">
+                    <span className="bg-[#1A1A1A]/80 text-white text-[8px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-none">
+                      Out of Stock
                     </span>
                   </div>
                 )}

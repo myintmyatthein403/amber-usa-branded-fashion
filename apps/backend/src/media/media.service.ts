@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
@@ -16,7 +20,7 @@ export class MediaService {
 
     try {
       const result = await this.cloudinary.uploadFile(file);
-      
+
       try {
         return await this.prisma.media.create({
           data: {
@@ -61,7 +65,9 @@ export class MediaService {
         where: { id },
       });
     } catch (error) {
-      throw new BadRequestException(`Failed to delete from Cloudinary: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to delete from Cloudinary: ${error.message}`,
+      );
     }
   }
 }

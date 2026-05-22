@@ -1,9 +1,21 @@
-import { Controller, Get, Post, Body, Delete, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Delete,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { VariantsService } from './variants.service';
-import { Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { CreateVariantDto, UpdateVariantDto } from './dto/variant.dto';
 
 @Controller('variants')
 export class VariantsController {
@@ -17,14 +29,31 @@ export class VariantsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  create(@Body() createVariantDto: Prisma.VariantUncheckedCreateInput) {
+  create(
+    @Body(new ZodValidationPipe(CreateVariantDto))
+    createVariantDto: CreateVariantDto,
+  ) {
     return this.variantsService.createVariant(createVariantDto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
+  @Patch(':id/stock')
+  updateStock(
+    @Param('id') id: string,
+    @Body() body: { stock: number },
+  ) {
+    return this.variantsService.updateVariantStock(id, { stock: body.stock });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateVariantDto: Prisma.VariantUpdateInput) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateVariantDto.partial()))
+    updateVariantDto: UpdateVariantDto,
+  ) {
     return this.variantsService.updateVariant(id, updateVariantDto);
   }
 

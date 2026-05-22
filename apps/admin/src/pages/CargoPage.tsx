@@ -63,8 +63,8 @@ export const CargoPage: React.FC = () => {
         <CargoManifestForm 
           warehouses={warehouses}
           variants={variants}
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           selectedVariantId={selectedVariantId}
           setSelectedVariantId={setSelectedVariantId}
           selectedQuantity={selectedQuantity}

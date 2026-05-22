@@ -1,37 +1,40 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { CommunityPostsRepository } from './community-posts.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class CommunityPostsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly communityPostsRepository: CommunityPostsRepository,
+  ) {}
 
   async create(data: any) {
-    return this.prisma.communityPost.create({ data });
+    const sanitizedData = sanitizeData(data);
+    return this.communityPostsRepository.create(sanitizedData);
   }
 
   async findAll() {
-    return this.prisma.communityPost.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.communityPostsRepository.findAll();
   }
 
   async findActive() {
-    return this.prisma.communityPost.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.communityPostsRepository.findActive();
   }
 
   async update(id: string, data: any) {
-    return this.prisma.communityPost.update({
-      where: { id },
-      data,
-    });
+    const post = await this.communityPostsRepository.findById(id);
+    if (!post)
+      throw new NotFoundException(`Community post with ID ${id} not found`);
+
+    const sanitizedData = sanitizeData(data);
+    return this.communityPostsRepository.update(id, sanitizedData);
   }
 
   async remove(id: string) {
-    return this.prisma.communityPost.delete({
-      where: { id },
-    });
+    const post = await this.communityPostsRepository.findById(id);
+    if (!post)
+      throw new NotFoundException(`Community post with ID ${id} not found`);
+
+    return this.communityPostsRepository.delete(id);
   }
 }

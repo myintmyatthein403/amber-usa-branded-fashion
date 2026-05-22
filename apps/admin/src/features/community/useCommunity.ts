@@ -1,12 +1,58 @@
-import { useState } from 'react';
-import { useFetch, useDelete } from '../../hooks/useCrud';
+import { useState, useEffect } from 'react';
 import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
 import { CommunityPost } from './schema';
+import { toast } from '../../store/useToastStore';
+import { useDelete } from '../../hooks/useCrud';
 
 export const useCommunity = () => {
-  const { data: posts, loading, refresh } = useFetch<CommunityPost>(API_ROUTES.COMMUNITY_POSTS.BASE);
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState('');
+  const [totalPages, setTotalPages] = useState(1);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  
   const { deleteItem } = useDelete(API_ROUTES.COMMUNITY_POSTS.BASE);
+
+  const fetchPosts = async (currentPage = page, currentSearch = search, currentLimit = limit) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
+      });
+      
+      if (currentSearch) {
+        params.append('search', currentSearch);
+      }
+      
+      const response = await apiService<unknown, { data: CommunityPost[]; meta?: any; pagination?: any }>(`${API_ROUTES.COMMUNITY_POSTS.BASE}?${params.toString()}`);
+      
+      // Based on user provided format, response.data is the array
+      const items = Array.isArray(response.data) ? response.data : [];
+      const meta = response.meta || response.pagination;
+
+      setPosts(items);
+      setTotal(meta?.total || items.length);
+      setTotalPages(meta?.totalPages || 1);
+    } catch (error) {
+      console.error('Failed to fetch community posts:', error);
+      toast.error('Failed to load community posts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const refresh = () => {
+    fetchPosts(page, search, limit);
+  };
   
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -30,7 +76,7 @@ export const useCommunity = () => {
     data.append('file', file);
     setUploading(true);
     try {
-      const response = await apiService(API_ROUTES.UPLOAD, {
+      const response = await apiService<FormData, { url: string }>(API_ROUTES.UPLOAD, {
         method: 'POST',
         body: data,
         isMultipart: true
@@ -70,8 +116,11 @@ export const useCommunity = () => {
 
       setModalOpen(false);
       refresh();
+      resetForm();
+      toast.success(editingPost ? 'Post updated' : 'Post created');
     } catch (error) {
       console.error('Failed to save post:', error);
+      toast.error('Failed to save post');
     } finally {
       setSubmitting(false);
     }
@@ -84,14 +133,20 @@ export const useCommunity = () => {
         body: { isActive: !post.isActive },
       });
       refresh();
+      toast.success(`Post ${!post.isActive ? 'activated' : 'deactivated'}`);
     } catch (error) {
       console.error('Failed to toggle active status:', error);
+      toast.error('Failed to update status');
     }
   };
 
-  const openAddModal = () => {
+  const resetForm = () => {
     setEditingPost(null);
     setFormData(initialFormData);
+  };
+
+  const openAddModal = () => {
+    resetForm();
     setModalOpen(true);
   };
 
@@ -110,14 +165,38 @@ export const useCommunity = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id);
-    if (success) refresh();
+    if (!window.confirm('Delete this post permanently?')) return;
+    try {
+      const success = await deleteItem(id);
+      if (success) {
+        refresh();
+        toast.success('Post deleted');
+      }
+    } catch (error) {
+      toast.error('Failed to delete post');
+    }
+  };
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+    fetchPosts(1, value, limit);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchPosts(newPage, search, limit);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+    fetchPosts(1, search, newLimit);
   };
 
   return {
     posts,
     loading,
-    refresh,
     modalOpen,
     setModalOpen,
     submitting,
@@ -128,8 +207,19 @@ export const useCommunity = () => {
     handleFileChange,
     handleSubmit,
     handleToggleActive,
+    handleDelete,
     openAddModal,
     openEditModal,
-    handleDelete
+    refresh,
+    viewMode,
+    setViewMode,
+    page,
+    totalPages,
+    total,
+    limit,
+    search,
+    handleSearch,
+    handlePageChange,
+    handleLimitChange
   };
 };

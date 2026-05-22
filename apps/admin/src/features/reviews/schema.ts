@@ -2,11 +2,6 @@ import { z } from 'zod';
 
 export const ReviewPlatformSchema = z.enum(['WEBSITE', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK']);
 
-export const ReviewProductSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-});
-
 export const ReviewSchema = z.object({
   id: z.string().uuid().optional(),
   rating: z.number().min(1).max(5),
@@ -18,9 +13,13 @@ export const ReviewSchema = z.object({
   productId: z.string().min(1, 'Product selection is required'),
 });
 
-export type ReviewProduct = z.infer<typeof ReviewProductSchema>;
 export type Review = z.infer<typeof ReviewSchema> & {
   id: string;
-  product: ReviewProduct;
+  product: { id: string; name: string };
   createdAt: string;
+};
+
+export type ReviewProduct = {
+  id: string;
+  name: string;
 };

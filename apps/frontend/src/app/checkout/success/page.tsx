@@ -32,11 +32,12 @@ export default function CheckoutSuccessPage() {
         });
         
         const data = await res.json();
+        const response = data.data || data;
         
-        if (data.success && data.status === 'PAID') {
+        if (response.success && response.status === 'PAID') {
           setStatus("success");
           clearCart();
-        } else if (data.status === 'FAILED') {
+        } else if (response.status === 'FAILED') {
           setStatus("error");
         } else {
           // If still PENDING, we could retry or just show loading/error
@@ -87,6 +88,23 @@ export default function CheckoutSuccessPage() {
                 </p>
               )}
             </div>
+
+            {/* Order Summary */}
+            {orderId && (
+              <div className="mt-6 p-6 bg-[#F5F0E1]/30 rounded-lg border border-[#D4AF37]/10">
+                <h3 className="text-lg font-serif font-bold mb-4">Order Summary</h3>
+                <div className="space-y-3 text-sm">
+                  <p className="text-[#1A1A1A]/40">Estimated Delivery: 3-5 business days</p>
+                  <p className="text-[#1A1A1A]/40">Tracking will be sent via email when order ships</p>
+                  <div className="pt-3 border-t border-[#1A1A1A]/5 mt-3">
+                    <p className="text-xs text-[#1A1A1A]/40">
+                      For USA-to-Myanmar orders, please allow additional 7-14 days for customs clearance.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col space-y-4 pt-4">
               <Link 
                 href="/profile" 

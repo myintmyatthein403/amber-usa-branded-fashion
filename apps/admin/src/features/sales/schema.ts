@@ -2,14 +2,6 @@ import { z } from 'zod';
 
 export const SaleDiscountTypeSchema = z.enum(['PERCENTAGE', 'FIXED_AMOUNT']);
 
-export const SaleProductSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  price: z.number(),
-  onSale: z.boolean(),
-  images: z.array(z.string()).optional(),
-});
-
 export const SaleSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, 'Sale name is required'),
@@ -23,8 +15,15 @@ export const SaleSchema = z.object({
   productIds: z.array(z.string()).default([]),
 });
 
-export type SaleProduct = z.infer<typeof SaleProductSchema>;
 export type Sale = z.infer<typeof SaleSchema> & {
   id: string;
-  products?: SaleProduct[];
+  products?: { id: string; name: string; price: number; onSale: boolean; images?: string[] }[];
+};
+
+export type SaleProduct = {
+  id: string;
+  name: string;
+  price: number;
+  onSale: boolean;
+  images?: string[];
 };

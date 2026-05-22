@@ -1,16 +1,63 @@
 "use client";
 
-import { useState, useMemo, Suspense, useEffect } from "react";
+import { useState, useMemo, Suspense, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import QuickViewModal from "@/components/modals/QuickViewModal";
 import CompareDrawer from "@/components/CompareDrawer";
+import ShopSidebar from "@/components/ShopSidebar";
+import { useDebounce } from "@/hooks/useDebounce";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
-import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Percent, Loader2, Search } from "lucide-react";
+import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
 import Price from "@/components/Price";
+import {
+  Product,
+  buildCategoryTree,
+  getCategoryScopeIds,
+  type CategoryNode,
+  type CategoryTreeNode,
+} from "@amber/shared";
+
+interface ShopVariant {
+  stock: number;
+  size?: string;
+  color?: string;
+  attributeSelections?: Record<string, string> | null;
+}
+
+interface FilterableAttribute {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  values: Array<{
+    id: string;
+    value: string;
+    slug: string;
+    hexColor?: string | null;
+  }>;
+}
+
+interface ShopProduct {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice: number | null;
+  isUsdPrice: boolean;
+  category: string;
+  categoryId?: string | null;
+  brand: string;
+  collections: string[];
+  image: string;
+  inStock: boolean;
+  sizes: string[];
+  colors: string[];
+  variants?: ShopVariant[];
+  onSale?: boolean;
+}
 
 const SORT_OPTIONS = [
   { label: "Latest", value: "latest" },
@@ -22,36 +69,75 @@ const SORT_OPTIONS = [
 function ShopContent() {
   const searchParams = useSearchParams();
   const initialSaleFilter = searchParams.get('sale') === 'true';
+  const initialCollectionFilter = searchParams.get('collection') || "All";
 
   const addToCart = useStore((state) => state.addToCart);
   const addToCompare = useStore((state) => state.addToCompare);
   const compareList = useStore((state) => state.compareList);
   const selectedQuickViewProduct = useStore((state) => state.selectedQuickViewProduct);
   const setQuickViewProduct = useStore((state) => state.setQuickViewProduct);
-  const formatPrice = useStore((state) => state.formatPrice);
   const currency = useStore((state) => state.currency);
   const exchangeRate = useStore((state) => state.exchangeRate);
+  const market = useStore((state) => state.market);
   
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const [addingId, setAddingId] = useState<string | null>(null);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedBrand, setSelectedBrand] = useState("All");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedColor, setSelectedColor] = useState("All");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [shopCategories, setShopCategories] = useState<CategoryNode[]>([]);
+  const [selectedCollection, setSelectedCollection] = useState(initialCollectionFilter);
   const [selectedSize, setSelectedSize] = useState("All");
+  const [filterableAttributes, setFilterableAttributes] = useState<FilterableAttribute[]>([]);
+  const [selectedAttributeFilters, setSelectedAttributeFilters] = useState<
+    Record<string, string>
+  >({});
   
-  // Price Range in currently selected currency
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]); // Default in USD
+  const MAX_PRICE_USD = 3000;
+  
+  // Use USD internally for price range to avoid conversion flicker
+  const [priceRangeUsd, setPriceRangeUsd] = useState<[number, number]>([0, MAX_PRICE_USD]);
+  const [minPriceInput, setMinPriceInput] = useState("0");
+  const [maxPriceInput, setMaxPriceInput] = useState(MAX_PRICE_USD.toLocaleString()); 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || "");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 9;
-  
+
+  // Sync inputs with priceRangeUsd and currency
+  useEffect(() => {
+    if (!mounted) return;
+    const factor = currency === 'MMK' ? exchangeRate : 1;
+    setMinPriceInput(Math.round(priceRangeUsd[0] * factor).toLocaleString());
+    setMaxPriceInput(Math.round(priceRangeUsd[1] * factor).toLocaleString());
+  }, [priceRangeUsd, currency, exchangeRate, mounted]);
+
   const [onlyInStock, setOnlyInStock] = useState(false);
   const [onlySale, setOnlySale] = useState(initialSaleFilter);
   const [sortBy, setSortBy] = useState("latest");
 
-  // Sync searchQuery with URL search param
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [filterLoading, setFilterLoading] = useState(false);
+  
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const debouncedPriceRangeUsd = useDebounce(priceRangeUsd, 500);
+  
+  const isDebouncing = searchQuery !== debouncedSearchQuery || 
+    priceRangeUsd[0] !== debouncedPriceRangeUsd[0] || 
+    priceRangeUsd[1] !== debouncedPriceRangeUsd[1];
+    
+  useEffect(() => {
+    if (isDebouncing) {
+      setFilterLoading(true);
+    } else {
+      const timer = setTimeout(() => setFilterLoading(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isDebouncing]);
+
   useEffect(() => {
     const search = searchParams.get('search');
     if (search !== null) {
@@ -59,107 +145,171 @@ function ShopContent() {
     }
   }, [searchParams]);
 
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedBrand, selectedCategory, selectedColor, selectedSize, priceRange, searchQuery, onlyInStock, onlySale, sortBy]);
+  }, [
+    selectedBrand,
+    selectedCategoryId,
+    selectedCollection,
+    selectedSize,
+    selectedAttributeFilters,
+    priceRangeUsd,
+    searchQuery,
+    onlyInStock,
+    onlySale,
+    sortBy,
+  ]);
 
-  // Adjust max price and range when currency changes
-  const MAX_PRICE_USD = 10000;
-  const maxPrice = currency === 'USD' ? MAX_PRICE_USD : MAX_PRICE_USD * exchangeRate;
-  
-  useEffect(() => {
-    // When currency changes, reset or convert the current price range to match new scale
-    setPriceRange([0, maxPrice]);
-  }, [currency, exchangeRate, maxPrice]);
-
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
+    try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?market=${market}`);
+    const result = await res.json();
+    const data = result?.data || result || [];
+
+    const mappedProducts = data.map((p: { collections?: { name: string }[]; variants?: ShopVariant[]; category?: { id: string; name: string }; brand?: { name: string }; images?: string[] } & Record<string, unknown>) => ({
+      ...p,
+      price: parseFloat(String(p.price)),
+      originalPrice: p.compareAtPrice ? parseFloat(String(p.compareAtPrice)) : null,
+      isUsdPrice: p.isUsdPrice !== false,
+      category: p.category?.name || "Uncategorized",
+      categoryId: p.category?.id ?? null,
+      brand: p.brand?.name || "Unbranded",
+      collections: p.collections?.map((c) => c.name) || [],
+      image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
+      inStock: p.variants?.some((v) => v.stock > 0) ?? true,
+      sizes: Array.from(new Set(p.variants?.flatMap((v) => v.size ? [v.size] : []) || [])),
+      colors: Array.from(new Set(p.variants?.flatMap((v) => v.color ? [v.color] : []) || [])),
+      variants: p.variants?.map((v) => ({
+        stock: v.stock,
+        size: v.size,
+        color: v.color,
+        attributeSelections:
+          v.attributeSelections && typeof v.attributeSelections === 'object'
+            ? (v.attributeSelections as Record<string, string>)
+            : null,
+      })),
+    }));
+
+    setProducts(mappedProducts);
+    } catch (error) {
+    console.error("Failed to fetch products:", error);
+    } finally {
+    setLoading(false);
+    }
+    };
+    if (mounted) fetchProducts();
+  }, [market, mounted]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
-        const data = await res.json();
-        
-        // Map backend data to frontend expected structure
-        const mappedProducts = data.map((p: any) => ({
-          ...p,
-          price: parseFloat(p.price),
-          originalPrice: p.compareAtPrice ? parseFloat(p.compareAtPrice) : null,
-          isUsdPrice: p.isUsdPrice !== false,
-          category: p.category?.name || "Uncategorized",
-          brand: p.brand?.name || "Unbranded",
-          image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
-          inStock: p.variants?.some((v: any) => v.stock > 0) ?? true,
-          sizes: Array.from(new Set(p.variants?.flatMap((v: any) => v.size ? [v.size] : []) || [])),
-          colors: Array.from(new Set(p.variants?.flatMap((v: any) => v.color ? [v.color] : []) || []))
-        }));
-        
-        setProducts(mappedProducts);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories?limit=100`);
+        const result = await res.json();
+        const data = (result?.data ?? result ?? []) as CategoryNode[];
+        setShopCategories(
+          data.filter((c) => c.isActive !== false),
+        );
       } catch (error) {
-        console.error("Failed to fetch products:", error);
-      } finally {
-        setLoading(false);
+        console.error("Failed to fetch categories:", error);
+        setShopCategories([]);
       }
     };
-
-    fetchProducts();
+    fetchCategories();
   }, []);
 
-  const brands = useMemo(() => {
-    const uniqueBrands = new Set(products.map(p => p.brand).filter(Boolean));
-    return ["All", ...Array.from(uniqueBrands).sort()];
-  }, [products]);
+  useEffect(() => {
+    const fetchFilterableAttributes = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/attributes/public`,
+        );
+        const result = await res.json();
+        const data = (Array.isArray(result) ? result : result?.data ?? []) as FilterableAttribute[];
+        setFilterableAttributes(data);
+        setSelectedAttributeFilters((prev) => {
+          const next = { ...prev };
+          for (const attr of data) {
+            if (next[attr.id] === undefined) next[attr.id] = 'All';
+          }
+          return next;
+        });
+      } catch (error) {
+        console.error('Failed to fetch filterable attributes:', error);
+        setFilterableAttributes([]);
+      }
+    };
+    fetchFilterableAttributes();
+  }, []);
 
-  const categories = useMemo(() => {
-    const uniqueCategories = new Set(products.map(p => p.category).filter(Boolean));
-    return ["All", ...Array.from(uniqueCategories).sort()];
-  }, [products]);
+  const categoryTree = useMemo<CategoryTreeNode[]>(
+    () => buildCategoryTree(shopCategories),
+    [shopCategories],
+  );
 
-  const sizes = useMemo(() => {
-    const allSizes = products.flatMap(p => p.sizes || []);
-    return ["All", ...Array.from(new Set(allSizes)).sort()];
-  }, [products]);
+  const categoryScopeIds = useMemo(() => {
+    if (!selectedCategoryId || shopCategories.length === 0) return null;
+    return new Set(getCategoryScopeIds(shopCategories, selectedCategoryId));
+  }, [selectedCategoryId, shopCategories]);
 
-  const colors = useMemo(() => {
-    const allColors = products.flatMap(p => p.colors || []);
-    return ["All", ...Array.from(new Set(allColors)).sort()];
-  }, [products]);
+  const sortPrice = (p: ShopProduct) => {
+    if (p.isUsdPrice && currency === "MMK") return p.price * exchangeRate;
+    if (!p.isUsdPrice && currency === "USD") return p.price / exchangeRate;
+    return p.price;
+  };
 
   const filteredProducts = useMemo(() => {
     const results = [...products].filter((product) => {
       const brandMatch = selectedBrand === "All" || product.brand === selectedBrand;
-      const categoryMatch = selectedCategory === "All" || product.category === selectedCategory;
-      const colorMatch = selectedColor === "All" || product.colors?.includes(selectedColor);
+      const categoryMatch =
+        selectedCategoryId === null ||
+        (categoryScopeIds
+          ? Boolean(product.categoryId && categoryScopeIds.has(product.categoryId))
+          : product.category === selectedCategoryId);
+      const collectionMatch = selectedCollection === "All" || product.collections?.includes(selectedCollection);
       const sizeMatch = selectedSize === "All" || product.sizes?.includes(selectedSize);
+
+      const attributeMatch = Object.entries(selectedAttributeFilters).every(
+        ([attributeId, valueId]) => {
+          if (!valueId || valueId === 'All') return true;
+          return product.variants?.some(
+            (v) => v.attributeSelections?.[attributeId] === valueId,
+          );
+        },
+      );
       
-      // Convert product price to current currency for filtering
-      let productPriceInCurrentCurrency = product.price;
-      if (product.isUsdPrice && currency === 'MMK') {
-        productPriceInCurrentCurrency = product.price * exchangeRate;
-      } else if (!product.isUsdPrice && currency === 'USD') {
-        productPriceInCurrentCurrency = product.price / exchangeRate;
-      }
+      const productPriceInUsd = product.isUsdPrice ? product.price : product.price / exchangeRate;
+      const priceMatch = productPriceInUsd >= debouncedPriceRangeUsd[0] && productPriceInUsd <= debouncedPriceRangeUsd[1];
       
-      const priceMatch = productPriceInCurrentCurrency >= priceRange[0] && productPriceInCurrentCurrency <= priceRange[1];
       const stockMatch = !onlyInStock || product.inStock;
       const saleMatch = !onlySale || product.onSale;
       
-      const searchMatch = searchQuery === "" || 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const searchMatch = debouncedSearchQuery === "" || 
+        product.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        product.brand.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        product.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
       
-      return brandMatch && categoryMatch && colorMatch && sizeMatch && priceMatch && stockMatch && saleMatch && searchMatch;
+      return (
+        brandMatch &&
+        categoryMatch &&
+        collectionMatch &&
+        sizeMatch &&
+        attributeMatch &&
+        priceMatch &&
+        stockMatch &&
+        saleMatch &&
+        searchMatch
+      );
     });
 
     switch (sortBy) {
       case "price_asc":
-        results.sort((a, b) => a.price - b.price);
+        results.sort((a, b) => sortPrice(a) - sortPrice(b));
         break;
       case "price_desc":
-        results.sort((a, b) => b.price - a.price);
+        results.sort((a, b) => sortPrice(b) - sortPrice(a));
         break;
       case "name_asc":
         results.sort((a, b) => a.name.localeCompare(b.name));
@@ -169,7 +319,22 @@ function ShopContent() {
     }
 
     return results;
-  }, [products, selectedBrand, selectedCategory, selectedColor, selectedSize, priceRange, onlyInStock, onlySale, sortBy, searchQuery, currency, exchangeRate]);
+  }, [
+    products,
+    selectedBrand,
+    selectedCategoryId,
+    categoryScopeIds,
+    selectedCollection,
+    selectedSize,
+    selectedAttributeFilters,
+    debouncedPriceRangeUsd,
+    onlyInStock,
+    onlySale,
+    sortBy,
+    debouncedSearchQuery,
+    currency,
+    exchangeRate,
+  ]);
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
@@ -178,13 +343,46 @@ function ShopContent() {
   }, [filteredProducts, currentPage]);
 
 
-  const handleAddToCart = (e: React.MouseEvent, product: any) => {
+  const handleAddToCart = (e: React.MouseEvent, product: ShopProduct) => {
     e.stopPropagation();
     e.preventDefault();
+    const hasVariants = Boolean(product.variants && product.variants.length > 0);
+    if (hasVariants) {
+      setQuickViewProduct(product as unknown as Product);
+      return;
+    }
     setAddingId(product.id);
-    addToCart(product);
-    setTimeout(() => setAddingId(null), 800);
+    const added = addToCart(product as unknown as Product);
+    if (added) setTimeout(() => setAddingId(null), 800);
   };
+
+  const resetAttributeFilters = useCallback(() => {
+    setSelectedAttributeFilters(
+      Object.fromEntries(filterableAttributes.map((a) => [a.id, 'All'])),
+    );
+  }, [filterableAttributes]);
+
+  const handleClearFilters = useCallback(() => {
+    setSelectedBrand("All");
+    setSelectedCategoryId(null);
+    setSelectedCollection("All");
+    setSelectedSize("All");
+    resetAttributeFilters();
+    setPriceRangeUsd([0, MAX_PRICE_USD]);
+    setOnlyInStock(false);
+    setOnlySale(false);
+    setSearchQuery("");
+    setMinPriceInput("0");
+    setMaxPriceInput(MAX_PRICE_USD.toLocaleString());
+  }, [
+    MAX_PRICE_USD,
+    resetAttributeFilters,
+  ]);
+
+  const displayPriceRange = useMemo(() => {
+    const factor = currency === 'MMK' ? exchangeRate : 1;
+    return [priceRangeUsd[0] * factor, priceRangeUsd[1] * factor] as [number, number];
+  }, [priceRangeUsd, currency, exchangeRate]);
 
   return (
     <>
@@ -196,6 +394,71 @@ function ShopContent() {
 
       <CompareDrawer />
 
+      {/* Mobile Filter Drawer */}
+      <AnimatePresence>
+        {isFilterDrawerOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsFilterDrawerOpen(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] md:hidden"
+            />
+            <motion.div 
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-[85%] max-w-sm bg-white z-[101] md:hidden overflow-y-auto p-8 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-12">
+                <h3 className="text-xl font-serif">Filters</h3>
+                <button onClick={() => setIsFilterDrawerOpen(false)} className="p-2 border border-[#1A1A1A]/5">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <ShopSidebar
+                selectedBrand={selectedBrand}
+                setSelectedBrand={setSelectedBrand}
+                selectedCategoryId={selectedCategoryId}
+                setSelectedCategoryId={setSelectedCategoryId}
+                categoryTree={categoryTree}
+                selectedCollection={selectedCollection}
+                setSelectedCollection={setSelectedCollection}
+                selectedSize={selectedSize}
+                setSelectedSize={setSelectedSize}
+                filterableAttributes={filterableAttributes}
+                selectedAttributeFilters={selectedAttributeFilters}
+                setSelectedAttributeFilters={setSelectedAttributeFilters}
+                priceRange={displayPriceRange}
+                setPriceRange={(range) => {
+                  const factor = currency === 'MMK' ? exchangeRate : 1;
+                  setPriceRangeUsd([range[0] / factor, range[1] / factor]);
+                }}
+                onlyInStock={onlyInStock}
+                setOnlyInStock={setOnlyInStock}
+                onlySale={onlySale}
+                setOnlySale={setOnlySale}
+                products={products}
+                currency={currency}
+                exchangeRate={exchangeRate}
+                minPriceInput={minPriceInput}
+                maxPriceInput={maxPriceInput}
+                setMinPriceInput={setMinPriceInput}
+                setMaxPriceInput={setMaxPriceInput}
+              />
+              <button 
+                onClick={() => setIsFilterDrawerOpen(false)}
+                className="w-full bg-[#1A1A1A] text-white py-4 uppercase tracking-[0.3em] text-[10px] font-bold mt-12 mb-8"
+              >
+                Show {filteredProducts.length} Items
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Hero Section for Shop */}
       <section className="pt-48 pb-20 bg-[#F5F0E1]/50 text-center relative overflow-hidden">
         <div className="absolute inset-0 acheik-pattern opacity-10" />
@@ -206,258 +469,127 @@ function ShopContent() {
         >
           <span className="text-[#D4AF37] text-[10px] uppercase font-bold tracking-[0.4em]">USA Collections</span>
           <h1 className="text-5xl md:text-7xl font-serif text-[#1A1A1A]">
-            {onlySale ? "Thingyan Mega Sale" : "The Brand Shop"}
+            {onlySale ? "Thingyan Mega Sale" : selectedCollection !== "All" ? selectedCollection : "The Brand Shop"}
           </h1>
         </motion.div>
       </section>
 
       <section className="max-w-7xl mx-auto px-6 md:px-12 py-16">
         <div className="flex flex-col md:flex-row gap-12">
-          {/* Sidebar Filters */}
-          <aside className="hidden md:block w-72 space-y-12 shrink-0 border-r border-[#1A1A1A]/5 pr-12">
-            
-            {/* Sale Filter */}
-            <div className="space-y-4">
-              <button 
-                onClick={() => setOnlySale(!onlySale)}
-                className={cn(
-                  "flex items-center space-x-3 w-full p-4 border transition-all group",
-                  onlySale ? "border-red-500 bg-red-50" : "border-[#1A1A1A]/10 hover:border-[#D4AF37]"
-                )}
-              >
-                <div className={cn(
-                  "w-5 h-5 border flex items-center justify-center",
-                  onlySale ? "bg-red-500 border-red-500" : "border-[#1A1A1A]/20"
-                )}>
-                  {onlySale && <Check className="w-3 h-3 text-white" />}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Percent className={cn("w-4 h-4", onlySale ? "text-red-500" : "text-[#1A1A1A]/40")} />
-                  <span className={cn("text-xs font-bold uppercase tracking-widest", onlySale ? "text-red-500" : "text-[#1A1A1A]/60")}>On Sale</span>
-                </div>
-              </button>
-            </div>
-
-            {/* Brands */}
-            <div className="space-y-6">
-              <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">Brands</h4>
-              <div className="flex flex-col space-y-4">
-                {brands.map((brand) => (
-                  <button
-                    key={brand}
-                    onClick={() => setSelectedBrand(brand)}
-                    className={cn(
-                      "text-left text-sm font-medium transition-all hover:text-[#D4AF37]",
-                      selectedBrand === brand ? "text-[#D4AF37] translate-x-2" : "text-[#1A1A1A]/60"
-                    )}
-                  >
-                    {brand}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Categories */}
-            <div className="space-y-6">
-              <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">Categories</h4>
-              <div className="flex flex-col space-y-4">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={cn(
-                      "text-left text-sm font-medium transition-all hover:text-[#D4AF37]",
-                      selectedCategory === cat ? "text-[#D4AF37] translate-x-2" : "text-[#1A1A1A]/60"
-                    )}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Price Range */}
-            <div className="space-y-6">
-              <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">Price Range</h4>
-              <div className="space-y-8">
-                {/* Double Range Slider UI */}
-                <div className="relative h-2 w-full bg-[#1A1A1A]/5 rounded-full mt-10">
-                  <div 
-                    className="absolute h-full bg-[#D4AF37] rounded-full"
-                    style={{
-                      left: `${(priceRange[0] / maxPrice) * 100}%`,
-                      right: `${100 - (priceRange[1] / maxPrice) * 100}%`
-                    }}
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max={maxPrice}
-                    step={currency === 'USD' ? 10 : 1000}
-                    value={priceRange[0]}
-                    onChange={(e) => {
-                      const val = Math.min(parseInt(e.target.value), priceRange[1] - (maxPrice * 0.05));
-                      setPriceRange([val, priceRange[1]]);
-                    }}
-                    className="absolute w-full -top-1 h-2 bg-transparent appearance-none pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#D4AF37] [&::-webkit-slider-thumb]:appearance-none accent-[#D4AF37]"
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max={maxPrice}
-                    step={currency === 'USD' ? 10 : 1000}
-                    value={priceRange[1]}
-                    onChange={(e) => {
-                      const val = Math.max(parseInt(e.target.value), priceRange[0] + (maxPrice * 0.05));
-                      setPriceRange([priceRange[0], val]);
-                    }}
-                    className="absolute w-full -top-1 h-2 bg-transparent appearance-none pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#D4AF37] [&::-webkit-slider-thumb]:appearance-none accent-[#D4AF37]"
-                  />
-                </div>
-                
-                {/* Manual Inputs */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <span className="text-[8px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Min ({currency})</span>
-                    <input 
-                      type="number"
-                      value={Math.round(priceRange[0])}
-                      onChange={(e) => setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])}
-                      className="w-full bg-[#1A1A1A]/5 border-none px-3 py-2 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[#D4AF37]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-[8px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Max ({currency})</span>
-                    <input 
-                      type="number"
-                      value={Math.round(priceRange[1])}
-                      onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value) || 0])}
-                      className="w-full bg-[#1A1A1A]/5 border-none px-3 py-2 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[#D4AF37]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40 pt-2">
-                  <span>{formatPrice(priceRange[0], currency === 'USD')}</span>
-                  <span className="text-[#D4AF37]">{formatPrice(priceRange[1], currency === 'USD')}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Sizes */}
-            <div className="space-y-6">
-              <h4 className="text-xs uppercase tracking-[0.2em] font-bold text-[#1A1A1A]">USA Size</h4>
-              <div className="grid grid-cols-3 gap-2">
-                {sizes.map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={cn(
-                      "py-2 border text-[10px] font-bold uppercase tracking-widest transition-all",
-                      selectedSize === size 
-                        ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" 
-                        : "border-[#1A1A1A]/10 text-[#1A1A1A]/60 hover:border-[#D4AF37] hover:text-[#D4AF37]"
-                    )}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button 
-              onClick={() => {
-                setSelectedBrand("All");
-                setSelectedCategory("All");
-                setSelectedColor("All");
-                setSelectedSize("All");
-                setPriceRange([0, maxPrice]);
-                setOnlyInStock(false);
-                setOnlySale(false);
-                setSearchQuery("");
+          {/* Sidebar Filters - Desktop */}
+          <aside className="hidden md:block w-72 shrink-0 border-r border-[#1A1A1A]/5 pr-12">
+            <ShopSidebar
+              selectedBrand={selectedBrand}
+              setSelectedBrand={setSelectedBrand}
+              selectedCategoryId={selectedCategoryId}
+              setSelectedCategoryId={setSelectedCategoryId}
+              categoryTree={categoryTree}
+              selectedCollection={selectedCollection}
+              setSelectedCollection={setSelectedCollection}
+              selectedSize={selectedSize}
+              setSelectedSize={setSelectedSize}
+              filterableAttributes={filterableAttributes}
+              selectedAttributeFilters={selectedAttributeFilters}
+              setSelectedAttributeFilters={setSelectedAttributeFilters}
+              priceRange={displayPriceRange}
+              setPriceRange={(range) => {
+                const factor = currency === 'MMK' ? exchangeRate : 1;
+                setPriceRangeUsd([range[0] / factor, range[1] / factor]);
               }}
-              className="text-[10px] uppercase tracking-widest font-bold text-red-500 hover:text-red-600 transition-colors pt-4 block"
-            >
-              Clear All Filters
-            </button>
-            </aside>
+              onlyInStock={onlyInStock}
+              setOnlyInStock={setOnlyInStock}
+              onlySale={onlySale}
+              setOnlySale={setOnlySale}
+              products={products}
+              currency={currency}
+              exchangeRate={exchangeRate}
+              minPriceInput={minPriceInput}
+              maxPriceInput={maxPriceInput}
+              setMinPriceInput={setMinPriceInput}
+              setMaxPriceInput={setMaxPriceInput}
+            />
+          </aside>
 
-            {/* Product Grid Area */}
-            <div className="flex-1 space-y-12">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-[#1A1A1A]/5">
-                {/* Search Bar - Aesthetic from image */}
-                <div className="relative flex-1 max-w-md group flex items-center">
+          {/* Product Grid Area */}
+          <div className="flex-1 space-y-12">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-[#1A1A1A]/5">
+              
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                {/* Mobile Filter Trigger */}
+                <button 
+                  onClick={() => setIsFilterDrawerOpen(true)}
+                  className="flex md:hidden items-center justify-center p-3 border border-[#1A1A1A]/10 bg-white shadow-sm"
+                >
+                  <SlidersHorizontal className="w-5 h-5" />
+                </button>
+
+                {/* Search Bar */}
+                <div className="relative flex-1 max-w-md group flex items-center bg-white md:bg-transparent border border-[#1A1A1A]/10 md:border-none p-2 md:p-0">
                   <Search className="w-5 h-5 text-[#1A1A1A]/20 group-focus-within:text-[#D4AF37] transition-colors" />
-                  <div className="h-6 w-[1px] bg-[#1A1A1A]/10 mx-4" /> {/* Vertical separator from image inspiration */}
+                  <div className="hidden md:block h-6 w-[1px] bg-[#1A1A1A]/10 mx-4" />
                   <input 
                     type="text"
                     placeholder="Search brands or items..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 bg-transparent border-none py-2 text-xs font-medium placeholder:text-[#1A1A1A]/20 outline-none transition-all"
+                    className="flex-1 bg-transparent border-none py-1 text-xs font-medium placeholder:text-[#1A1A1A]/20 outline-none transition-all"
                   />
-                  {searchQuery && (
-                    <button 
-                      onClick={() => setSearchQuery("")}
-                      className="ml-2"
-                    >
-                      <X className="w-4 h-4 text-[#1A1A1A]/40 hover:text-[#1A1A1A]" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between md:justify-end gap-8">
-                  <span className="text-sm text-[#1A1A1A]/40 font-medium tracking-widest uppercase text-[10px] font-bold">
-                    {filteredProducts.length} Items Found
-                  </span>
-
-                  <div className="relative">
-                    <button 
-                      onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                      className="flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]"
-                    >
-                      <span className="text-[#1A1A1A]/40 font-medium">Sort by:</span>
-                      <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
-                      <ChevronDown className={cn("w-4 h-4 transition-transform", isSortDropdownOpen && "rotate-180")} />
-                    </button>
-
-                    <AnimatePresence>
-                      {isSortDropdownOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }}
-                          className="absolute right-0 mt-4 w-56 bg-white border border-[#1A1A1A]/5 shadow-xl z-20 py-2"
-                        >
-                          {SORT_OPTIONS.map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setSortBy(option.value);
-                                setIsSortDropdownOpen(false);
-                              }}
-                              className={cn(
-                                "w-full text-left px-6 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors",
-                                sortBy === option.value ? "text-[#D4AF37] bg-[#F5F0E1]/30" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A] hover:bg-zinc-50"
-                              )}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
                 </div>
               </div>
 
-              {loading ? (
-                <div className="py-24 flex flex-col items-center justify-center space-y-4">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Syncing Master Catalog...</span>
+              <div className="flex items-center justify-between md:justify-end gap-8">
+                <span className="hidden sm:inline text-sm text-[#1A1A1A]/40 font-medium tracking-widest uppercase text-[10px] font-bold">
+                  {filteredProducts.length} Items Found
+                </span>
+
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                    className="flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]"
+                  >
+                    <span className="text-[#1A1A1A]/40 font-medium">Sort by:</span>
+                    <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
+                    <ChevronDown className={cn("w-4 h-4 transition-transform", isSortDropdownOpen && "rotate-180")} />
+                  </button>
+
+                  <AnimatePresence>
+                    {isSortDropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute right-0 mt-4 w-56 bg-white border border-[#1A1A1A]/5 shadow-xl z-[90] py-2"
+                      >
+                        {SORT_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              setSortBy(option.value);
+                              setIsSortDropdownOpen(false);
+                            }}
+                            className={cn(
+                              "w-full text-left px-6 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors",
+                              sortBy === option.value ? "text-[#D4AF37] bg-[#F5F0E1]/30" : "text-[#1A1A1A]/60 hover:text-[#1A1A1A] hover:bg-zinc-50"
+                            )}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              ) : (
-                <div className="space-y-20">
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="py-24 flex flex-col items-center justify-center space-y-4">
+                <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Syncing Master Catalog...</span>
+              </div>
+            ) : (
+              <div className="space-y-20">
+                {paginatedProducts.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
                     <AnimatePresence mode="popLayout">
                       {paginatedProducts.map((product) => (
@@ -498,13 +630,13 @@ function ShopContent() {
                                 <span>{addingId === product.id ? "Added" : "Add to Bag"}</span>
                               </button>
                               <button 
-                                onClick={() => setQuickViewProduct(product)}
+                                onClick={() => setQuickViewProduct(product as unknown as Product)}
                                 className="w-12 h-12 bg-white text-[#1A1A1A] flex items-center justify-center hover:bg-[#D4AF37] hover:text-white transition-colors"
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
                               <button 
-                                onClick={() => addToCompare(product)}
+                                onClick={() => addToCompare(product as unknown as Product)}
                                 className={cn(
                                   "w-12 h-12 flex items-center justify-center transition-colors",
                                   compareList.find(p => p.id === product.id) ? "bg-[#D4AF37] text-white" : "bg-white text-[#1A1A1A] hover:bg-[#D4AF37] hover:text-white"
@@ -538,55 +670,73 @@ function ShopContent() {
                       ))}
                     </AnimatePresence>
                   </div>
-
-                  {/* Pagination Controls */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center space-x-2 pt-12 border-t border-[#1A1A1A]/5">
-                      <button
-                        disabled={currentPage === 1}
-                        onClick={() => {
-                          setCurrentPage(currentPage - 1);
-                          window.scrollTo({ top: 400, behavior: 'smooth' });
-                        }}
-                        className="px-6 py-3 border border-[#1A1A1A]/10 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all"
-                      >
-                        Previous
-                      </button>
-
-                      <div className="flex items-center px-8 space-x-6">
-                        {[...Array(totalPages)].map((_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => {
-                              setCurrentPage(i + 1);
-                              window.scrollTo({ top: 400, behavior: 'smooth' });
-                            }}
-                            className={cn(
-                              "text-[10px] font-bold tracking-widest transition-all",
-                              currentPage === i + 1 ? "text-[#D4AF37]" : "text-[#1A1A1A]/40 hover:text-[#1A1A1A]"
-                            )}
-                          >
-                            {i + 1}
-                          </button>
-                        ))}
+                ) : (
+                  <div className="py-24 text-center space-y-6">
+                    <div className="flex justify-center">
+                      <div className="w-16 h-16 bg-[#F5F0E1] rounded-full flex items-center justify-center">
+                        <Filter className="w-8 h-8 text-[#D4AF37] opacity-20" />
                       </div>
-
-                      <button
-                        disabled={currentPage === totalPages}
-                        onClick={() => {
-                          setCurrentPage(currentPage + 1);
-                          window.scrollTo({ top: 400, behavior: 'smooth' });
-                        }}
-                        className="px-6 py-3 border border-[#1A1A1A]/10 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all"
-                      >
-                        Next
-                      </button>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    <div className="space-y-2">
+                      <h3 className="text-2xl font-serif text-[#1A1A1A]">No items found</h3>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Try adjusting your filters or search query.</p>
+                    </div>
+                    <button 
+                      onClick={handleClearFilters}
+                      className="text-[10px] uppercase tracking-widest font-bold border-b-2 border-[#D4AF37] pb-1 hover:text-[#D4AF37] transition-colors"
+                    >
+                      Reset All Filters
+                    </button>
+                  </div>
+                )}
 
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center space-x-2 pt-12 border-t border-[#1A1A1A]/5">
+                    <button
+                      disabled={currentPage === 1}
+                      onClick={() => {
+                        setCurrentPage(currentPage - 1);
+                        window.scrollTo({ top: 400, behavior: 'smooth' });
+                      }}
+                      className="px-6 py-3 border border-[#1A1A1A]/10 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all"
+                    >
+                      Previous
+                    </button>
+
+                    <div className="flex items-center px-8 space-x-6">
+                      {[...Array(totalPages)].map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setCurrentPage(i + 1);
+                            window.scrollTo({ top: 400, behavior: 'smooth' });
+                          }}
+                          className={cn(
+                            "text-[10px] font-bold tracking-widest transition-all",
+                            currentPage === i + 1 ? "text-[#D4AF37]" : "text-[#1A1A1A]/40 hover:text-[#1A1A1A]"
+                          )}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      disabled={currentPage === totalPages}
+                      onClick={() => {
+                        setCurrentPage(currentPage + 1);
+                        window.scrollTo({ top: 400, behavior: 'smooth' });
+                      }}
+                      className="px-6 py-3 border border-[#1A1A1A]/10 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </section>
     </>

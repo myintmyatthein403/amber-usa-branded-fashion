@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { Order } from '@amber/shared';
 
 interface User {
   id: string;
@@ -12,7 +13,7 @@ interface User {
   avatar: string | null;
   points: number;
   memberLevel: string;
-  orders?: any[];
+  orders?: Order[];
 }
 
 interface AuthState {
@@ -20,10 +21,12 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoggingOut: boolean;
+  hasHydrated: boolean;
   setAuth: (user: User, token: string) => void;
   updateUser: (user: User) => void;
   logout: () => void;
   setLoggingOut: (val: boolean) => void;
+  setHasHydrated: (val: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -33,15 +36,26 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoggingOut: false,
-      setAuth: (user, token) => set({ user, token, isAuthenticated: true, isLoggingOut: false }),
+      hasHydrated: false,
+      setAuth: (user, token) =>
+        set({ user, token, isAuthenticated: true, isLoggingOut: false }),
       updateUser: (user) => set({ user }),
       logout: () => {
         set({ user: null, token: null, isAuthenticated: false });
       },
       setLoggingOut: (val) => set({ isLoggingOut: val }),
+      setHasHydrated: (val) => set({ hasHydrated: val }),
     }),
     {
       name: 'amber-auth-storage',
-    }
-  )
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    },
+  ),
 );

@@ -1,13 +1,14 @@
 import React from 'react';
 import { Image as ImageIcon, Plus, FileText, Loader2 } from 'lucide-react';
+import type { Brand, BrandFormData } from '@amber/shared';
 
 interface BrandFormProps {
-  formData: { name: string; logo: string; note: string };
-  setFormData: (data: any) => void;
+  formData: BrandFormData;
+  setFormData: (data: BrandFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
   submitting: boolean;
-  editingBrand: any;
+  editingBrand: Brand | null;
   onMediaSelectorOpen: () => void;
 }
 

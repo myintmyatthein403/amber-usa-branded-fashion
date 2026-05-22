@@ -40,6 +40,10 @@ export const OrdersPage: React.FC = () => {
     setModalOpen,
     updatingStatus,
     handleUpdateStatus,
+    handleUpdateTracking,
+    handleRefund,
+    handleConfirmManualPayment,
+    handleRejectManualPayment,
     handleDelete
   } = useOrders();
 
@@ -135,10 +139,14 @@ export const OrdersPage: React.FC = () => {
         size="xl"
       >
         {selectedOrder && (
-          <OrderDetails 
+          <OrderDetails
             order={selectedOrder}
             onUpdateStatus={handleUpdateStatus}
             updatingStatus={updatingStatus}
+            onUpdateTracking={handleUpdateTracking}
+            onRefund={handleRefund}
+            onConfirmManualPayment={handleConfirmManualPayment}
+            onRejectManualPayment={handleRejectManualPayment}
           />
         )}
       </Modal>

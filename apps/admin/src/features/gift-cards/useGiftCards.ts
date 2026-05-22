@@ -70,7 +70,9 @@ export const useGiftCards = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const success = await deleteItem(id, 'Are you sure? This will permanently invalidate the gift card.');
+    const confirmed = window.confirm('Are you sure? This will permanently invalidate the gift card.');
+    if (!confirmed) return;
+    const success = await deleteItem(id);
     if (success) refresh();
   };
 

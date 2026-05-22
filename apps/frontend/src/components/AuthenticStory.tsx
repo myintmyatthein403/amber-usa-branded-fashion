@@ -23,8 +23,12 @@ interface MissionData {
   ctaLink: string;
 }
 
+interface ResponseData {
+  data: MissionData;
+}
+
 export default function AuthenticStory() {
-  const [data, setData] = useState<MissionData | null>(null);
+  const [data, setData] = useState<ResponseData | null>(null);
   const containerRef = useRef(null);
   
   const { scrollYProgress } = useScroll({
@@ -56,19 +60,21 @@ export default function AuthenticStory() {
             
             {/* Left: Multi-layered Images */}
             <div className="relative h-[700px] flex items-center justify-center">
-              <motion.div style={{ y: y1 }} className="absolute top-0 right-0 w-[300px] h-[450px] shadow-2xl z-10 border-[12px] border-white bg-gray-100">
-                <Image 
-                  src={data.imageMain} 
-                  alt="Mission Primary" 
-                  fill 
-                  className="object-cover" 
-                />
-              </motion.div>
+              {data?.data?.imageMain && (
+                <motion.div style={{ y: y1 }} className="absolute top-0 right-0 w-[300px] h-[450px] shadow-2xl z-10 border-[12px] border-white bg-gray-100">
+                  <Image 
+                    src={data.data.imageMain} 
+                    alt="Mission Primary" 
+                    fill 
+                    className="object-cover" 
+                  />
+                </motion.div>
+              )}
               
-              {data.imageSecondary && (
+              {data?.data?.imageSecondary && (
                 <motion.div style={{ y: y2 }} className="absolute bottom-0 left-0 w-[350px] h-[500px] shadow-2xl z-0 overflow-hidden bg-gray-100">
                   <Image 
-                    src={data.imageSecondary} 
+                    src={data.data.imageSecondary} 
                     alt="Mission Secondary" 
                     fill 
                     className="object-cover brightness-75" 
@@ -80,7 +86,7 @@ export default function AuthenticStory() {
               <div className="absolute -bottom-10 right-10 bg-[#D4AF37] p-10 text-white shadow-2xl z-20 max-w-[220px]">
                 <ShieldCheck className="w-10 h-10 mb-4" />
                 <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed">
-                  {data.trustBadgeText}
+                  {data.data.trustBadgeText}
                 </p>
               </div>
             </div>
@@ -88,19 +94,19 @@ export default function AuthenticStory() {
             {/* Right: Story Content */}
             <div className="space-y-12">
               <div className="space-y-6">
-                <span className="text-[#D4AF37] text-[10px] uppercase font-bold tracking-[0.5em] block">{data.badge}</span>
+                <span className="text-[#D4AF37] text-[10px] uppercase font-bold tracking-[0.5em] block">{data.data.badge}</span>
                 <h2 className="text-5xl md:text-7xl font-serif text-[#1A1A1A] leading-[1.1]">
-                  {data.title} <br /> <span className="italic text-[#D4AF37]">{data.titleItalic}</span>
+                  {data.data.title} <br /> <span className="italic text-[#D4AF37]">{data.data.titleItalic}</span>
                 </h2>
               </div>
 
               <div className="space-y-8 text-[#1A1A1A]/70 text-lg leading-relaxed font-sans max-w-lg">
                 <p>
-                  {data.description}
+                  {data.data.description}
                 </p>
-                {data.descriptionSecondary && (
+                {data.data.descriptionSecondary && (
                   <p className="text-base">
-                    {data.descriptionSecondary}
+                    {data.data.descriptionSecondary}
                   </p>
                 )}
               </div>
@@ -109,22 +115,22 @@ export default function AuthenticStory() {
                 <div className="flex items-start space-x-4">
                   <Globe className="w-6 h-6 text-[#D4AF37] shrink-0" />
                   <div className="space-y-1">
-                    <h4 className="text-sm font-bold uppercase tracking-widest text-[#1A1A1A]">{data.featureOneTitle}</h4>
-                    <p className="text-xs text-[#1A1A1A]/40">{data.featureOneDescription}</p>
+                    <h4 className="text-sm font-bold uppercase tracking-widest text-[#1A1A1A]">{data.data.featureOneTitle}</h4>
+                    <p className="text-xs text-[#1A1A1A]/40">{data.data.featureOneDescription}</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-4">
                   <DollarSign className="w-6 h-6 text-[#D4AF37] shrink-0" />
                   <div className="space-y-1">
-                    <h4 className="text-sm font-bold uppercase tracking-widest text-[#1A1A1A]">{data.featureTwoTitle}</h4>
-                    <p className="text-xs text-[#1A1A1A]/40">{data.featureTwoDescription}</p>
+                    <h4 className="text-sm font-bold uppercase tracking-widest text-[#1A1A1A]">{data.data.featureTwoTitle}</h4>
+                    <p className="text-xs text-[#1A1A1A]/40">{data.data.featureTwoDescription}</p>
                   </div>
                 </div>
               </div>
 
-              <Link href={data.ctaLink || "/shop"}>
+              <Link href={data.data.ctaLink || "/shop"}>
                 <button className="inline-flex items-center space-x-6 group">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-[#1A1A1A]">{data.ctaText}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-[#1A1A1A]">{data.data.ctaText}</span>
                   <div className="w-12 h-px bg-[#D4AF37] transition-all group-hover:w-24" />
                 </button>
               </Link>

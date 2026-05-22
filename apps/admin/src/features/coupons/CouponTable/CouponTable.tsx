@@ -63,7 +63,7 @@ export const CouponTable: React.FC<CouponTableProps> = ({
                 <td className="px-10 py-6">
                   <div className="space-y-1 text-[10px] uppercase tracking-wider">
                     <div className="flex items-center gap-2 text-muted-foreground">
-                      <Hash size={10} /> {coupon.usedCount} / {coupon.usageLimit || '∞'} USED
+                      <Hash size={10} /> {coupon.usageCount} / {coupon.usageLimit || '∞'} USED
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Calendar size={10} /> {coupon.expiryDate ? new Date(coupon.expiryDate).toLocaleDateString() : 'NO EXPIRY'}

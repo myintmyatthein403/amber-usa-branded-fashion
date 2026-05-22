@@ -3,14 +3,14 @@ import { useAdminUIStore } from '../store/useAdminUIStore';
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
-interface ApiOptions {
+interface ApiOptions<T = unknown> {
   method?: HttpMethod;
-  body?: any;
+  body?: T;
   headers?: Record<string, string>;
   isMultipart?: boolean;
 }
 
-export const apiService = async (endpoint: string, options: ApiOptions = {}) => {
+export const apiService = async <T = unknown, R = unknown>(endpoint: string, options: ApiOptions<T> = {}): Promise<R> => {
   const { method = 'GET', body, headers = {}, isMultipart = false } = options;
   const token = useAdminUIStore.getState().token;
 
@@ -31,7 +31,7 @@ export const apiService = async (endpoint: string, options: ApiOptions = {}) => 
   const response = await fetch(url, {
     method,
     headers: defaultHeaders,
-    body: isMultipart ? body : (body ? JSON.stringify(body) : undefined),
+    body: isMultipart ? body as BodyInit : (body ? JSON.stringify(body) : undefined),
   });
 
   if (!response.ok) {

@@ -1,17 +1,23 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Sale, Prisma } from '@prisma/client';
+import { SalesRepository } from './sales.repository';
+import { sanitizeData } from '../common/utils/data-sanitizer';
+
+type SaleInput = Prisma.SaleCreateInput;
+type SaleUpdateInput = Prisma.SaleUpdateInput;
 
 @Injectable()
 export class SalesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly salesRepository: SalesRepository) {}
 
-  async createSale(data: Prisma.SaleCreateInput & { productIds?: string[] }): Promise<Sale> {
-    const sanitizedData = this.prisma.sanitizeData(data);
-    const { productIds, ...saleData } = sanitizedData;
-    const sale = await this.prisma.sale.create({
-      data: saleData as Prisma.SaleCreateInput,
-    });
+  async createSale(data: SaleInput): Promise<Sale> {
+    const sanitizedData = sanitizeData(data);
+    const productIds = (sanitizedData as Record<string, unknown>).productIds as
+      | string[]
+      | undefined;
+    const saleData = sanitizeData(data);
+
+    const sale = await this.salesRepository.create(saleData);
 
     if (productIds && productIds.length > 0) {
       await this.syncProducts(sale.id, productIds);
@@ -20,66 +26,38 @@ export class SalesService {
     return sale;
   }
 
-  async getAllSales(): Promise<Sale[]> {
-    return this.prisma.sale.findMany({
-      include: {
-        products: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            images: true,
-          }
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async getAllSales(options?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    return this.salesRepository.findAll(options);
   }
 
   async getActiveSales(): Promise<Sale[]> {
-    const now = new Date();
-    return this.prisma.sale.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          {
-            startDate: { lte: now },
-            endDate: { gte: now },
-          },
-          {
-            startDate: null,
-            endDate: null,
-          },
-          {
-            startDate: { lte: now },
-            endDate: null,
-          }
-        ],
-      },
-      include: {
-        products: true,
-      },
-    });
+    return this.salesRepository.findActive();
   }
 
-  async getSaleById(id: string): Promise<Sale | null> {
-    return this.prisma.sale.findUnique({
-      where: { id },
-      include: {
-        products: true,
-      },
-    });
+  async getSaleById(id: string): Promise<Sale> {
+    const sale = await this.salesRepository.findById(id);
+    if (!sale) throw new NotFoundException(`Sale with ID ${id} not found`);
+    return sale;
   }
 
-  async updateSale(id: string, data: Prisma.SaleUpdateInput & { productIds?: string[] }): Promise<Sale> {
-    const sanitizedData = this.prisma.sanitizeData(data);
-    const { productIds, ...saleData } = sanitizedData;
-    const sale = await this.prisma.sale.update({
-      where: { id },
-      data: saleData as Prisma.SaleUpdateInput,
-    });
+  async updateSale(id: string, data: SaleUpdateInput): Promise<Sale> {
+    const saleToUpdate = await this.salesRepository.findById(id);
+    if (!saleToUpdate)
+      throw new NotFoundException(`Sale with ID ${id} not found`);
 
-    if (productIds) {
+    const sanitizedData = sanitizeData(data);
+    const productIds = (sanitizedData as Record<string, unknown>).productIds as
+      | string[]
+      | undefined;
+    const saleData = sanitizeData(data);
+
+    const sale = await this.salesRepository.update(id, saleData);
+
+    if (productIds !== undefined) {
       await this.syncProducts(id, productIds);
     }
 
@@ -87,50 +65,31 @@ export class SalesService {
   }
 
   async deleteSale(id: string): Promise<Sale> {
-    // Before deleting, reset product onSale status
-    await this.prisma.product.updateMany({
-      where: { saleId: id },
-      data: { saleId: null, onSale: false }
-    });
-    
-    return this.prisma.sale.delete({
-      where: { id },
-    });
+    const sale = await this.salesRepository.findById(id);
+    if (!sale) throw new NotFoundException(`Sale with ID ${id} not found`);
+
+    await this.salesRepository.resetProductsInSale(id);
+
+    return this.salesRepository.delete(id);
   }
 
   async syncProducts(saleId: string, productIds: string[]) {
-    // 1. Remove sale association from all products currently in this sale
-    await this.prisma.product.updateMany({
-      where: { saleId: saleId },
-      data: { saleId: null, onSale: false },
-    });
+    await this.salesRepository.resetProductsInSale(saleId);
 
-    // 2. Add sale association to new products
     if (productIds.length > 0) {
-      await this.prisma.product.updateMany({
-        where: { id: { in: productIds } },
-        data: { saleId: saleId, onSale: true },
-      });
+      await this.salesRepository.updateProductsSaleAssociation(
+        productIds,
+        saleId,
+        true,
+      );
     }
   }
 
   async addProductToSale(saleId: string, productId: string) {
-    return this.prisma.product.update({
-      where: { id: productId },
-      data: {
-        saleId: saleId,
-        onSale: true,
-      },
-    });
+    return this.salesRepository.updateProductSale(productId, saleId, true);
   }
 
   async removeProductFromSale(productId: string) {
-    return this.prisma.product.update({
-      where: { id: productId },
-      data: {
-        saleId: null,
-        onSale: false,
-      },
-    });
+    return this.salesRepository.updateProductSale(productId, null, false);
   }
 }

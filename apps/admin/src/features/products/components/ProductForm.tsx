@@ -1,193 +1,264 @@
 import React from 'react';
-import { Package, Globe, Info, Image as ImageIcon, Plus, X, ChevronRight, Link as LinkIcon } from 'lucide-react';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
-import { Category, Brand, Sale } from '../schema';
+import { ChevronRight } from 'lucide-react';
+import { Category, Brand } from "@amber/shared";
+import type { Product } from "@amber/shared";
+import { EditorialImagery } from './form/EditorialImagery';
+import { ProductIdentification } from './form/ProductIdentification';
+import { ProductStorytelling } from './form/ProductStorytelling';
+import { PricingSection } from './form/PricingSection';
+import { ClassificationSection } from './form/ClassificationSection';
+import type { Sale } from '../schema';
+import type { Collection } from '@amber/shared';
 
 interface ProductFormProps {
-  productForm: any;
-  setProductForm: (form: any) => void;
+  productForm: Partial<Product> & {
+    currency?: string;
+    currencyCode?: string;
+    nameMy?: string;
+    descriptionMy?: string;
+    publishAt?: string;
+    tags?: string[];
+  };
+  setProductForm: (form: ProductFormProps['productForm']) => void;
   categories: Category[] | null;
   brands: Brand[] | null;
+  collections: Collection[] | null;
   sales: Sale[] | null;
-  onSubmit: (e: React.FormEvent) => void;
+  onNext?: () => void;
   submitting: boolean;
-  editingProduct: any;
+  editingProduct: { id?: string } | null;
   onOpenMedia: (index?: number) => void;
 }
-
-const quillModules = {
-  toolbar: [
-    [{ 'header': [1, 2, 3, false] }],
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-    ['link', 'clean']
-  ],
-};
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   productForm,
   setProductForm,
   categories,
   brands,
+  collections,
   sales,
-  onSubmit,
+  onNext,
   submitting,
   editingProduct,
   onOpenMedia
 }) => {
-  const [urlInput, setUrlInput] = React.useState('');
+  const handleFieldChange = (field: string, value: unknown) => {
+    setProductForm({ ...productForm, [field]: value });
+  };
 
-  const removeImage = (index: number) => {
+  const handleCurrencyChange = (code: string) => {
     setProductForm({
       ...productForm,
-      images: productForm.images.filter((_: any, i: number) => i !== index)
+      currency: code as 'USD' | 'MMK' | 'THB',
+      currencyCode: code as 'USD' | 'MMK' | 'THB',
+      isUsdPrice: code === 'USD',
     });
   };
 
-  const addImageUrl = () => {
-    if (urlInput.trim()) {
-      setProductForm({
-        ...productForm,
-        images: [...productForm.images, urlInput.trim()]
-      });
-      setUrlInput('');
-    }
+  const handleNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onNext) onNext();
   };
 
+  const tagsInput = (productForm.tags || []).join(', ');
+
   return (
-    <form onSubmit={onSubmit} className="space-y-12 py-10 animate-in fade-in slide-in-from-left-4 duration-500">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground flex items-center gap-2">
-              <ImageIcon size={14} /> Editorial Imagery
-            </label>
-            <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Click an image to replace, or use the (+) to add more.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input 
-                type="text" 
-                placeholder="Paste Image URL..." 
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addImageUrl())}
-                className="h-8 pl-8 pr-3 bg-card border border-border text-[10px] w-64 focus:border-primary focus:outline-none transition-all"
-              />
-            </div>
-            <button 
-              type="button"
-              onClick={addImageUrl}
-              className="h-8 px-4 bg-foreground text-background text-[10px] font-bold uppercase tracking-widest hover:bg-primary transition-colors"
-            >
-              Link
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {productForm.images.map((url: string, index: number) => (
-            <div key={index} className="group relative aspect-square bg-secondary border border-border overflow-hidden cursor-pointer">
-              <img 
-                src={url} 
-                alt={`Product ${index}`} 
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                onClick={() => onOpenMedia(index)}
-              />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                <span className="text-[9px] text-white font-bold uppercase tracking-[0.2em]">Change</span>
-              </div>
-              <button 
-                type="button" 
-                onClick={(e) => { e.stopPropagation(); removeImage(index); }}
-                className="absolute top-2 right-2 p-1.5 bg-background/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground z-10"
-              >
-                <X size={12} />
-              </button>
-              {index === 0 && (
-                <div className="absolute bottom-0 left-0 right-0 bg-primary/90 text-primary-foreground text-[8px] font-bold uppercase tracking-widest text-center py-1">
-                  Primary
-                </div>
-              )}
-            </div>
-          ))}
-          <button 
-            type="button"
-            onClick={() => onOpenMedia()}
-            className="aspect-square border-2 border-dashed border-muted-foreground/20 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-all duration-300 group"
-          >
-            <Plus size={24} className="group-hover:scale-110 transition-transform" />
-            <span className="text-[9px] font-bold uppercase tracking-widest">Add Image</span>
-          </button>
-        </div>
-      </div>
+    <form onSubmit={handleNext} className="space-y-12 py-10 animate-in fade-in slide-in-from-left-4 duration-500">
+      <EditorialImagery 
+        images={productForm.images || []} 
+        onChange={(images) => handleFieldChange('images', images)} 
+        onOpenMedia={onOpenMedia} 
+      />
+
+      <ProductIdentification 
+        name={productForm.name || ""} 
+        slug={productForm.slug || ""} 
+        onChange={handleFieldChange} 
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
         <div className="space-y-2">
-          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Product Title</label>
-          <input type="text" required value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-2xl font-serif focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" placeholder="Enter Product Name..." />
+          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Name (Burmese)</label>
+          <input
+            type="text"
+            value={productForm.nameMy || ''}
+            onChange={(e) => handleFieldChange('nameMy', e.target.value)}
+            className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-serif focus:border-primary focus:outline-none transition-colors duration-300 rounded-none"
+            placeholder="မြန်မာအမည်..."
+          />
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Unique Slug</label>
-          <input type="text" required value={productForm.slug} onChange={(e) => setProductForm({ ...productForm, slug: e.target.value })} className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" placeholder="product-url-slug" />
+          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Market Visibility</label>
+          <select
+            value={productForm.visibility || 'BOTH'}
+            onChange={(e) => handleFieldChange('visibility', e.target.value)}
+            className="w-full h-12 border-b border-input bg-background px-2 text-sm focus:border-primary focus:outline-none rounded-sm cursor-pointer"
+          >
+            <option value="BOTH">Show in Both Markets</option>
+            <option value="USA">USA Market Only</option>
+            <option value="MYANMAR">Myanmar Market Only</option>
+            <option value="PRE_ORDER_ONLY">Pre-order Only</option>
+          </select>
         </div>
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Scheduled Publish</label>
+          <input
+            type="datetime-local"
+            value={productForm.publishAt || ''}
+            onChange={(e) => handleFieldChange('publishAt', e.target.value)}
+            className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none"
+          />
+        </div>
+      </div>
+
+      <ProductStorytelling 
+        description={productForm.description || ""} 
+        onChange={(val) => handleFieldChange('description', val)} 
+      />
+
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Description (Burmese)</label>
+        <textarea
+          value={productForm.descriptionMy || ''}
+          onChange={(e) => handleFieldChange('descriptionMy', e.target.value)}
+          rows={3}
+          className="w-full border border-input bg-card px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors duration-300"
+          placeholder="မြန်မာဖော်ပြချက်..."
+        />
+      </div>
+
+      <PricingSection 
+        price={productForm.price?.toString() || ""} 
+        compareAtPrice={productForm.compareAtPrice?.toString() || ""} 
+        currency={productForm.currency || productForm.currencyCode || 'USD'} 
+        onChange={handleFieldChange}
+        onCurrencyChange={handleCurrencyChange}
+      />
+
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Sale / Promotion</label>
+        <select
+          value={productForm.saleId || ''}
+          onChange={(e) => handleFieldChange('saleId', e.target.value)}
+          className="w-full h-12 border-b border-input bg-background px-2 text-sm focus:border-primary focus:outline-none rounded-sm cursor-pointer"
+        >
+          <option value="">No sale</option>
+          {(sales || []).map((sale) => (
+            <option key={sale.id} value={sale.id}>{sale.name}</option>
+          ))}
+        </select>
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Editorial Storytelling</label>
-        <div className="border border-input bg-card focus-within:border-primary transition-colors duration-300">
-          <ReactQuill theme="snow" value={productForm.description} onChange={(val) => setProductForm({ ...productForm, description: val })} modules={quillModules} className="[&_.ql-editor]:min-h-[150px]" />
-        </div>
+        <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Tags (comma-separated)</label>
+        <input
+          type="text"
+          value={tagsInput}
+          onChange={(e) =>
+            handleFieldChange(
+              'tags',
+              e.target.value.split(',').map((t) => t.trim()).filter(Boolean)
+            )
+          }
+          className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm focus:border-primary focus:outline-none transition-colors duration-300 rounded-none"
+          placeholder="summer, silk, new"
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        <div className="space-y-2">
-          <div className="flex justify-between items-end">
-            <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Retail Price ({productForm.isUsdPrice ? 'USD' : 'MMK'})</label>
-            <label className="flex items-center gap-2 cursor-pointer mb-1 group">
-              <input type="checkbox" checked={productForm.isUsdPrice} onChange={(e) => setProductForm({...productForm, isUsdPrice: e.target.checked})} className="w-3.5 h-3.5 accent-primary" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors">USD Currency</span>
-            </label>
+      <div className="space-y-6">
+        <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground border-b border-border pb-4">SEO</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Meta Title</label>
+            <input
+              type="text"
+              value={productForm.metaTitle || ''}
+              onChange={(e) => handleFieldChange('metaTitle', e.target.value)}
+              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+            />
           </div>
-          <input type="text" required value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" placeholder="0.00" />
-        </div>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Compare at Price ({productForm.isUsdPrice ? 'USD' : 'MMK'})</label>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Meta Description</label>
+            <input
+              type="text"
+              value={productForm.metaDescription || ''}
+              onChange={(e) => handleFieldChange('metaDescription', e.target.value)}
+              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+            />
           </div>
-          <input type="text" value={productForm.compareAtPrice} onChange={(e) => setProductForm({ ...productForm, compareAtPrice: e.target.value })} className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none text-muted-foreground" placeholder="0.00" />
         </div>
+        <p className="text-[10px] text-muted-foreground/60 font-mono">
+          Preview URL: /shop/{productForm.slug || 'product-slug'}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="space-y-2">
-          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Brand/Vendor</label>
-          <select value={productForm.brandId} onChange={(e) => setProductForm({ ...productForm, brandId: e.target.value })} className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors duration-300 rounded-none">
-            <option value="">Select Brand</option>
-            {brands?.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Classification</label>
-          <select value={productForm.categoryId} onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })} className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors duration-300 rounded-none">
-            <option value="">Select Category</option>
-            {categories?.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Status</label>
-          <select value={productForm.status} onChange={(e) => setProductForm({ ...productForm, status: e.target.value as any })} className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors duration-300 rounded-none">
-            <option value="DRAFT">DRAFT</option>
-            <option value="PUBLISHED">PUBLISHED</option>
-            <option value="ARCHIVED">ARCHIVED</option>
-          </select>
-        </div>
+      <div className="flex flex-wrap gap-6">
+        {[
+          { key: 'isFeatured', label: 'Featured' },
+          { key: 'isNewArrival', label: 'New Arrival' },
+          { key: 'isBestSeller', label: 'Best Seller' },
+        ].map(({ key, label }) => (
+          <label key={key} className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean((productForm as Record<string, unknown>)[key])}
+              onChange={(e) => handleFieldChange(key, e.target.checked)}
+              className="accent-primary"
+            />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
+          </label>
+        ))}
       </div>
+
+      <div className="space-y-6 p-6 border border-dashed border-primary/20 bg-secondary/30">
+        <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Preorder</h4>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={productForm.isPreOrder ?? false}
+            onChange={(e) => handleFieldChange('isPreOrder', e.target.checked)}
+            className="accent-primary"
+          />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Enable Preorder</span>
+        </label>
+        {productForm.isPreOrder && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Shipping Date</label>
+              <input
+                type="date"
+                value={productForm.preOrderShippingDate || ''}
+                onChange={(e) => handleFieldChange('preOrderShippingDate', e.target.value)}
+                className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Preorder Note</label>
+              <input
+                type="text"
+                value={productForm.preOrderNote || ''}
+                onChange={(e) => handleFieldChange('preOrderNote', e.target.value)}
+                className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ClassificationSection 
+        brandId={productForm.brandId || undefined} 
+        categoryId={productForm.categoryId || undefined} 
+        collectionIds={productForm.collectionIds || []}
+        status={productForm.status} 
+        brands={brands || []} 
+        categories={categories || []}
+        collections={collections || []}
+        onChange={handleFieldChange} 
+      />
 
       <div className="flex justify-end pt-10 border-t border-border">
         <button type="submit" disabled={submitting} className="flex items-center gap-3 bg-foreground text-primary-foreground px-10 py-4 text-xs font-bold uppercase tracking-[0.3em] hover:bg-primary transition-colors duration-500 disabled:opacity-50">
-          {submitting ? 'Processing...' : editingProduct ? 'Commit Changes' : 'Initialize SKU'}
+          {submitting ? 'Processing...' : editingProduct ? 'Proceed to Variants' : 'Proceed to Variants'}
           <ChevronRight size={16} />
         </button>
       </div>

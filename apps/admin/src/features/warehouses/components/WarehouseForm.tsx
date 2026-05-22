@@ -1,18 +1,21 @@
 import React from 'react';
 import { Loader2, Globe, MapPin, Save } from 'lucide-react';
+import type { WarehouseFormData } from '@amber/shared';
 
 interface WarehouseFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: WarehouseFormData;
+  setFormData: (data: WarehouseFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
+  editing?: boolean;
 }
 
 export const WarehouseForm: React.FC<WarehouseFormProps> = ({
   formData,
   setFormData,
   onSubmit,
-  submitting
+  submitting,
+  editing = false
 }) => {
   return (
     <form onSubmit={onSubmit} className="space-y-8 py-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -28,7 +31,7 @@ export const WarehouseForm: React.FC<WarehouseFormProps> = ({
              <button
                key={loc}
                type="button"
-               onClick={() => setFormData({ ...formData, location: loc })}
+               onClick={() => setFormData({ ...formData, location: loc as 'USA' | 'MYANMAR' })}
                className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border transition-all duration-300 ${formData.location === loc ? 'bg-foreground text-primary-foreground border-foreground' : 'bg-transparent text-muted-foreground border-border hover:border-primary'}`}
              >
                {loc}
@@ -45,7 +48,7 @@ export const WarehouseForm: React.FC<WarehouseFormProps> = ({
       <div className="flex justify-end pt-10 border-t border-border">
         <button type="submit" disabled={submitting} className="flex items-center gap-3 bg-foreground text-primary-foreground px-10 py-4 text-xs font-bold uppercase tracking-[0.3em] hover:bg-primary transition-all duration-300 disabled:opacity-50">
           {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Establish Node
+          {editing ? 'Update Changes' : 'Establish Node'}
         </button>
       </div>
     </form>

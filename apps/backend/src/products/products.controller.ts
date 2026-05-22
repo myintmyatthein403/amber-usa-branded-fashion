@@ -1,71 +1,151 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  UsePipes,
+  Req,
+  Res,
+  Header,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { ProductsService } from './products.service';
-import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
 import { Permissions } from '../auth/permissions.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { ProductSchema, Permission } from '@amber/shared';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductQueryDto,
+  StockValidationItemDto,
+} from './dto/product.dto';
 
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Permissions('products:write')
+  @Permissions(Permission.PRODUCTS_WRITE)
   @Post()
-  create(@Body() createProductDto: Prisma.ProductCreateInput) {
+  create(
+    @Body(new ZodValidationPipe(ProductSchema))
+    createProductDto: CreateProductDto,
+  ) {
     return this.productsService.createProduct(createProductDto);
   }
 
-  @UseGuards(OptionalJwtAuthGuard, RolesGuard)
-  @Permissions('products:read')
   @Get()
-  async findAll(
-    @Query('isFeatured') isFeatured?: string,
-    @Query('isNewArrival') isNewArrival?: string,
-    @Query('isBestSeller') isBestSeller?: string,
-    @Query('onSale') onSale?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('brandId') brandId?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-  ) {
+  async findAll(@Query() query: ProductQueryDto, @Req() req: { user?: { roleName?: string } }) {
+    const isAdmin = req.user && ['ADMIN', 'SUPERADMIN'].includes(req.user.roleName ?? '');
+    let attributeFilters: Record<string, string> | undefined;
+    if (query.attributeFilters) {
+      try {
+        attributeFilters = JSON.parse(query.attributeFilters);
+      } catch {
+        attributeFilters = undefined;
+      }
+    }
+
     return this.productsService.getAllProducts({
-      isFeatured: isFeatured !== undefined ? isFeatured === 'true' : undefined,
-      isNewArrival: isNewArrival !== undefined ? isNewArrival === 'true' : undefined,
-      isBestSeller: isBestSeller !== undefined ? isBestSeller === 'true' : undefined,
-      onSale: onSale !== undefined ? onSale === 'true' : undefined,
-      categoryId,
-      brandId,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      search,
+      isFeatured: query.isFeatured !== undefined ? query.isFeatured === 'true' : undefined,
+      isNewArrival: query.isNewArrival !== undefined ? query.isNewArrival === 'true' : undefined,
+      isBestSeller: query.isBestSeller !== undefined ? query.isBestSeller === 'true' : undefined,
+      onSale: query.onSale !== undefined ? query.onSale === 'true' : undefined,
+      categoryId: query.categoryId,
+      brandId: query.brandId,
+      currencyCode: query.currencyCode,
+      market: query.market as 'US' | 'MM' | undefined,
+      warehouseLocation: query.warehouseLocation as 'USA' | 'MYANMAR' | undefined,
+      inStock: query.inStock !== undefined ? query.inStock === 'true' : undefined,
+      priceMin: query.priceMin ? parseFloat(query.priceMin) : undefined,
+      priceMax: query.priceMax ? parseFloat(query.priceMax) : undefined,
+      status: isAdmin && query.status ? (query.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') : undefined,
+      attributeFilters,
+      page: query.page ? parseInt(query.page, 10) : undefined,
+      limit: query.limit ? parseInt(query.limit, 10) : undefined,
+      search: query.search,
+      publicOnly: !isAdmin,
     });
   }
 
-  @UseGuards(OptionalJwtAuthGuard, RolesGuard)
-  @Permissions('products:read')
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.productsService.getProductBySlug(slug);
+  }
+
+  @Get('export')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Permissions(Permission.PRODUCTS_READ)
+  @Header('Content-Type', 'text/csv')
+  async exportProducts(@Res() res: Response) {
+    const products = await this.productsService.getAllProducts({ limit: 10000 });
+    const rows = ['sku,productName,variantSize,variantColor,price,currencyCode,stock,warehouseLocation,buyPrice'];
+    const data = Array.isArray(products) ? products : products.data;
+    for (const p of data) {
+      for (const v of (p as { variants?: Array<Record<string, unknown>> }).variants ?? []) {
+        const inv = (v as { inventory?: Array<{ warehouse?: { location?: string }; quantity?: number }> }).inventory ?? [];
+        const loc = inv.map((i) => `${i.warehouse?.location}:${i.quantity}`).join('|') || '';
+        rows.push(
+          `${v.sku},"${p.name}",${v.size},${v.color},${v.price ?? p.price},${(v as { currencyCode?: string }).currencyCode ?? (p as { currencyCode?: string }).currencyCode},${v.stock},${loc},${(v as { buyPrice?: string }).buyPrice ?? ''}`,
+        );
+      }
+    }
+    res.send(rows.join('\n'));
+  }
+
+  @Post('import')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Permissions(Permission.PRODUCTS_WRITE)
+  async importProducts(
+    @Body() body: { rows: Array<Record<string, string>>; dryRun?: boolean },
+  ) {
+    const errors: string[] = [];
+    const preview: Array<Record<string, string>> = [];
+    for (const row of body.rows ?? []) {
+      if (!row.sku || !row.productName) {
+        errors.push(`Missing sku or productName: ${JSON.stringify(row)}`);
+        continue;
+      }
+      preview.push(row);
+    }
+    if (body.dryRun || errors.length) {
+      return { dryRun: true, preview, errors };
+    }
+    return { imported: preview.length, preview };
+  }
+
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productsService.getProductById(id);
+  findOne(@Param('id') id: string, @Req() req: { user?: { roleName?: string } }) {
+    const isAdmin = req.user && ['ADMIN', 'SUPERADMIN'].includes(req.user.roleName ?? '');
+    return this.productsService.getProductById(id, !isAdmin);
   }
 
   @Post('validate-stock')
-  validateStock(@Body() items: Array<{ productId: string; variantId?: string; quantity: number }>) {
+  validateStock(@Body() items: StockValidationItemDto[]) {
     return this.productsService.validateStock(items);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Permissions('products:write')
+  @Permissions(Permission.PRODUCTS_WRITE)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: Prisma.ProductUpdateInput) {
-    return this.productsService.updateProduct(id, updateProductDto);
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateProductDto))
+    updateProductDto: UpdateProductDto,
+    @Query('draft') draft?: string,
+  ) {
+    return this.productsService.updateProduct(id, updateProductDto, draft === 'true');
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Permissions('products:write')
+  @Permissions(Permission.PRODUCTS_WRITE)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.productsService.deleteProduct(id);

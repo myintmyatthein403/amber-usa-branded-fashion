@@ -1,9 +1,20 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { TestimonialsService } from './testimonials.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { TestimonialSchema } from '@amber/shared';
 
 @Controller('testimonials')
 export class TestimonialsController {
@@ -12,7 +23,7 @@ export class TestimonialsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  create(@Body() data: any) {
+  create(@Body(new ZodValidationPipe(TestimonialSchema)) data: any) {
     return this.testimonialsService.create(data);
   }
 
@@ -31,7 +42,10 @@ export class TestimonialsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  update(@Param('id') id: string, @Body() data: any) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(TestimonialSchema.partial())) data: any,
+  ) {
     return this.testimonialsService.update(id, data);
   }
 

@@ -23,9 +23,10 @@ async function main() {
       description: 'Complete system access and ownership. Can manage all staff, settings, and financial data.',
       permissions: [
         'products:read', 'products:write', 'categories:manage', 'brands:manage',
-        'orders:manage', 'marketing:manage', 'giftcards:manage', 'ads:manage',
-        'content:manage', 'reviews:manage', 'community:manage',
-        'staff:manage', 'roles:manage', 'settings:manage'
+        'orders:manage', 'logistics:manage',
+        'marketing:manage', 'giftcards:manage', 'ads:manage', 'sales:manage', 'coupons:manage', 'collections:manage',
+        'content:manage', 'reviews:manage', 'community:manage', 'hero:manage',
+        'staff:manage', 'roles:manage', 'settings:manage', 'users:manage'
       ],
       color: 'text-primary',
       isImmutable: true,
@@ -35,8 +36,9 @@ async function main() {
       description: 'Operational manager. Can manage products, orders, customers, and website content.',
       permissions: [
         'products:read', 'products:write', 'categories:manage', 'brands:manage',
-        'orders:manage', 'marketing:manage', 'ads:manage',
-        'content:manage', 'reviews:manage', 'community:manage'
+        'orders:manage', 'logistics:manage', 'marketing:manage', 'ads:manage',
+        'content:manage', 'reviews:manage', 'community:manage', 'hero:manage',
+        'sales:manage', 'coupons:manage', 'collections:manage'
       ],
       color: 'text-emerald-500',
       isImmutable: true,
@@ -84,19 +86,34 @@ async function main() {
   const accessories = await prisma.category.upsert({
     where: { name: 'Accessories' },
     update: {},
-    create: { name: 'Accessories' },
+    create: { 
+      name: 'Accessories',
+      slug: 'accessories',
+      description: 'Fashion accessories',
+      displayOrder: 1
+    },
   });
 
   const apparel = await prisma.category.upsert({
     where: { name: 'Apparel' },
     update: {},
-    create: { name: 'Apparel' },
+    create: { 
+      name: 'Apparel',
+      slug: 'apparel',
+      description: 'Clothing and apparel',
+      displayOrder: 2
+    },
   });
 
   const footwear = await prisma.category.upsert({
     where: { name: 'Footwear' },
     update: {},
-    create: { name: 'Footwear' },
+    create: { 
+      name: 'Footwear',
+      slug: 'footwear',
+      description: 'Shoes and footwear',
+      displayOrder: 3
+    },
   });
 
   const coachBrand = await prisma.brand.upsert({
@@ -377,28 +394,32 @@ async function main() {
       type: 'MANUAL',
       accountName: 'AMBER CO., LTD',
       accountNumber: '09123456789',
-      instructions: 'Please send a screenshot of your payment to our Facebook page or Viber.',
+      instructions: 'Transfer the order total to the account above, then upload your payment screenshot in checkout.',
       isActive: true,
+      markets: ['MM'],
     },
     {
       name: 'WavePay',
       type: 'MANUAL',
       accountName: 'AMBER CO., LTD',
       accountNumber: '09123456789',
-      instructions: 'Please send a screenshot of your payment to our Facebook page or Viber.',
+      instructions: 'Transfer the order total to the account above, then upload your payment screenshot in checkout.',
       isActive: true,
+      markets: ['MM'],
     },
     {
       name: 'Credit Card',
       type: 'STRIPE',
       instructions: 'Secure payment via Stripe. Supported cards: Visa, Mastercard, AMEX.',
       isActive: true,
+      markets: ['US'],
     },
     {
       name: 'Cash on Delivery',
       type: 'MANUAL',
       instructions: 'Pay with cash upon delivery.',
       isActive: true,
+      markets: ['MM'],
     },
   ];
 
@@ -411,6 +432,47 @@ async function main() {
   }
 
   console.log('Payment Methods created');
+
+  const materialAttr = await prisma.attribute.upsert({
+    where: { slug: 'material' },
+    update: {},
+    create: {
+      name: 'Material',
+      slug: 'material',
+      type: 'text',
+      isFilterable: true,
+      position: 0,
+      values: {
+        create: [
+          { value: 'Cotton', slug: 'cotton', position: 0 },
+          { value: 'Silk', slug: 'silk', position: 1 },
+          { value: 'Linen', slug: 'linen', position: 2 },
+        ],
+      },
+    },
+    include: { values: true },
+  });
+
+  await prisma.attribute.upsert({
+    where: { slug: 'color-family' },
+    update: {},
+    create: {
+      name: 'Color',
+      slug: 'color-family',
+      type: 'color',
+      isFilterable: true,
+      position: 1,
+      values: {
+        create: [
+          { value: 'Gold', slug: 'gold', hexColor: '#D4AF37', position: 0 },
+          { value: 'Black', slug: 'black', hexColor: '#1A1A1A', position: 1 },
+          { value: 'Ivory', slug: 'ivory', hexColor: '#F5F0E1', position: 2 },
+        ],
+      },
+    },
+  });
+
+  console.log('Attributes seeded:', materialAttr.name);
 
   console.log('Seed completed with Thingyan Sale data');
 }

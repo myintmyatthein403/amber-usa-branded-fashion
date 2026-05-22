@@ -1,119 +1,146 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { UsersRepository } from './users.repository';
 import * as bcrypt from 'bcrypt';
+import { sanitizeData } from '../common/utils/data-sanitizer';
+import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+
+interface JwtPayload {
+  userId: string;
+  email: string;
+  role: string;
+  permissions: string[];
+}
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private usersRepository: UsersRepository) {}
 
   async findAll() {
-    const users = await this.prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        roleName: true,
-        phone: true,
-        points: true,
-        memberLevel: true,
-        status: true,
-        joinedAt: true,
-      },
-    });
-
-    return users.map(user => ({
+    const users = await this.usersRepository.findAll();
+    return users.map((user) => ({
       ...user,
       role: user.roleName,
     }));
   }
 
   async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-      include: {
-        orders: true,
-        refundRequests: true,
-        role: true,
-      },
-    });
+    const user = await this.usersRepository.findByIdWithFullDetails(id);
     if (!user) throw new NotFoundException('User not found');
-    const { password, ...result } = user;
-    return result;
+    const { password, role, ...result } = user as any;
+    return {
+      ...result,
+      role: user.roleName,
+      permissions: role?.permissions || [],
+    };
   }
 
-  async create(data: any, currentUser: any) {
-    // Only SUPERADMIN can create staff
-    if (currentUser.role !== 'SUPERADMIN' && (data.roleName === 'ADMIN' || data.roleName === 'SUPERADMIN')) {
+  async create(data: CreateUserDto, currentUser: JwtPayload) {
+    if (
+      currentUser.role !== 'SUPERADMIN' &&
+      (data.roleName === 'ADMIN' || data.roleName === 'SUPERADMIN')
+    ) {
       throw new ForbiddenException('Only Superadmins can create staff members');
     }
 
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
+    const sanitizedData = sanitizeData(data) as Record<string, unknown>;
+    if (sanitizedData.role === null || sanitizedData.role === undefined) {
+      delete sanitizedData.role;
+    } else if (typeof sanitizedData.role === 'string') {
+      sanitizedData.roleName = sanitizedData.role;
+      delete sanitizedData.role;
+    }
+    if (sanitizedData.password) {
+      sanitizedData.password = await bcrypt.hash(
+        sanitizedData.password as string,
+        10,
+      );
     }
 
-    const user = await this.prisma.user.create({
-      data,
-    });
+    const user = await this.usersRepository.create(sanitizedData as any);
     const { password: _, ...result } = user;
     return result;
   }
 
-  async update(id: string, data: any, currentUser: any) {
-    const userToUpdate = await this.prisma.user.findUnique({ where: { id } });
+  async update(id: string, data: UpdateUserDto, currentUser: JwtPayload) {
+    const userToUpdate = await this.usersRepository.findById(id);
     if (!userToUpdate) throw new NotFoundException('User not found');
 
-    // Rule: ADMIN cannot modify or delete a SUPERADMIN
-    if (currentUser.role === 'ADMIN' && userToUpdate.roleName === 'SUPERADMIN') {
+    if (
+      currentUser.role === 'ADMIN' &&
+      userToUpdate.roleName === 'SUPERADMIN'
+    ) {
       throw new ForbiddenException('Admins cannot modify Superadmins');
     }
 
-    // Rule: ADMIN cannot modify another ADMIN
-    if (currentUser.role === 'ADMIN' && userToUpdate.roleName === 'ADMIN' && currentUser.userId !== id) {
+    if (
+      currentUser.role === 'ADMIN' &&
+      userToUpdate.roleName === 'ADMIN' &&
+      currentUser.userId !== id
+    ) {
       throw new ForbiddenException('Admins cannot modify other Admins');
     }
 
-    // Rule: ADMIN cannot elevate their own role or others to SUPERADMIN
     if (currentUser.role === 'ADMIN' && data.roleName === 'SUPERADMIN') {
       throw new ForbiddenException('Admins cannot grant Superadmin privileges');
     }
 
-    // Rule: Only SUPERADMIN can change roles of other staff
-    if (currentUser.role === 'ADMIN' && data.roleName && data.roleName !== userToUpdate.roleName) {
-      // Allow Admin to change USER to USER (no change) or prevent elevating to ADMIN/SUPERADMIN
+    if (
+      currentUser.role === 'ADMIN' &&
+      data.roleName &&
+      data.roleName !== userToUpdate.roleName
+    ) {
       if (userToUpdate.roleName === 'USER' && data.roleName !== 'USER') {
-         throw new ForbiddenException('Admins cannot promote customers to staff roles');
+        throw new ForbiddenException(
+          'Admins cannot promote customers to staff roles',
+        );
       }
     }
 
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
+    const sanitizedData = sanitizeData(data) as Record<string, unknown>;
+    if (sanitizedData.role === null || sanitizedData.role === undefined) {
+      delete sanitizedData.role;
+    } else if (typeof sanitizedData.role === 'string') {
+      sanitizedData.roleName = sanitizedData.role;
+      delete sanitizedData.role;
+    }
+    if (sanitizedData.password) {
+      sanitizedData.password = await bcrypt.hash(
+        sanitizedData.password as string,
+        10,
+      );
     }
 
-    const updatedUser = await this.prisma.user.update({
-      where: { id },
-      data,
-    });
+    const updatedUser = await this.usersRepository.update(
+      id,
+      sanitizedData as any,
+    );
     const { password: _, ...result } = updatedUser;
     return result;
   }
 
-  async remove(id: string, currentUser: any) {
-    const userToDelete = await this.prisma.user.findUnique({ where: { id } });
+  async remove(id: string, currentUser: JwtPayload) {
+    const userToDelete = await this.usersRepository.findById(id);
     if (!userToDelete) throw new NotFoundException('User not found');
 
-    // Rule: ADMIN cannot delete a SUPERADMIN
-    if (currentUser.role === 'ADMIN' && userToDelete.roleName === 'SUPERADMIN') {
+    if (
+      currentUser.role === 'ADMIN' &&
+      userToDelete.roleName === 'SUPERADMIN'
+    ) {
       throw new ForbiddenException('Admins cannot delete Superadmins');
     }
 
-    // Rule: ADMIN cannot delete another ADMIN
-    if (currentUser.role === 'ADMIN' && userToDelete.roleName === 'ADMIN' && currentUser.userId !== id) {
-       throw new ForbiddenException('Admins cannot delete other admins');
+    if (
+      currentUser.role === 'ADMIN' &&
+      userToDelete.roleName === 'ADMIN' &&
+      currentUser.userId !== id
+    ) {
+      throw new ForbiddenException('Admins cannot delete other admins');
     }
 
-    return this.prisma.user.delete({
-      where: { id },
-    });
+    return this.usersRepository.delete(id);
   }
 }

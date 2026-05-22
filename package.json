@@ -15,12 +15,27 @@
     "admin:build": "npm run build -w admin",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
+    "db:test:up": "docker compose up postgres_test -d",
+    "db:test:down": "docker compose down postgres_test",
     "db:migrate": "npm run prisma:migrate -w backend",
     "db:studio": "npm run prisma:studio -w backend",
-    "prisma:generate": "npm run prisma:generate -w backend"
+    "prisma:generate": "npm run prisma:generate -w backend",
+    "test": "npm run test -w packages/shared",
+    "test:watch": "npm run test:watch -w packages/shared",
+    "test:coverage": "npm run test:coverage -w packages/shared",
+    "test:backend": "npm run test -w apps/backend",
+    "test:e2e": "npm run test:e2e -w apps/backend",
+    "test:e2e:playwright": "playwright test",
+    "test:e2e:playwright:ui": "playwright test --ui",
+    "test:all": "concurrently \"npm run test\" \"npm run test:backend\"",
+    "playwright:install": "playwright install"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "concurrently": "^9.2.1",
     "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "slugify": "^1.6.9"
   }
 }

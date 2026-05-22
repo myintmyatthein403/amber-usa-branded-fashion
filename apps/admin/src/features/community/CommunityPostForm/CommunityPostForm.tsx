@@ -1,14 +1,15 @@
 import React from 'react';
 import { Image as ImageIcon, Star, Loader2 } from 'lucide-react';
+import type { CommunityPost } from '../schema';
 
 interface CommunityPostFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: CommunityPost;
+  setFormData: (data: CommunityPost) => void;
   onSubmit: (e: React.FormEvent) => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   submitting: boolean;
   uploading: boolean;
-  editingPost: any;
+  editingPost: CommunityPost | null;
   onCancel: () => void;
 }
 

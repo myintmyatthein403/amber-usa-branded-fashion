@@ -1,9 +1,28 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  UsePipes,
+  Query,
+} from '@nestjs/common';
 import { BrandsService } from './brands.service';
-import { Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { BrandSchema } from '@amber/shared';
+import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
+
+interface PaginationQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
 
 @Controller('brands')
 export class BrandsController {
@@ -12,13 +31,23 @@ export class BrandsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  create(@Body() createBrandDto: Prisma.BrandCreateInput) {
+  create(
+    @Body(new ZodValidationPipe(BrandSchema)) createBrandDto: CreateBrandDto,
+  ) {
     return this.brandsService.createBrand(createBrandDto);
   }
 
   @Get()
-  findAll() {
-    return this.brandsService.getAllBrands();
+  findAll(@Query() query: PaginationQuery) {
+    const page = query.page ? Math.max(1, parseInt(String(query.page), 10)) : 1;
+    const limit = query.limit
+      ? Math.max(1, Math.min(100, parseInt(String(query.limit), 10)))
+      : 10;
+    const search =
+      typeof query.search === 'string' && query.search.trim()
+        ? query.search.trim()
+        : undefined;
+    return this.brandsService.getAllBrands(page, limit, search);
   }
 
   @Get(':id')
@@ -29,7 +58,11 @@ export class BrandsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBrandDto: Prisma.BrandUpdateInput) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(BrandSchema.partial()))
+    updateBrandDto: UpdateBrandDto,
+  ) {
     return this.brandsService.updateBrand(id, updateBrandDto);
   }
 

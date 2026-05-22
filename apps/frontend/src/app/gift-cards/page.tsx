@@ -13,6 +13,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
+import { Product } from "@amber/shared";
+
+interface GiftCardOptionParsed {
+  id: string;
+  value: number;
+  label: string;
+}
 
 const GIFT_CARD_VALUES = [
   { id: "gc-50", value: 50000, label: "50,000 MMK" },
@@ -36,7 +43,7 @@ export default function GiftCardsPage() {
       label: label
     }))
   });
-  const [selectedAmount, setSelectedAmount] = useState<any>(null);
+  const [selectedAmount, setSelectedAmount] = useState<GiftCardOptionParsed | null>(null);
   const addToCart = useStore((state) => state.addToCart);
   const [isAdding, setIsAdding] = useState(false);
 
@@ -85,7 +92,7 @@ export default function GiftCardsPage() {
       sizes: ["Digital"],
       isUsdPrice: false,
     };
-    addToCart(giftCardProduct);
+    addToCart(giftCardProduct as unknown as Product);
     setTimeout(() => setIsAdding(false), 1000);
   };
 
@@ -179,7 +186,7 @@ export default function GiftCardsPage() {
                 Select Amount
               </h4>
               <div className="grid grid-cols-2 gap-4">
-                {data.parsedAmounts?.map((option: any, index: number) => (
+                {data.parsedAmounts?.map((option: GiftCardOptionParsed, index: number) => (
                   <motion.button
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { DeliveryMethodsService } from './delivery-methods.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -7,7 +16,9 @@ import { Role } from '@prisma/client';
 
 @Controller('delivery-methods')
 export class DeliveryMethodsController {
-  constructor(private readonly deliveryMethodsService: DeliveryMethodsService) {}
+  constructor(
+    private readonly deliveryMethodsService: DeliveryMethodsService,
+  ) {}
 
   @Get()
   findAll() {

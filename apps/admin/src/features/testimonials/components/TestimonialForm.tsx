@@ -1,9 +1,10 @@
 import React from 'react';
 import { Star, User, MapPin, Briefcase, MessageSquare, Loader2, Save } from 'lucide-react';
+import type { TestimonialFormData } from '@amber/shared';
 
 interface TestimonialFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: TestimonialFormData;
+  setFormData: (data: TestimonialFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
   editingTestimonial: any;

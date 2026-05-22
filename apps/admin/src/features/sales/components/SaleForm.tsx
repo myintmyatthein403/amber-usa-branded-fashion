@@ -3,14 +3,15 @@ import { Search, Percent, Banknote, Calendar, CheckCircle2, X, Loader2, Info, Sh
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { SaleProduct } from '../schema';
+import type { SaleFormData } from '@amber/shared';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 interface SaleFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: SaleFormData;
+  setFormData: (data: SaleFormData) => void;
   productSearch: string;
   setProductSearch: (value: string) => void;
   filteredProducts: SaleProduct[];
@@ -63,7 +64,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
              <div className="absolute left-0 top-1/2 -translate-y-1/2 text-muted-foreground">
                {formData.discountType === 'PERCENTAGE' ? <Percent size={14}/> : <Banknote size={14}/>}
              </div>
-             <input type="number" required value={formData.discountValue} onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })} className="w-full h-12 border-b border-input bg-transparent pl-8 pr-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" />
+             <input type="number" required value={formData.discountValue} onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })} className="w-full h-12 border-b border-input bg-transparent pl-8 pr-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none" />
           </div>
         </div>
         <div className="space-y-2">

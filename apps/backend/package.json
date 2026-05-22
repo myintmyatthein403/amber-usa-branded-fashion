@@ -27,13 +27,16 @@
     "seed": "npx ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@amber/shared": "*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/event-emitter": "^3.1.0",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/serve-static": "^5.0.4",
+    "@nestjs/swagger": "^11.4.2",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@types/bcrypt": "^6.0.0",
@@ -52,9 +55,12 @@
     "passport-local": "^1.0.0",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1",
+    "rxjs": "^7.8.2",
     "streamifier": "^0.1.1",
-    "stripe": "^20.4.1"
+    "stripe": "^20.4.1",
+    "swagger-ui-express": "^5.0.1",
+    "yn": "^3.1.1",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

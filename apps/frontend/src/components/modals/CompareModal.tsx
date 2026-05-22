@@ -7,7 +7,7 @@ import { useStore } from "@/store/useStore";
 import Price from "@/components/Price";
 
 interface Product {
-  id: number | string;
+  id: string;
   name: string;
   price: number;
   isUsdPrice?: boolean;
@@ -23,7 +23,7 @@ interface CompareModalProps {
   products: Product[];
   isOpen: boolean;
   onClose: () => void;
-  onRemove: (id: number | string) => void;
+  onRemove: (id: string) => void;
 }
 
 export default function CompareModal({ products, isOpen, onClose, onRemove }: CompareModalProps) {
@@ -89,8 +89,8 @@ export default function CompareModal({ products, isOpen, onClose, onRemove }: Co
                          <h3 className="text-sm font-serif font-bold text-[#1A1A1A] line-clamp-2">{product.name}</h3>
                       </div>
                       <button 
-                        onClick={() => addToCart(product)}
-                        disabled={!product.inStock}
+                        onClick={() => addToCart(product as any)}
+                        disabled={!(product as any).variants?.length}
                         className="w-full bg-[#1A1A1A] text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all disabled:opacity-50"
                       >
                         Add to Bag

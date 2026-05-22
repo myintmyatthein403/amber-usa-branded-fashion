@@ -1,8 +1,28 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    userId: string;
+    email: string;
+    role: string;
+    permissions: string[];
+  };
+}
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -21,17 +41,24 @@ export class UsersController {
   }
 
   @Post()
-  async create(@Body() createDto: any, @Req() req: any) {
+  async create(
+    @Body() createDto: CreateUserDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.usersService.create(createDto, req.user);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateDto: any, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateUserDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.usersService.update(id, updateDto, req.user);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string, @Req() req: any) {
+  async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.usersService.remove(id, req.user);
   }
 }

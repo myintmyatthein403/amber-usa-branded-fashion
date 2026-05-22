@@ -12,24 +12,31 @@ export const useSettings = () => {
   const [formData, setFormData] = useState({
     privacyPolicy: '',
     termsConditions: '',
-    usdToMmkRate: '3500',
     stripePublishableKey: '',
     stripeSecretKey: '',
     stripeWebhookSecret: '',
   });
 
+  const [rateMeta, setRateMeta] = useState<{
+    rateUpdatedAt?: string | null;
+    isManualOverride?: boolean;
+  }>({});
+
   const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiService(API_ROUTES.SETTINGS);
+      const data = await apiService<unknown, Settings>(API_ROUTES.SETTINGS);
       setSettings(data);
       setFormData({
-        privacyPolicy: data.privacyPolicy || '',
-        termsConditions: data.termsConditions || '',
-        usdToMmkRate: data.usdToMmkRate?.toString() || '3500',
-        stripePublishableKey: data.stripePublishableKey || '',
-        stripeSecretKey: data.stripeSecretKey || '',
-        stripeWebhookSecret: data.stripeWebhookSecret || '',
+        privacyPolicy: data?.privacyPolicy || '',
+        termsConditions: data?.termsConditions || '',
+        stripePublishableKey: data?.stripePublishableKey || '',
+        stripeSecretKey: data?.stripeSecretKey || '',
+        stripeWebhookSecret: data?.stripeWebhookSecret || '',
+      });
+      setRateMeta({
+        rateUpdatedAt: (data as Settings & { rateUpdatedAt?: string })?.rateUpdatedAt ?? null,
+        isManualOverride: (data as Settings & { isManualOverride?: boolean })?.isManualOverride ?? false,
       });
     } catch (error) {
       console.error('Failed to fetch settings:', error);
@@ -47,15 +54,20 @@ export const useSettings = () => {
     setSubmitting(true);
     setSuccess(false);
     try {
+      const { privacyPolicy, termsConditions, stripePublishableKey, stripeSecretKey, stripeWebhookSecret } = formData;
       await apiService(API_ROUTES.SETTINGS, {
         method: 'PATCH',
         body: {
-          ...formData,
-          usdToMmkRate: parseFloat(formData.usdToMmkRate),
+          privacyPolicy,
+          termsConditions,
+          stripePublishableKey,
+          stripeSecretKey,
+          stripeWebhookSecret,
         },
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
+      await fetchSettings();
     } catch (error) {
       console.error('Failed to update settings:', error);
     } finally {
@@ -63,7 +75,7 @@ export const useSettings = () => {
     }
   };
 
-  const updateField = useCallback((field: string, value: any) => {
+  const updateField = useCallback((field: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
@@ -82,6 +94,7 @@ export const useSettings = () => {
     submitting,
     success,
     formData,
+    rateMeta,
     updateField,
     handleSubmit,
     quillModules,

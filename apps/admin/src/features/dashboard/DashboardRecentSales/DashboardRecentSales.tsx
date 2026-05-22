@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface RecentSale {
-  id: number;
+  id: string;
   customerName: string;
   email: string;
   amount: string;
@@ -17,7 +17,7 @@ export const DashboardRecentSales: React.FC<DashboardRecentSalesProps> = ({ rece
     <div className="col-span-3 rounded-xl border border-border bg-card p-6 shadow-sm transition-colors duration-300">
       <h3 className="text-lg font-semibold mb-4 text-foreground">Recent Sales</h3>
       <div className="space-y-6">
-        {recentSales.map((sale) => (
+        {recentSales.length > 0 ? recentSales.map((sale) => (
           <div key={sale.id} className="flex items-center gap-4">
             <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center font-semibold text-xs text-secondary-foreground">
               {sale.initials}
@@ -28,7 +28,11 @@ export const DashboardRecentSales: React.FC<DashboardRecentSalesProps> = ({ rece
             </div>
             <div className="font-medium text-sm text-foreground">{sale.amount}</div>
           </div>
-        ))}
+        )) : (
+          <div className="text-center text-sm text-muted-foreground py-8">
+            No recent sales yet
+          </div>
+        )}
       </div>
     </div>
   );

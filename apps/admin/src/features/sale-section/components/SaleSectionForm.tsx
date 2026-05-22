@@ -1,9 +1,10 @@
 import React from 'react';
 import { Image as ImageIcon, Loader2, Save } from 'lucide-react';
+import type { SaleSectionFormData } from '@amber/shared';
 
 interface SaleSectionFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: SaleSectionFormData;
+  setFormData: (data: SaleSectionFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   submitting: boolean;
@@ -64,8 +65,8 @@ export const SaleSectionForm: React.FC<SaleSectionFormProps> = ({
         <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground flex items-center gap-2"><ImageIcon size={12}/> Hero Visual Assets</label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
            <div className="aspect-[21/9] bg-secondary border border-border overflow-hidden relative group">
-              {formData.imageMain ? (
-                <img src={formData.imageMain} className="w-full h-full object-cover" />
+              {(formData.imageMain || formData.imageUrl) ? (
+                <img src={formData.imageMain || formData.imageUrl} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/30">
                    <ImageIcon size={40} />
@@ -79,15 +80,51 @@ export const SaleSectionForm: React.FC<SaleSectionFormProps> = ({
                  </label>
               </div>
            </div>
-           <div className="space-y-4">
+               <div className="space-y-4">
               <p className="text-[10px] text-muted-foreground leading-relaxed italic">Upload high-resolution landscape imagery (21:9 ratio recommended). This asset will serve as the primary emotional trigger for the promotional event.</p>
-              {!formData.imageMain && (
+              {!(formData.imageMain || formData.imageUrl) && (
                 <label className="inline-flex items-center gap-3 bg-secondary text-foreground px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] cursor-pointer hover:bg-muted transition-colors border border-border">
                    {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
                    {uploading ? 'Processing Architecture...' : 'Select Asset'}
                    <input type="file" className="hidden" accept="image/*" onChange={onFileChange} disabled={uploading} />
                 </label>
               )}
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Image URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={formData.imageUrl || ''}
+                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    className="flex-1 h-10 border-b border-input bg-transparent px-2 py-2 text-xs font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none"
+                    placeholder="https://example.com/image.jpg"
+                  />
+                  {formData.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (formData.imageMain) {
+                          setFormData({ ...formData, imageUrl: '', imageMain: '' });
+                        } else {
+                          setFormData({ ...formData, imageUrl: '' });
+                        }
+                      }}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {formData.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, imageMain: formData.imageUrl })}
+                    className="text-[10px] text-primary hover:underline"
+                  >
+                    Use as main image
+                  </button>
+                )}
+              </div>
            </div>
         </div>
       </div>

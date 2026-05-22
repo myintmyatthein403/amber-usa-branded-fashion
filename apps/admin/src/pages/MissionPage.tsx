@@ -43,8 +43,8 @@ export const MissionPage: React.FC = () => {
         title={editingMission ? 'Refine Mission Design' : 'Initialize Mission Section'}
       >
         <MissionForm 
-          formData={formData}
-          setFormData={setFormData}
+          formData={formData as any}
+          setFormData={setFormData as any}
           submitting={submitting}
           uploading={uploading}
           editingMission={editingMission}

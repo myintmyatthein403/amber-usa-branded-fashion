@@ -1,39 +1,39 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { Coupon, Prisma } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { CouponsRepository } from './coupons.repository';
+import { Coupon } from '@prisma/client';
+import { sanitizeData } from '../common/utils/data-sanitizer';
 
 @Injectable()
 export class CouponsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly couponsRepository: CouponsRepository) {}
 
-  async create(data: Prisma.CouponCreateInput): Promise<Coupon> {
-    return this.prisma.coupon.create({
-      data,
-    });
+  async create(data: any): Promise<Coupon> {
+    const sanitizedData = sanitizeData(data);
+    return this.couponsRepository.create(sanitizedData);
   }
 
   async findAll(): Promise<Coupon[]> {
-    return this.prisma.coupon.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.couponsRepository.findAll();
   }
 
-  async findOne(id: string): Promise<Coupon | null> {
-    return this.prisma.coupon.findUnique({
-      where: { id },
-    });
+  async findOne(id: string): Promise<Coupon> {
+    const coupon = await this.couponsRepository.findById(id);
+    if (!coupon) throw new NotFoundException(`Coupon with ID ${id} not found`);
+    return coupon;
   }
 
-  async update(id: string, data: Prisma.CouponUpdateInput): Promise<Coupon> {
-    return this.prisma.coupon.update({
-      where: { id },
-      data,
-    });
+  async update(id: string, data: any): Promise<Coupon> {
+    const coupon = await this.couponsRepository.findById(id);
+    if (!coupon) throw new NotFoundException(`Coupon with ID ${id} not found`);
+
+    const sanitizedData = sanitizeData(data);
+    return this.couponsRepository.update(id, sanitizedData);
   }
 
   async remove(id: string): Promise<Coupon> {
-    return this.prisma.coupon.delete({
-      where: { id },
-    });
+    const coupon = await this.couponsRepository.findById(id);
+    if (!coupon) throw new NotFoundException(`Coupon with ID ${id} not found`);
+
+    return this.couponsRepository.delete(id);
   }
 }

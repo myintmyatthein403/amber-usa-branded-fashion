@@ -7,9 +7,6 @@ export const WarehouseSchema = z.object({
   name: z.string().min(1, 'Warehouse name is required'),
   location: WarehouseLocationSchema.default('USA'),
   address: z.string().optional(),
-  _count: z.object({
-    inventory: z.number(),
-  }).optional(),
 });
 
 export type Warehouse = z.infer<typeof WarehouseSchema> & { id: string };

@@ -1,10 +1,34 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { OrdersRepository } from './orders.repository';
+import { PrismaService } from '../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { OrderStatusChangedEvent } from '../common/events/domain.events';
+import { ExchangeRateHelper } from '../currencies/exchange-rate.helper';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { normalizePrice, toUsd } from '@amber/shared';
+
+const STRIPE_METHOD_NAMES = ['stripe', 'credit card'];
+
+function isManualPaymentMethod(paymentMethod: string): boolean {
+  const lower = paymentMethod.toLowerCase();
+  return !STRIPE_METHOD_NAMES.some((s) => lower.includes(s));
+}
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private ordersRepository: OrdersRepository,
+    private prisma: PrismaService,
+    private eventEmitter: EventEmitter2,
+    private exchangeRateHelper: ExchangeRateHelper,
+    private cloudinaryService: CloudinaryService,
+  ) {}
 
   async createOrder(data: {
     userId: string;
@@ -16,292 +40,338 @@ export class OrdersService {
     phone: string;
     shippingMethod: string;
     paymentMethod: string;
-    totalAmount: number; // Still received but will be validated
+    paymentReference?: string;
+    totalAmount: number;
     currency: string;
+    market?: string;
+    shippingCountry?: string;
     deliveryFee?: number;
+    deliveryMethodId?: string;
     warehouseId?: string;
+    shippingAddress: string;
+    customerName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    street?: string;
+    state?: string;
+    township?: string;
+    zipCode?: string;
     items: Array<{
       productId: string;
       variantId?: string;
       name: string;
       price: number;
       isUsd: boolean;
+      currencyCode?: string;
       quantity: number;
       image: string;
       size?: string;
     }>;
   }) {
-    return this.prisma.$transaction(async (tx) => {
-      let hasPreOrderItems = false;
-      const itemsWithPreOrderInfo = [];
-      let calculatedTotal = 0;
+    let warehouseId = data.warehouseId;
+    const itemsWithPreOrderInfo = [];
+    let calculatedTotal = 0;
+    const orderCurrency = data.currency || 'USD';
 
-      // Find fulfillment warehouse (Finding 1 & 2)
-      let warehouseId = data.warehouseId;
-      if (!warehouseId) {
-        // Try to find a warehouse that has stock for at least the first item
-        const firstItem = data.items.find(item => item.variantId);
-        if (firstItem) {
-          const inventory = await tx.inventory.findFirst({
-            where: { 
-              variantId: firstItem.variantId,
-              quantity: { gte: firstItem.quantity }
-            }
-          });
-          warehouseId = inventory?.warehouseId;
-        }
+    if (!warehouseId) {
+      const firstItem = data.items.find((item) => item.variantId);
+      if (firstItem && firstItem.variantId) {
+        const inventory = await this.ordersRepository.findWarehouseWithStock(
+          firstItem.variantId,
+          firstItem.quantity,
+        );
+        warehouseId = inventory?.warehouseId;
+      }
+    }
+
+    if (!warehouseId) {
+      warehouseId =
+        (await this.ordersRepository.findDefaultWarehouse('MYANMAR'))?.id ||
+        (await this.ordersRepository.findAnyWarehouse())?.id;
+    }
+
+    if (!warehouseId) {
+      throw new BadRequestException('No fulfillment warehouse available');
+    }
+
+    const lockedExchangeRate = await this.exchangeRateHelper.getRateForOrder(
+      orderCurrency,
+    );
+
+    for (const item of data.items) {
+      let isPreOrder = false;
+      let expectedShippingDate = null;
+      let dbPrice = 0;
+      let currencyCode = item.currencyCode || (item.isUsd ? 'USD' : 'MMK');
+
+      if (item.variantId) {
+        const variant = await this.ordersRepository.findVariantForOrder(
+          item.variantId,
+        );
+        if (!variant)
+          throw new NotFoundException(`Variant not found: ${item.variantId}`);
+
+        dbPrice = Number(variant.price || variant.product.price);
+        currencyCode =
+          (variant as { currencyCode?: string }).currencyCode ||
+          (variant.product as { currencyCode?: string }).currencyCode ||
+          currencyCode;
+        isPreOrder = variant.isPreOrder || variant.product.isPreOrder;
+        expectedShippingDate =
+          variant.preOrderShippingDate || variant.product.preOrderShippingDate;
+      } else {
+        const product = await this.ordersRepository.findProductForOrder(
+          item.productId,
+        );
+        if (!product)
+          throw new NotFoundException(`Product not found: ${item.productId}`);
+
+        dbPrice = Number(product.price);
+        currencyCode =
+          (product as { currencyCode?: string }).currencyCode || currencyCode;
+        isPreOrder = product.isPreOrder;
+        expectedShippingDate = product.preOrderShippingDate;
       }
 
-      // Fallback to Myanmar then any if still not found
-      if (!warehouseId) {
-        warehouseId = (await tx.warehouse.findFirst({ where: { location: 'MYANMAR' } }))?.id || (await tx.warehouse.findFirst())?.id;
-      }
+      const unitPriceUsd = toUsd(dbPrice, currencyCode, lockedExchangeRate);
+      const lineInOrderCurrency = normalizePrice(
+        dbPrice * item.quantity,
+        currencyCode,
+        orderCurrency,
+        lockedExchangeRate,
+      );
+      calculatedTotal += lineInOrderCurrency;
 
-      for (const item of data.items) {
-        let isPreOrder = false;
-        let expectedShippingDate = null;
-        let variant = null;
-        let product = null;
-        let dbPrice = 0;
+      itemsWithPreOrderInfo.push({
+        ...item,
+        price: dbPrice,
+        currencyCode,
+        unitPriceUsd,
+        isUsd: currencyCode === 'USD',
+        isPreOrder,
+        expectedShippingDate,
+      });
+    }
 
-        if (item.variantId) {
-          variant = await tx.variant.findUnique({
-            where: { id: item.variantId },
-            include: { product: true }
-          });
-          
-          if (!variant) {
-            throw new NotFoundException(`Variant not found: ${item.variantId}`);
-          }
+    calculatedTotal += data.deliveryFee || 0;
 
-          // Use DB price for total calculation
-          dbPrice = Number(variant.price || variant.product.price);
-          isPreOrder = variant.isPreOrder || variant.product.isPreOrder;
-          expectedShippingDate = variant.preOrderShippingDate || variant.product.preOrderShippingDate;
+    return this.ordersRepository.create(
+      data,
+      warehouseId,
+      itemsWithPreOrderInfo,
+      calculatedTotal,
+      lockedExchangeRate,
+    );
+  }
 
-          // Stock Check for Non-PreOrder Items
-          if (!isPreOrder) {
-            try {
-              // 1. Update Inventory (Source of Truth) - Conditional update (Finding 1)
-              if (warehouseId) {
-                const updatedInventory = await tx.inventory.updateMany({
-                  where: { 
-                    variantId: variant.id, 
-                    warehouseId,
-                    quantity: { gte: item.quantity }
-                  },
-                  data: { quantity: { decrement: item.quantity } }
-                });
+  async uploadPaymentProof(
+    orderId: string,
+    userId: string,
+    file: Express.Multer.File,
+  ) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
 
-                if (updatedInventory.count === 0) {
-                  throw new BadRequestException(`Insufficient stock for item: ${item.name} in selected warehouse.`);
-                }
-              }
+    if (order.userId && order.userId !== userId) {
+      throw new ForbiddenException('You can only upload proof for your own orders');
+    }
 
-              // 2. Atomic conditional update on Variant to prevent lost-update/overselling (Finding 1)
-              const updatedVariant = await tx.variant.updateMany({
-                where: { 
-                  id: variant.id,
-                  stock: { gte: item.quantity }
-                },
-                data: { stock: { decrement: item.quantity } }
-              });
+    if (!isManualPaymentMethod(order.paymentMethod)) {
+      throw new BadRequestException(
+        'Payment proof upload is only for manual payment methods',
+      );
+    }
 
-              if (updatedVariant.count === 0) {
-                throw new BadRequestException(`Insufficient total stock for item: ${item.name}.`);
-              }
-            } catch (error) {
-              if (error instanceof BadRequestException) throw error;
-              throw error;
-            }
-          }
+    if (order.paymentStatus !== 'PENDING' && order.paymentStatus !== 'REJECTED') {
+      throw new BadRequestException(
+        'Payment proof can only be uploaded while payment is pending or after rejection',
+      );
+    }
 
-        } else {
-          product = await tx.product.findUnique({
-            where: { id: item.productId }
-          });
-          
-          if (!product) {
-            throw new NotFoundException(`Product not found: ${item.productId}`);
-          }
-          
-          dbPrice = Number(product.price);
-          isPreOrder = product.isPreOrder;
-          expectedShippingDate = product.preOrderShippingDate;
-        }
+    const result = await this.cloudinaryService.uploadFile(file, {
+      folder: `amber-brand-fashion/payment-proofs/${orderId}`,
+    });
 
-        calculatedTotal += dbPrice * item.quantity;
-        if (isPreOrder) hasPreOrderItems = true;
+    const url = (result as { secure_url?: string }).secure_url;
+    if (!url) {
+      throw new BadRequestException('Failed to upload payment proof');
+    }
 
-        itemsWithPreOrderInfo.push({
-          ...item,
-          price: dbPrice, // Override with DB price
-          isPreOrder,
-          expectedShippingDate
-        });
-      }
-
-      // Add delivery fee to calculation
-      const deliveryFee = data.deliveryFee || 0;
-      calculatedTotal += deliveryFee;
-
-      // Note: We should probably check if calculatedTotal matches data.totalAmount or just use calculatedTotal.
-      // For security, we MUST use calculatedTotal.
-
-      // Retry logic for order number generation (Finding 4)
-      let order: any;
-      let retries = 3;
-      while (retries > 0) {
-        try {
-          const timestamp = Date.now().toString().slice(-4);
-          const random = Math.floor(1000 + Math.random() * 9000);
-          const orderNumber = `AMB-${new Date().getFullYear()}-${timestamp}-${random}`;
-          
-          order = await tx.order.create({
-            data: {
-              orderNumber,
-              status: 'PENDING',
-              paymentStatus: 'PENDING',
-              totalAmount: calculatedTotal,
-              currency: data.currency || 'USD',
-              paymentMethod: data.paymentMethod,
-              shippingAddress: `${data.firstName} ${data.lastName}, ${data.address}, ${data.city}. Phone: ${data.phone}`,
-              userId: data.userId,
-              warehouseId,
-              hasPreOrderItems,
-              items: {
-                create: itemsWithPreOrderInfo.map(item => ({
-                  productId: item.productId,
-                  variantId: item.variantId,
-                  name: item.name,
-                  price: item.price,
-                  isUsd: item.isUsd ?? true,
-                  quantity: item.quantity,
-                  image: item.image,
-                  size: item.size,
-                  isPreOrder: item.isPreOrder,
-                  expectedShippingDate: item.expectedShippingDate,
-                })),
-              },
-            },
-            include: {
-              items: true,
-            }
-          });
-          break; // Success
-        } catch (error) {
-          if (error.code === 'P2002' && retries > 1) { // Unique constraint violation
-            retries--;
-            continue;
-          }
-          throw error;
-        }
-      }
-
-      return order;
+    return this.ordersRepository.update(orderId, {
+      paymentProofUrl: url,
+      paymentProofUploadedAt: new Date(),
+      paymentStatus: 'PENDING',
+      manualPaymentRejectionReason: null,
+      manualPaymentReviewedAt: null,
+      manualPaymentReviewedBy: null,
     });
   }
 
-  async getOrderById(id: string, user?: { userId: string; role: string }) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: {
-        items: true,
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          }
-        }
-      }
-    });
+  async confirmManualPayment(orderId: string, adminUserId: string) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
 
-    if (!order) {
-      throw new NotFoundException(`Order with ID ${id} not found`);
+    if (!isManualPaymentMethod(order.paymentMethod)) {
+      throw new BadRequestException('Not a manual payment order');
     }
 
-    // Ownership check (Finding 1)
+    if (!order.paymentProofUrl) {
+      throw new BadRequestException(
+        'Cannot confirm payment without uploaded proof',
+      );
+    }
+
+    if (order.paymentStatus === 'PAID') {
+      throw new BadRequestException('Order is already paid');
+    }
+
+    await this.ordersRepository.update(orderId, {
+      paymentStatus: 'PAID',
+      status: 'PROCESSING',
+      manualPaymentReviewedAt: new Date(),
+      manualPaymentReviewedBy: adminUserId,
+      manualPaymentRejectionReason: null,
+    });
+
+    const updated = await this.ordersRepository.findById(orderId);
+    if (updated && order.status !== 'PROCESSING') {
+      this.eventEmitter.emit(
+        'order.status_changed',
+        new OrderStatusChangedEvent(orderId, order.status, 'PROCESSING'),
+      );
+    }
+
+    return updated;
+  }
+
+  async rejectManualPayment(
+    orderId: string,
+    adminUserId: string,
+    reason: string,
+  ) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (!isManualPaymentMethod(order.paymentMethod)) {
+      throw new BadRequestException('Not a manual payment order');
+    }
+
+    await this.ordersRepository.update(orderId, {
+      paymentStatus: 'REJECTED',
+      manualPaymentReviewedAt: new Date(),
+      manualPaymentReviewedBy: adminUserId,
+      manualPaymentRejectionReason: reason,
+    });
+
+    return this.ordersRepository.findById(orderId);
+  }
+
+  async getOrderById(id: string, user?: { userId: string; role: string }) {
+    const order = await this.ordersRepository.findById(id);
+    if (!order) throw new NotFoundException(`Order with ID ${id} not found`);
+
     if (user) {
       const isOwner = order.userId === user.userId;
       const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(user.role);
-      
-      if (!isOwner && !isAdmin) {
-        throw new ForbiddenException('You do not have permission to access this order');
-      }
+      if (!isOwner && !isAdmin)
+        throw new ForbiddenException('No permission to access this order');
     } else {
-      // If no user object is passed, but route is OptionalJwtAuthGuard, 
-      // we might want to strictly forbid or allow depending on context.
-      // Typically, for order tracking of guest orders, we might use a special token or just orderNumber + email.
-      // For this specific finding, let's enforce that if we can't verify ownership, we restrict data.
-      throw new ForbiddenException('Authentication required to access order details');
+      throw new ForbiddenException('Authentication required');
     }
 
     return order;
   }
 
   async updateOrderStatus(id: string, status: OrderStatus) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { items: true }
-    });
-
+    const order = await this.ordersRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
 
-    // If moving to CANCELLED, restock items (Finding 2)
+    const oldStatus = order.status;
     if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
-      await this.restockItems(order.id);
+      await this.ordersRepository.restock(order.id);
     }
 
-    return this.prisma.order.update({
-      where: { id },
-      data: { status },
-    });
+    const updatedOrder = await this.ordersRepository.updateStatus(id, status);
+
+    if (oldStatus !== status) {
+      this.eventEmitter.emit(
+        'order.status_changed',
+        new OrderStatusChangedEvent(id, oldStatus, status),
+      );
+    }
+
+    return updatedOrder;
   }
 
-  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { items: true }
-    });
-
+  async updateOrderTracking(
+    id: string,
+    trackingData: {
+      carrier?: string;
+      trackingNumber?: string;
+      warehouseId?: string;
+    },
+  ) {
+    const order = await this.ordersRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
 
-    // If payment fails, restock (Finding 2)
+    const updateData: Record<string, string> = {};
+    if (trackingData.carrier) updateData.carrier = trackingData.carrier;
+    if (trackingData.trackingNumber)
+      updateData.trackingNumber = trackingData.trackingNumber;
+    if (trackingData.warehouseId)
+      updateData.warehouseId = trackingData.warehouseId;
+
+    return this.ordersRepository.update(id, updateData);
+  }
+
+  async updatePaymentStatus(
+    id: string,
+    paymentStatus: PaymentStatus,
+    options?: { skipRestock?: boolean },
+  ) {
+    const order = await this.ordersRepository.findById(id);
+    if (!order) throw new NotFoundException('Order not found');
+
     if (paymentStatus === 'FAILED' && order.paymentStatus !== 'FAILED') {
-      await this.restockItems(order.id);
+      const previousStatus = order.paymentStatus;
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.order.update({
+            where: { id },
+            data: { paymentStatus: 'FAILED' },
+          });
+          await this.ordersRepository.restockWithTransaction(tx, id);
+        });
+      } catch (error) {
+        await this.ordersRepository.updatePaymentStatus(id, previousStatus);
+        throw new BadRequestException(
+          'Failed to process payment failure: stock rollback failed',
+        );
+      }
+    } else {
+      await this.ordersRepository.updatePaymentStatus(id, paymentStatus);
     }
 
-    return this.prisma.order.update({
-      where: { id },
-      data: { paymentStatus },
-    });
+    return this.ordersRepository.findById(id);
   }
 
   async bulkUpdateStatus(ids: string[], status: OrderStatus) {
-    return this.prisma.order.updateMany({
-      where: { id: { in: ids } },
-      data: { status },
-    });
+    return this.ordersRepository.bulkUpdateStatus(ids, status);
   }
 
   async bulkUpdatePaymentStatus(ids: string[], paymentStatus: PaymentStatus) {
-    return this.prisma.order.updateMany({
-      where: { id: { in: ids } },
-      data: { paymentStatus },
-    });
+    return this.ordersRepository.bulkUpdatePaymentStatus(ids, paymentStatus);
+  }
+
+  async getOrderByNumber(orderNumber: string) {
+    const order = await this.ordersRepository.findByOrderNumber(orderNumber);
+    if (!order)
+      throw new NotFoundException(`Order with number ${orderNumber} not found`);
+    return order;
   }
 
   async getOrdersByUser(userId: string) {
-    return this.prisma.order.findMany({
-      where: { userId },
-      include: {
-        items: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      }
-    });
+    return this.ordersRepository.findByUser(userId);
   }
 
   async getAllOrders(query: {
@@ -310,60 +380,49 @@ export class OrdersService {
     search?: string;
     status?: OrderStatus;
     paymentStatus?: PaymentStatus;
+    awaitingPaymentReview?: boolean;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   }) {
-    const { 
-      page = 1, 
-      limit = 10, 
-      search, 
-      status, 
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
       paymentStatus,
-      sortBy = 'createdAt', 
-      sortOrder = 'desc' 
+      awaitingPaymentReview,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = query;
-    
+
     const skip = (page - 1) * limit;
+    const where: Record<string, unknown> = {};
+    if (status) where.status = status;
+    if (paymentStatus) where.paymentStatus = paymentStatus;
 
-    const where: any = {};
-    
-    if (status) {
-      where.status = status;
+    if (awaitingPaymentReview) {
+      where.paymentStatus = 'PENDING';
+      where.paymentProofUrl = { not: null };
     }
 
-    if (paymentStatus) {
-      where.paymentStatus = paymentStatus;
-    }
-    
     if (search) {
       where.OR = [
         { orderNumber: { contains: search, mode: 'insensitive' } },
         { shippingAddress: { contains: search, mode: 'insensitive' } },
+        { paymentReference: { contains: search, mode: 'insensitive' } },
+        { customerName: { contains: search, mode: 'insensitive' } },
+        { customerPhone: { contains: search, mode: 'insensitive' } },
         { user: { name: { contains: search, mode: 'insensitive' } } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
-    const [orders, total] = await Promise.all([
-      this.prisma.order.findMany({
-        where,
-        include: {
-          items: true,
-          user: {
-            select: {
-              name: true,
-              email: true,
-            }
-          }
-        },
-        orderBy: {
-          [sortBy]: sortOrder,
-        },
-        skip,
-        take: Number(limit),
-      }),
-      this.prisma.order.count({ where }),
-    ]);
+    const [orders, total] = await this.ordersRepository.findMany(
+      where,
+      skip,
+      Number(limit),
+      { [sortBy]: sortOrder },
+    );
 
     return {
       data: orders,
@@ -372,69 +431,49 @@ export class OrdersService {
         page: Number(page),
         limit: Number(limit),
         totalPages: Math.ceil(total / limit),
-      }
+      },
     };
   }
 
-  async restockItems(orderId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true }
-    });
-
-    if (!order || order.restocked) return;
-
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        if (item.variantId && !item.isPreOrder) {
-          // Reconcile Inventory (Finding 1)
-          if (order.warehouseId) {
-            await tx.inventory.update({
-              where: { 
-                variantId_warehouseId: { 
-                  variantId: item.variantId, 
-                  warehouseId: order.warehouseId 
-                } 
-              },
-              data: { quantity: { increment: item.quantity } }
-            });
-          }
-
-          // Update Variant cached stock
-          await tx.variant.update({
-            where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } }
-          });
-        }
-      }
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: { restocked: true }
-      });
-    });
-  }
-
   async deleteOrder(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { items: true }
-    });
-
-    if (order && !order.restocked && order.status !== 'CANCELLED' && order.paymentStatus !== 'FAILED') {
-      await this.restockItems(id);
+    const order = await this.ordersRepository.findById(id);
+    if (
+      order &&
+      !order.restocked &&
+      order.status !== 'CANCELLED' &&
+      order.paymentStatus !== 'FAILED'
+    ) {
+      await this.ordersRepository.restock(id);
     }
-
-    return this.prisma.order.delete({
-      where: { id },
-    });
+    return this.ordersRepository.delete(id);
   }
 
   async getPendingOrdersCount() {
-    return this.prisma.order.count({
+    return this.ordersRepository.countPending();
+  }
+
+  async cleanupStaleOrders() {
+    const oneHourAgo = new Date();
+    oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+
+    const staleOrders = await this.prisma.order.findMany({
       where: {
         status: 'PENDING',
+        paymentStatus: 'PENDING',
+        paymentProofUrl: null,
+        createdAt: { lt: oneHourAgo },
       },
+      select: { id: true },
     });
+
+    for (const order of staleOrders) {
+      try {
+        await this.updateOrderStatus(order.id, 'CANCELLED');
+      } catch (error) {
+        console.error(`Failed to cleanup stale order ${order.id}:`, error);
+      }
+    }
+
+    return staleOrders.length;
   }
 }
