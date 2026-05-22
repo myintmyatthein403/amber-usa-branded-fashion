@@ -9,10 +9,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CouponsService } from './coupons.service';
-import { Prisma, Role } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { CouponSchema } from '@amber/shared';
 
 @Controller('coupons')
 export class CouponsController {
@@ -21,7 +23,7 @@ export class CouponsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  create(@Body() data: Prisma.CouponCreateInput) {
+  create(@Body(new ZodValidationPipe(CouponSchema)) data: any) {
     return this.couponsService.create(data);
   }
 
@@ -38,7 +40,10 @@ export class CouponsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() data: Prisma.CouponUpdateInput) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(CouponSchema.partial())) data: any,
+  ) {
     return this.couponsService.update(id, data);
   }
 

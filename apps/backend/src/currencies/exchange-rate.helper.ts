@@ -35,11 +35,29 @@ export class ExchangeRateHelper {
       }
     }
 
-    const settings = await this.prisma.settings.findUnique({
-      where: { id: 'global' },
+    // Backup: Search by codes if IDs don't match for some reason
+    const backupPair = await this.prisma.exchangeRate.findFirst({
+      where: {
+        fromCurrency: { code: 'USD' },
+        toCurrency: { code: 'MMK' },
+      },
+      include: {
+        fromCurrency: true,
+        toCurrency: true,
+      },
     });
+
+    if (backupPair) {
+      return {
+        rate: Number(backupPair.rate),
+        lastFetchedAt: backupPair.lastFetchedAt?.toISOString() ?? null,
+        isManualOverride: backupPair.isManualOverride ?? false,
+        rateSource: 'exchange_rates',
+      };
+    }
+
     return {
-      rate: Number(settings?.usdToMmkRate ?? 3500),
+      rate: 3500,
       lastFetchedAt: null,
       isManualOverride: false,
       rateSource: 'settings_fallback',

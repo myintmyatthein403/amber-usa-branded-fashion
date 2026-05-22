@@ -35,7 +35,6 @@ export class SettingsRepository {
         id: true,
         privacyPolicy: true,
         termsConditions: true,
-        usdToMmkRate: true,
         stripePublishableKey: true,
         updatedAt: true,
       },

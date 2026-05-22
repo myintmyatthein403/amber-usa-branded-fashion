@@ -61,6 +61,7 @@ export class ProductsController {
       categoryId: query.categoryId,
       brandId: query.brandId,
       currencyCode: query.currencyCode,
+      market: query.market as 'US' | 'MM' | undefined,
       warehouseLocation: query.warehouseLocation as 'USA' | 'MYANMAR' | undefined,
       inStock: query.inStock !== undefined ? query.inStock === 'true' : undefined,
       priceMin: query.priceMin ? parseFloat(query.priceMin) : undefined,

@@ -10,6 +10,7 @@ interface OrderSummaryProps {
   shippingCost: number;
   getShippingDisplay: (cost: number) => string;
   currency: string;
+  total: number;
 }
 
 export default function OrderSummary({
@@ -18,6 +19,7 @@ export default function OrderSummary({
   shippingCost,
   getShippingDisplay,
   currency,
+  total,
 }: OrderSummaryProps) {
   const formatPrice = useStore((state) => state.formatPrice);
 
@@ -35,7 +37,7 @@ export default function OrderSummary({
             }
             className="flex space-x-6 items-center"
           >
-<div className="relative w-20 aspect-[3/4] rounded-sm overflow-hidden bg-white shadow-sm shrink-0">
+            <div className="relative w-20 aspect-[3/4] rounded-sm overflow-hidden bg-white shadow-sm shrink-0">
               {item.image ? (
                 <Image
                   src={item.image}
@@ -111,22 +113,12 @@ export default function OrderSummary({
             <p className="text-[10px] text-[#1A1A1A]/40 uppercase font-bold tracking-widest mb-1">
               {currency === "USD" ? "USD Total" : "Myanmar Kyat"}
             </p>
-            <TotalDisplay />
+            <span className="text-3xl font-bold text-[#D4AF37]">
+              {formatPrice(total, currency === "USD")}
+            </span>
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function TotalDisplay() {
-  const subtotal = useStore((state) => state.getSubtotal());
-  const formatPrice = useStore((state) => state.formatPrice);
-  const currency = useStore((state) => state.currency);
-
-  return (
-    <span className="text-3xl font-bold text-[#D4AF37]">
-      {formatPrice(subtotal, currency === "USD")}
-    </span>
   );
 }

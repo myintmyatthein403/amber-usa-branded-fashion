@@ -32,11 +32,6 @@ export class CurrenciesService implements OnApplicationBootstrap {
   }
 
   private async ensureDefaultCurrenciesAndRate() {
-    const settings = await this.prisma.settings.findUnique({
-      where: { id: 'global' },
-    });
-    const fallbackRate = Number(settings?.usdToMmkRate ?? 3500);
-
     const usd = await this.prisma.currency.upsert({
       where: { code: 'USD' },
       create: {
@@ -87,7 +82,7 @@ export class CurrenciesService implements OnApplicationBootstrap {
       create: {
         fromCurrencyId: usd.id,
         toCurrencyId: mmk.id,
-        rate: fallbackRate,
+        rate: 3500,
         isManualOverride: false,
       },
       update: {},
@@ -201,8 +196,10 @@ export class CurrenciesService implements OnApplicationBootstrap {
   }
 
   async updateExchangeRate(id: string, rate: number) {
-    await this.findExchangeRateById(id);
-    return this.exchangeRatesRepo.update(id, rate, { isManualOverride: true });
+    const updated = await this.exchangeRatesRepo.update(id, rate, {
+      isManualOverride: true,
+    });
+    return updated;
   }
 
   async deleteExchangeRate(id: string) {

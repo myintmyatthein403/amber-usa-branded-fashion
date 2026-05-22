@@ -4,10 +4,13 @@ import { motion } from "motion/react";
 import Image from "next/image";
 import { ShoppingBag, Star, Check } from "lucide-react";
 import { useQuickBuyActions } from "@/hooks/useQuickBuyActions";
+import { useStore } from "@/store/useStore";
 import { cn } from "@/lib/utils";
 import Price from "./Price";
 
 export default function QuickBuy() {
+  const currency = useStore((state) => state.currency);
+  const exchangeRate = useStore((state) => state.exchangeRate);
   const {
     product,
     loading,

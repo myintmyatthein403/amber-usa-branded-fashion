@@ -132,6 +132,7 @@ export const API_ROUTES = {
     INVENTORY_BY_WAREHOUSE: (warehouseId: string) => `/logistics/inventory/warehouse/${warehouseId}`,
     UPDATE_STOCK: '/logistics/inventory/update',
     TRANSFER_STOCK: '/logistics/inventory/transfer',
+    BULK_TRANSFER: '/logistics/inventory/bulk-transfer',
     LOW_STOCK: '/logistics/inventory/low-stock',
     CARGO: '/logistics/cargo',
     CARGO_BY_ID: (id: string) => `/logistics/cargo/${id}`,

@@ -89,16 +89,32 @@ export default function ProductDetailPage() {
 
   const addToCart = useStore((state) => state.addToCart);
   const addToCompare = useStore((state) => state.addToCompare);
+  const currency = useStore((state) => state.currency);
+  const exchangeRate = useStore((state) => state.exchangeRate);
   const market = useStore((state) => state.market);
   const locale = useStore((state) => state.locale);
 
   const productAttributes = useMemo(() => {
     if (!product?.variants?.length || !filterableAttributes.length) return [];
-    const usedIds = new Set<string>();
+    
+    // Map of attributeId -> Set of valueIds used in variants
+    const usedValueIdsByAttr: Record<string, Set<string>> = {};
+    
     (product.variants as DetailVariant[]).forEach((v) => {
-      Object.keys(v.attributeSelections || {}).forEach((k) => usedIds.add(k));
+      Object.entries(v.attributeSelections || {}).forEach(([attrId, valueId]) => {
+        if (!usedValueIdsByAttr[attrId]) {
+          usedValueIdsByAttr[attrId] = new Set();
+        }
+        usedValueIdsByAttr[attrId].add(valueId);
+      });
     });
-    return filterableAttributes.filter((a) => usedIds.has(a.id));
+
+    return filterableAttributes
+      .filter((a) => usedValueIdsByAttr[a.id])
+      .map((a) => ({
+        ...a,
+        values: a.values.filter((v) => usedValueIdsByAttr[a.id].has(v.id)),
+      }));
   }, [product, filterableAttributes]);
 
   const selectedVariant = useMemo(() => {
@@ -132,7 +148,9 @@ export default function ProductDetailPage() {
 
   const canAddToBag =
     product &&
-    (product.isPreOrder || warehouseStock > 0) &&
+    (product.isPreOrder ||
+      product.visibility === 'PRE_ORDER_ONLY' ||
+      warehouseStock > 0) &&
     (productAttributes.length === 0 || Boolean(selectedVariant));
 
   const activeImage = useMemo(() => {
@@ -190,7 +208,7 @@ export default function ProductDetailPage() {
         }
         if (productData.brandId) {
           const relatedRes = await fetch(
-            `${getApiUrl()}/products?brandId=${productData.brandId}&limit=4`,
+            `${getApiUrl()}/products?market=${market}&brandId=${productData.brandId}&limit=4`,
           );
           const relatedResult = await relatedRes.json();
           const list = (relatedResult?.data ?? relatedResult ?? []) as RelatedProduct[];

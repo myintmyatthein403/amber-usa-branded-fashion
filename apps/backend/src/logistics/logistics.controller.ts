@@ -125,6 +125,20 @@ export class LogisticsController {
     return this.logisticsService.transferStock(data);
   }
 
+  @Post('inventory/bulk-transfer')
+  @ApiOperation({ summary: 'Bulk transfer stock between warehouses' })
+  bulkTransfer(
+    @Body()
+    data: {
+      fromWarehouseId: string;
+      toWarehouseId: string;
+      items: { variantId: string; quantity: number }[];
+      note?: string;
+    },
+  ) {
+    return this.logisticsService.bulkTransferStock(data);
+  }
+
   @Get('inventory/low-stock')
   @ApiOperation({ summary: 'Get variants at or below low stock threshold' })
   getLowStock() {

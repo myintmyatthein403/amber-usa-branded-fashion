@@ -32,6 +32,7 @@ export {
 } from './logistics.schema';
 export * from './cms.schema';
 export * from './forms.schema';
+export * from './coupon.schema';
 export * from './api.schema';
 export * from './permission.schema';
 export * from './stats.schema';

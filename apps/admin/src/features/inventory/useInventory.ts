@@ -17,6 +17,10 @@ export const useInventory = () => {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
   const [adjustmentQty, setAdjustmentQty] = useState(0);
 
+  // Bulk Transfer State
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+
   const groupedInventory = useMemo(() => {
     if (!rawInventory) return [];
 
@@ -92,6 +96,22 @@ export const useInventory = () => {
     }
   };
 
+  const handleBulkTransfer = async (data: any) => {
+    setTransferSubmitting(true);
+    try {
+      await apiService(API_ROUTES.LOGISTICS.BULK_TRANSFER, {
+        method: 'POST',
+        body: data
+      });
+      setTransferModalOpen(false);
+      refresh();
+    } catch (error) {
+      console.error('Failed to execute bulk transfer:', error);
+    } finally {
+      setTransferSubmitting(false);
+    }
+  };
+
   const updateAdjustmentQtyByWarehouse = useCallback((warehouseId: string) => {
     setSelectedWarehouseId(warehouseId);
     const group = groupedInventory.find(g => g.variant.id === selectedVariant?.id);
@@ -118,6 +138,10 @@ export const useInventory = () => {
     warehouses,
     openAdjustModal,
     handleAdjustStock,
-    updateAdjustmentQtyByWarehouse
+    handleBulkTransfer,
+    updateAdjustmentQtyByWarehouse,
+    transferModalOpen,
+    setTransferModalOpen,
+    transferSubmitting
   };
 };

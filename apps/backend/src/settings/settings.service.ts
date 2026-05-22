@@ -23,7 +23,6 @@ export class SettingsService implements OnApplicationBootstrap {
           stripePublishableKey: null,
           stripeSecretKey: null,
           stripeWebhookSecret: null,
-          usdToMmkRate: 3500.0,
         });
         this.logger.log('Created global settings');
       }
@@ -50,7 +49,6 @@ export class SettingsService implements OnApplicationBootstrap {
   async updateSettings(data: {
     privacyPolicy?: string;
     termsConditions?: string;
-    usdToMmkRate?: number;
     stripePublishableKey?: string;
     stripeSecretKey?: string;
     stripeWebhookSecret?: string;
@@ -58,13 +56,11 @@ export class SettingsService implements OnApplicationBootstrap {
     const sanitizedData = sanitizeData(data) as {
       privacyPolicy?: string;
       termsConditions?: string;
-      usdToMmkRate?: number;
       stripePublishableKey?: string | null;
       stripeSecretKey?: string | null;
       stripeWebhookSecret?: string | null;
     };
-    const { usdToMmkRate: _ignoredRate, ...rest } = sanitizedData;
-    const updateData: typeof rest = { ...rest };
+    const updateData = { ...sanitizedData };
 
     // Sanitize HTML content
     if (updateData.privacyPolicy) {

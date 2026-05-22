@@ -8,11 +8,14 @@ import {
 import { Response } from 'express';
 import { Prisma } from '@prisma/client';
 
-@Catch(Prisma.PrismaClientKnownRequestError)
+@Catch(Prisma.PrismaClientKnownRequestError, Prisma.PrismaClientValidationError)
 export class PrismaExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(PrismaExceptionFilter.name);
 
-  catch(exception: Prisma.PrismaClientKnownRequestError, host: ArgumentsHost) {
+  catch(
+    exception: Prisma.PrismaClientKnownRequestError | Prisma.PrismaClientValidationError,
+    host: ArgumentsHost,
+  ) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
@@ -20,7 +23,19 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     let message = 'Database operation failed';
     let error = 'Prisma Error';
 
-    switch (exception.code) {
+    const isValidationError = 
+      exception instanceof Prisma.PrismaClientValidationError || 
+      (exception as any).name === 'PrismaClientValidationError';
+
+    if (isValidationError) {
+      status = HttpStatus.BAD_REQUEST;
+      message = 'Invalid data provided for database operation';
+      error = 'Prisma Validation Error';
+      
+      // Log the specific validation error for debugging
+      this.logger.error(`Prisma Validation Error: ${exception.message}`);
+    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      switch (exception.code) {
       case 'P2000':
         status = HttpStatus.BAD_REQUEST;
         message = 'The provided value is too long for the column';
@@ -169,6 +184,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         );
         message = 'An unexpected database error occurred';
     }
+  }
 
     const errorResponse = {
       statusCode: status,

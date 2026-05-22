@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Suspense, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, Suspense, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import QuickViewModal from "@/components/modals/QuickViewModal";
@@ -9,7 +9,7 @@ import ShopSidebar from "@/components/ShopSidebar";
 import { useDebounce } from "@/hooks/useDebounce";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
-import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Percent, Loader2, Search, LayoutGrid, SlidersHorizontal } from "lucide-react";
+import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
 import Price from "@/components/Price";
@@ -76,10 +76,13 @@ function ShopContent() {
   const compareList = useStore((state) => state.compareList);
   const selectedQuickViewProduct = useStore((state) => state.selectedQuickViewProduct);
   const setQuickViewProduct = useStore((state) => state.setQuickViewProduct);
-  const formatPrice = useStore((state) => state.formatPrice);
   const currency = useStore((state) => state.currency);
   const exchangeRate = useStore((state) => state.exchangeRate);
+  const market = useStore((state) => state.market);
   
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const [addingId, setAddingId] = useState<string | null>(null);
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,20 +91,30 @@ function ShopContent() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [shopCategories, setShopCategories] = useState<CategoryNode[]>([]);
   const [selectedCollection, setSelectedCollection] = useState(initialCollectionFilter);
-  const [selectedColor, setSelectedColor] = useState("All");
   const [selectedSize, setSelectedSize] = useState("All");
   const [filterableAttributes, setFilterableAttributes] = useState<FilterableAttribute[]>([]);
   const [selectedAttributeFilters, setSelectedAttributeFilters] = useState<
     Record<string, string>
   >({});
   
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 3000]);
+  const MAX_PRICE_USD = 3000;
+  
+  // Use USD internally for price range to avoid conversion flicker
+  const [priceRangeUsd, setPriceRangeUsd] = useState<[number, number]>([0, MAX_PRICE_USD]);
   const [minPriceInput, setMinPriceInput] = useState("0");
-  const [maxPriceInput, setMaxPriceInput] = useState("10000"); 
+  const [maxPriceInput, setMaxPriceInput] = useState(MAX_PRICE_USD.toLocaleString()); 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || "");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 9;
-  
+
+  // Sync inputs with priceRangeUsd and currency
+  useEffect(() => {
+    if (!mounted) return;
+    const factor = currency === 'MMK' ? exchangeRate : 1;
+    setMinPriceInput(Math.round(priceRangeUsd[0] * factor).toLocaleString());
+    setMaxPriceInput(Math.round(priceRangeUsd[1] * factor).toLocaleString());
+  }, [priceRangeUsd, currency, exchangeRate, mounted]);
+
   const [onlyInStock, setOnlyInStock] = useState(false);
   const [onlySale, setOnlySale] = useState(initialSaleFilter);
   const [sortBy, setSortBy] = useState("latest");
@@ -110,11 +123,11 @@ function ShopContent() {
   const [filterLoading, setFilterLoading] = useState(false);
   
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const debouncedPriceRange = useDebounce(priceRange, 500);
+  const debouncedPriceRangeUsd = useDebounce(priceRangeUsd, 500);
   
   const isDebouncing = searchQuery !== debouncedSearchQuery || 
-    priceRange[0] !== debouncedPriceRange[0] || 
-    priceRange[1] !== debouncedPriceRange[1];
+    priceRangeUsd[0] !== debouncedPriceRangeUsd[0] || 
+    priceRangeUsd[1] !== debouncedPriceRangeUsd[1];
     
   useEffect(() => {
     if (isDebouncing) {
@@ -138,55 +151,21 @@ function ShopContent() {
     selectedBrand,
     selectedCategoryId,
     selectedCollection,
-    selectedColor,
     selectedSize,
     selectedAttributeFilters,
-    priceRange,
+    priceRangeUsd,
     searchQuery,
     onlyInStock,
     onlySale,
     sortBy,
   ]);
 
-  const MAX_PRICE_USD = 3000;
-  const maxPrice = currency === 'USD' ? MAX_PRICE_USD : MAX_PRICE_USD * exchangeRate;
-  
-  useEffect(() => {
-    setPriceRange([0, maxPrice]);
-    setMinPriceInput("0");
-    setMaxPriceInput(maxPrice.toLocaleString());
-  }, [currency, exchangeRate, maxPrice]);
-
-  const formatNumber = (value: string) => {
-    const cleaned = value.replace(/[^0-9]/g, '');
-    if (!cleaned) return '';
-    return parseInt(cleaned, 10).toLocaleString();
-  };
-
-  const parseFormattedNumber = (value: string) => {
-    return parseInt(value.replace(/[^0-9]/g, ''), 10) || 0;
-  };
-
-  const handleMinPriceChange = (value: string) => {
-    const formatted = formatNumber(value);
-    setMinPriceInput(formatted);
-    const numValue = parseFormattedNumber(formatted);
-    setPriceRange([Math.min(numValue, priceRange[1] - 1), priceRange[1]]);
-  };
-
-  const handleMaxPriceChange = (value: string) => {
-    const formatted = formatNumber(value);
-    setMaxPriceInput(formatted);
-    const numValue = parseFormattedNumber(formatted);
-    setPriceRange([priceRange[0], Math.max(numValue, priceRange[0] + 1)]);
-  };
-
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
     try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?market=${market}`);
     const result = await res.json();
     const data = result?.data || result || [];
 
@@ -221,8 +200,8 @@ function ShopContent() {
     setLoading(false);
     }
     };
-    fetchProducts();
-  }, []);
+    if (mounted) fetchProducts();
+  }, [market, mounted]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -275,21 +254,6 @@ function ShopContent() {
     return new Set(getCategoryScopeIds(shopCategories, selectedCategoryId));
   }, [selectedCategoryId, shopCategories]);
 
-  const brands = useMemo(() => {
-    const uniqueBrands = new Set(products.map(p => p.brand).filter(Boolean));
-    return ["All", ...Array.from(uniqueBrands).sort()];
-  }, [products]);
-
-  const collections = useMemo(() => {
-    const uniqueCollections = new Set(products.flatMap(p => p.collections || []));
-    return ["All", ...Array.from(uniqueCollections).sort()];
-  }, [products]);
-
-  const sizes = useMemo(() => {
-    const allSizes = products.flatMap(p => p.sizes || []);
-    return ["All", ...Array.from(new Set(allSizes)).sort()];
-  }, [products]);
-
   const sortPrice = (p: ShopProduct) => {
     if (p.isUsdPrice && currency === "MMK") return p.price * exchangeRate;
     if (!p.isUsdPrice && currency === "USD") return p.price / exchangeRate;
@@ -316,14 +280,9 @@ function ShopContent() {
         },
       );
       
-      let productPriceInCurrentCurrency = product.price;
-      if (product.isUsdPrice && currency === 'MMK') {
-        productPriceInCurrentCurrency = product.price * exchangeRate;
-      } else if (!product.isUsdPrice && currency === 'USD') {
-        productPriceInCurrentCurrency = product.price / exchangeRate;
-      }
+      const productPriceInUsd = product.isUsdPrice ? product.price : product.price / exchangeRate;
+      const priceMatch = productPriceInUsd >= debouncedPriceRangeUsd[0] && productPriceInUsd <= debouncedPriceRangeUsd[1];
       
-      const priceMatch = productPriceInCurrentCurrency >= debouncedPriceRange[0] && productPriceInCurrentCurrency <= debouncedPriceRange[1];
       const stockMatch = !onlyInStock || product.inStock;
       const saleMatch = !onlySale || product.onSale;
       
@@ -368,7 +327,7 @@ function ShopContent() {
     selectedCollection,
     selectedSize,
     selectedAttributeFilters,
-    debouncedPriceRange,
+    debouncedPriceRangeUsd,
     onlyInStock,
     onlySale,
     sortBy,
@@ -407,51 +366,23 @@ function ShopContent() {
     setSelectedBrand("All");
     setSelectedCategoryId(null);
     setSelectedCollection("All");
-    setSelectedColor("All");
     setSelectedSize("All");
     resetAttributeFilters();
-    setPriceRange([0, maxPrice]);
+    setPriceRangeUsd([0, MAX_PRICE_USD]);
     setOnlyInStock(false);
     setOnlySale(false);
     setSearchQuery("");
     setMinPriceInput("0");
-    setMaxPriceInput(maxPrice.toLocaleString());
+    setMaxPriceInput(MAX_PRICE_USD.toLocaleString());
   }, [
-    maxPrice,
+    MAX_PRICE_USD,
     resetAttributeFilters,
-    setSelectedBrand,
-    setSelectedCategoryId,
-    setSelectedCollection,
-    setSelectedSize,
-    setPriceRange,
-    setOnlyInStock,
-    setOnlySale,
-    setSearchQuery,
   ]);
 
-  const handleResetFilters = useCallback(() => {
-    setSelectedBrand("All");
-    setSelectedCategoryId(null);
-    setSelectedCollection("All");
-    setSelectedColor("All");
-    setSelectedSize("All");
-    resetAttributeFilters();
-    setPriceRange([0, maxPrice]);
-    setOnlyInStock(false);
-    setOnlySale(false);
-    setSearchQuery("");
-  }, [
-    maxPrice,
-    resetAttributeFilters,
-    setSelectedBrand,
-    setSelectedCategoryId,
-    setSelectedCollection,
-    setSelectedSize,
-    setPriceRange,
-    setOnlyInStock,
-    setOnlySale,
-    setSearchQuery,
-  ]);
+  const displayPriceRange = useMemo(() => {
+    const factor = currency === 'MMK' ? exchangeRate : 1;
+    return [priceRangeUsd[0] * factor, priceRangeUsd[1] * factor] as [number, number];
+  }, [priceRangeUsd, currency, exchangeRate]);
 
   return (
     <>
@@ -487,7 +418,7 @@ function ShopContent() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-<ShopSidebar
+              <ShopSidebar
                 selectedBrand={selectedBrand}
                 setSelectedBrand={setSelectedBrand}
                 selectedCategoryId={selectedCategoryId}
@@ -500,8 +431,11 @@ function ShopContent() {
                 filterableAttributes={filterableAttributes}
                 selectedAttributeFilters={selectedAttributeFilters}
                 setSelectedAttributeFilters={setSelectedAttributeFilters}
-                priceRange={priceRange}
-                setPriceRange={setPriceRange}
+                priceRange={displayPriceRange}
+                setPriceRange={(range) => {
+                  const factor = currency === 'MMK' ? exchangeRate : 1;
+                  setPriceRangeUsd([range[0] / factor, range[1] / factor]);
+                }}
                 onlyInStock={onlyInStock}
                 setOnlyInStock={setOnlyInStock}
                 onlySale={onlySale}
@@ -557,8 +491,11 @@ function ShopContent() {
               filterableAttributes={filterableAttributes}
               selectedAttributeFilters={selectedAttributeFilters}
               setSelectedAttributeFilters={setSelectedAttributeFilters}
-              priceRange={priceRange}
-              setPriceRange={setPriceRange}
+              priceRange={displayPriceRange}
+              setPriceRange={(range) => {
+                const factor = currency === 'MMK' ? exchangeRate : 1;
+                setPriceRangeUsd([range[0] / factor, range[1] / factor]);
+              }}
               onlyInStock={onlyInStock}
               setOnlyInStock={setOnlyInStock}
               onlySale={onlySale}
@@ -745,13 +682,7 @@ function ShopContent() {
                       <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Try adjusting your filters or search query.</p>
                     </div>
                     <button 
-                      onClick={() => {
-                        setSelectedBrand("All");
-                        setSelectedCategoryId(null);
-                        setSelectedCollection("All");
-                        setSelectedColor("All");
-                        handleResetFilters();
-                      }}
+                      onClick={handleClearFilters}
                       className="text-[10px] uppercase tracking-widest font-bold border-b-2 border-[#D4AF37] pb-1 hover:text-[#D4AF37] transition-colors"
                     >
                       Reset All Filters

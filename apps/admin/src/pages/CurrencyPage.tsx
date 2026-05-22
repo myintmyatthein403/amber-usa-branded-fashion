@@ -151,10 +151,16 @@ export const CurrencyPage: React.FC = () => {
     setCurrencyModalOpen(true);
   };
 
-  const openEditRate = (rate: { id: string; rate: number }) => {
+  const openEditRate = (rate: ExchangeRate) => {
+    if (!rate.id) return;
     setRateModalError(null);
-    setEditingRate(rate);
-    setRateForm({ ...rateForm, rate: rate.rate.toString() });
+    setEditingRate({ id: rate.id, rate: Number(rate.rate) });
+    setRateForm({
+      fromCurrencyId: rate.fromCurrencyId,
+      toCurrencyId: rate.toCurrencyId,
+      rate: rate.rate.toString(),
+      effectiveDate: rate.effectiveDate ? new Date(rate.effectiveDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    });
     setRateModalOpen(true);
   };
 
@@ -297,7 +303,7 @@ export const CurrencyPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => rate.id && openEditRate({ id: rate.id, rate: Number(rate.rate) })}
+                        onClick={() => rate.id && openEditRate(rate)}
                         className="p-2 text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <Edit2 size={16} />

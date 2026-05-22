@@ -27,12 +27,14 @@ export const VariantBaseSchema = z.object({
 });
 
 export const ProductStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
+export const ProductVisibilitySchema = z.enum(['USA', 'MYANMAR', 'BOTH', 'PRE_ORDER_ONLY']);
 
 export const ProductBaseSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, 'Product name is required'),
   slug: z.string().min(1, 'Slug is required'),
   status: ProductStatusSchema.default('DRAFT'),
+  visibility: ProductVisibilitySchema.default('BOTH'),
   shortDescription: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   detail: z.string().optional().nullable(),

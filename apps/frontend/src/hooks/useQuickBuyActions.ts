@@ -23,12 +23,14 @@ export function useQuickBuyActions() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const addToCart = useStore((state) => state.addToCart);
+  const market = useStore((state) => state.market);
 
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?isFeatured=true`);
-        const data = await res.json();
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?market=${market}&isFeatured=true`);
+        const result = await res.json();
+        const data = result?.data || result || [];
         if (data.length > 0) {
           const p = data[0] as Product;
           setProduct({
@@ -49,7 +51,7 @@ export function useQuickBuyActions() {
       }
     };
     fetchFeatured();
-  }, []);
+  }, [market]);
 
   const activeImage = useMemo(() => {
     if (!product) return "";

@@ -31,6 +31,8 @@ export default function Price({
 }: PriceProps) {
   const [mounted] = useState(typeof window !== "undefined");
   const formatPrice = useStore((state) => state.formatPrice);
+  const currency = useStore((state) => state.currency);
+  const exchangeRate = useStore((state) => state.exchangeRate);
   const rateUpdatedAt = useStore((state) => state.rateUpdatedAt);
   const lockedRateNote = useStore((state) => state.lockedRateNote);
   const locale = useStore((state) => state.locale);

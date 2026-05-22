@@ -12,7 +12,7 @@ export const CouponSchema = z.object({
   maxDiscount: z.number().nullable().optional(),
   expiryDate: z.string().nullable().optional(),
   usageLimit: z.number().nullable().optional(),
-  usedCount: z.number().default(0),
+  usageCount: z.number().default(0),
   isActive: z.boolean().default(true),
 });
 

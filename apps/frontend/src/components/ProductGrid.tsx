@@ -34,12 +34,14 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
   const selectedQuickViewProduct = useStore((state) => state.selectedQuickViewProduct);
   const setQuickViewProduct = useStore((state) => state.setQuickViewProduct);
   const addToCart = useStore((state) => state.addToCart);
+  const market = useStore((state) => state.market);
   const [addingId, setAddingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const queryParams = new URLSearchParams();
+        queryParams.append('market', market);
         if (filter) {
           Object.entries(filter).forEach(([key, value]) => {
             queryParams.append(key, value.toString());
@@ -73,7 +75,7 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
       }
     };
     fetchProducts();
-  }, [filter]);
+  }, [filter, market]);
 
   const handleAddToCart = (e: React.MouseEvent, product: ExtendedProduct) => {
     e.stopPropagation();

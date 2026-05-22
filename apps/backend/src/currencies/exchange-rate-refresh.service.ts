@@ -20,12 +20,21 @@ export class ExchangeRateRefreshService {
         source = 'exchangerate.host';
       }
     } catch (err) {
-      this.logger.warn('External rate fetch failed, using settings fallback', err);
-      const settings = await this.prisma.settings.findUnique({
-        where: { id: 'global' },
+      this.logger.warn(
+        'External rate fetch failed',
+        err,
+      );
+      // If external fetch fails, we just don't update anything and return existing
+      const existing = await this.prisma.exchangeRate.findFirst({
+        where: {
+          fromCurrency: { code: 'USD' },
+          toCurrency: { code: 'MMK' },
+        },
       });
-      rate = Number(settings?.usdToMmkRate ?? 3500);
-      source = 'settings';
+      return { 
+        rate: Number(existing?.rate ?? 3500), 
+        source: 'existing_record' 
+      };
     }
 
     const usd = await this.prisma.currency.findUnique({ where: { code: 'USD' } });
@@ -53,12 +62,6 @@ export class ExchangeRateRefreshService {
         },
       });
     }
-
-    await this.prisma.settings.upsert({
-      where: { id: 'global' },
-      create: { id: 'global', usdToMmkRate: rate },
-      update: { usdToMmkRate: rate },
-    });
 
     return { rate, source };
   }

@@ -17,6 +17,7 @@ export interface ProductListParams {
   categoryId?: string;
   brandId?: string;
   currencyCode?: string;
+  market?: 'US' | 'MM';
   warehouseLocation?: 'USA' | 'MYANMAR';
   inStock?: boolean;
   priceMin?: number;
@@ -64,6 +65,17 @@ export class ProductsService {
       where.status = 'PUBLISHED';
     } else if (params.status) {
       where.status = params.status;
+    }
+
+    if (params.market) {
+      const allowedVisibilities: any[] = ['BOTH'];
+      if (params.market === 'US') {
+        allowedVisibilities.push('USA');
+      } else {
+        allowedVisibilities.push('MYANMAR');
+        allowedVisibilities.push('PRE_ORDER_ONLY');
+      }
+      where.visibility = { in: allowedVisibilities };
     }
 
     if (params.currencyCode) {
@@ -221,7 +233,10 @@ export class ProductsService {
           continue;
         }
 
-        const isPreOrder = variant.isPreOrder || variant.product.isPreOrder;
+        const isPreOrder =
+          variant.isPreOrder ||
+          variant.product.isPreOrder ||
+          variant.product.visibility === 'PRE_ORDER_ONLY';
         if (isPreOrder) {
           results.push({ ...item, inStock: true, isPreOrder: true });
         } else {
@@ -256,11 +271,14 @@ export class ProductsService {
         results.push({
           ...item,
           inStock:
-            isDigital || product.isPreOrder
+            isDigital ||
+            product.isPreOrder ||
+            product.visibility === 'PRE_ORDER_ONLY'
               ? true
               : product.stock >= item.quantity,
           available: product.stock,
-          isPreOrder: product.isPreOrder,
+          isPreOrder:
+            product.isPreOrder || product.visibility === 'PRE_ORDER_ONLY',
           isDigital,
         });
       }

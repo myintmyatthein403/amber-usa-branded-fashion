@@ -125,7 +125,6 @@ export const FooterSectionSchema = z.object({
 export type FooterSection = z.infer<typeof FooterSectionSchema> & { id: string };
 export type CreateFooterSectionInput = z.infer<typeof FooterSectionSchema>;
 export type CreateCollectionInput = z.infer<typeof CollectionSchema>;
-export type CreateCouponInput = z.infer<typeof CouponSchema>;
 
 export const CollectionSchema = z.object({
   id: z.string().uuid().optional(),
@@ -137,24 +136,6 @@ export const CollectionSchema = z.object({
 });
 
 export type Collection = z.infer<typeof CollectionSchema> & { id: string };
-
-export const CouponDiscountTypeSchema = z.enum(['PERCENTAGE', 'FIXED_AMOUNT']);
-
-export const CouponSchema = z.object({
-  id: z.string().uuid().optional(),
-  code: z.string().min(1, 'Code is required'),
-  description: z.string().nullable().optional(),
-  discountType: CouponDiscountTypeSchema.default('PERCENTAGE'),
-  discountValue: z.number().min(0),
-  minOrderAmount: z.number().nullable().optional(),
-  maxDiscount: z.number().nullable().optional(),
-  expiryDate: z.string().nullable().optional(),
-  usageLimit: z.number().nullable().optional(),
-  usedCount: z.number().default(0),
-  isActive: z.boolean().default(true),
-});
-
-export type Coupon = z.infer<typeof CouponSchema> & { id: string };
 
 export const SaleDiscountTypeSchema = z.enum(['PERCENTAGE', 'FIXED_AMOUNT']);
 

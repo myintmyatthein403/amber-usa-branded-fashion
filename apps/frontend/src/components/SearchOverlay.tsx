@@ -6,6 +6,7 @@ import { X, Search, ArrowRight, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import Price from "./Price";
+import { useStore } from "@/store/useStore";
 import { Product, Brand } from "@amber/shared";
 
 interface SearchResult extends Product {
@@ -17,6 +18,7 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
   const [results, setResults] = useState<SearchResult[]>([]);
   const [popularBrands, setPopularBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const market = useStore((state) => state.market);
 
   useEffect(() => {
     const fetchPopularBrands = async () => {
@@ -38,17 +40,15 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
       if (query.length > 1) {
         setIsLoading(true);
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
-          const data: Product[] = await res.json();
-          const filtered: SearchResult[] = (data as unknown as any[]).filter((p) => 
-            p.name.toLowerCase().includes(query.toLowerCase()) || 
-            ((p as any).brand?.name || "").toLowerCase().includes(query.toLowerCase()) ||
-            ((p as any).category?.name || "").toLowerCase().includes(query.toLowerCase())
-          ).map((p) => ({
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?market=${market}&search=${encodeURIComponent(query)}&limit=8`);
+          const result = await res.json();
+          const data = result?.data || result || [];
+
+          const filtered: SearchResult[] = (data as unknown as any[]).map((p) => ({
             ...p,
             image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
           }));
-          setResults(filtered.slice(0, 8)); // Limit to 8 results for overlay
+          setResults(filtered); 
         } catch (error) {
           console.error("Search failed:", error);
         } finally {
@@ -61,7 +61,7 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
 
     const timeoutId = setTimeout(fetchResults, 300);
     return () => clearTimeout(timeoutId);
-  }, [query]);
+  }, [query, market]);
 
   return (
     <AnimatePresence>

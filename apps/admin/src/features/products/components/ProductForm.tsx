@@ -88,6 +88,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           />
         </div>
         <div className="space-y-2">
+          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Market Visibility</label>
+          <select
+            value={productForm.visibility || 'BOTH'}
+            onChange={(e) => handleFieldChange('visibility', e.target.value)}
+            className="w-full h-12 border-b border-input bg-background px-2 text-sm focus:border-primary focus:outline-none rounded-sm cursor-pointer"
+          >
+            <option value="BOTH">Show in Both Markets</option>
+            <option value="USA">USA Market Only</option>
+            <option value="MYANMAR">Myanmar Market Only</option>
+            <option value="PRE_ORDER_ONLY">Pre-order Only</option>
+          </select>
+        </div>
+        <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Scheduled Publish</label>
           <input
             type="datetime-local"

@@ -65,6 +65,7 @@ export const ProductQueryDto = z.object({
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
   currencyCode: z.string().optional(),
+  market: z.enum(['US', 'MM']).optional(),
   warehouseLocation: z.string().optional(),
   inStock: z.string().optional(),
   priceMin: z.string().optional(),

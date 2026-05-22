@@ -319,6 +319,8 @@ export const useStore = create<AppState>()(
         cartItems: state.cartItems,
         compareList: state.compareList,
         currency: state.currency,
+        exchangeRate: state.exchangeRate,
+        rateUpdatedAt: state.rateUpdatedAt,
         market: state.market,
         locale: state.locale,
         liteMode: state.liteMode,

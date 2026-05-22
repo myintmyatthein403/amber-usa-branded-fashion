@@ -156,15 +156,16 @@ export default function CheckoutPage() {
   const isShippingUsd = selectedMethod?.isUsdPrice ?? false;
   const getShippingDisplay = (cost: number) => formatPrice(cost, isShippingUsd);
 
-  const calculateTotal = () =>
-    computeCheckoutTotal(
-      cartItems,
-      shippingCost,
-      currency,
-      exchangeRate,
-      isShippingUsd,
-      shippingCost,
-    );
+  const total = computeCheckoutTotal(
+    cartItems,
+    shippingCost,
+    currency,
+    exchangeRate,
+    isShippingUsd,
+    shippingCost,
+  );
+
+  const calculateTotal = () => total;
 
   const handleCreatePaymentIntent = async () => {
     setIsCreatingIntent(true);
@@ -597,6 +598,7 @@ export default function CheckoutPage() {
             shippingCost={shippingCost}
             getShippingDisplay={getShippingDisplay}
             currency={currency}
+            total={total}
           />
         </div>
       </div>

@@ -154,6 +154,76 @@ export class LogisticsService {
     return { success: true };
   }
 
+  async bulkTransferStock(data: {
+    fromWarehouseId: string;
+    toWarehouseId: string;
+    items: { variantId: string; quantity: number }[];
+    note?: string;
+    userId?: string;
+  }) {
+    const fromWh = await this.prisma.warehouse.findUnique({
+      where: { id: data.fromWarehouseId },
+    });
+    const toWh = await this.prisma.warehouse.findUnique({
+      where: { id: data.toWarehouseId },
+    });
+
+    if (!fromWh || !toWh) {
+      throw new NotFoundException('One or both warehouses not found');
+    }
+
+    // Verify all stock first
+    for (const item of data.items) {
+      const fromInv = await this.logisticsRepository.findInventory(
+        item.variantId,
+        data.fromWarehouseId,
+      );
+      if (!fromInv || fromInv.quantity < item.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for variant ${item.variantId} at origin warehouse`,
+        );
+      }
+    }
+
+    // Perform transfers
+    for (const item of data.items) {
+      await this.logisticsRepository.transferInventory(
+        item.variantId,
+        data.fromWarehouseId,
+        data.toWarehouseId,
+        item.quantity,
+      );
+
+      await this.prisma.stockMovement.create({
+        data: {
+          variantId: item.variantId,
+          fromWarehouseId: data.fromWarehouseId,
+          toWarehouseId: data.toWarehouseId,
+          quantity: item.quantity,
+          reason: 'TRANSFER',
+          note: data.note,
+          userId: data.userId,
+        },
+      });
+    }
+
+    // Create cargo shipment if international
+    if (
+      fromWh.location !== toWh.location &&
+      fromWh.location === 'USA' &&
+      toWh.location === 'MYANMAR'
+    ) {
+      await this.createCargoShipment({
+        originId: data.fromWarehouseId,
+        destinationId: data.toWarehouseId,
+        notes: `Bulk transfer cargo. ${data.note ?? ''}`,
+        items: data.items,
+      });
+    }
+
+    return { success: true, itemCount: data.items.length };
+  }
+
   async getLowStockVariants() {
     const variants = await this.prisma.variant.findMany({
       include: { product: true, inventory: { include: { warehouse: true } } },

@@ -20,6 +20,7 @@ export const ApiProductSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
+  visibility: z.enum(['USA', 'MYANMAR', 'BOTH', 'PRE_ORDER_ONLY']).optional(),
   price: z.union([z.number(), z.string()]),
   compareAtPrice: z.union([z.number(), z.string()]).nullable(),
   isUsdPrice: z.boolean().default(true),

@@ -12,7 +12,6 @@ export const useSettings = () => {
   const [formData, setFormData] = useState({
     privacyPolicy: '',
     termsConditions: '',
-    usdToMmkRate: '3500',
     stripePublishableKey: '',
     stripeSecretKey: '',
     stripeWebhookSecret: '',
@@ -31,7 +30,6 @@ export const useSettings = () => {
       setFormData({
         privacyPolicy: data?.privacyPolicy || '',
         termsConditions: data?.termsConditions || '',
-        usdToMmkRate: String(data?.usdToMmkRate || '3500'),
         stripePublishableKey: data?.stripePublishableKey || '',
         stripeSecretKey: data?.stripeSecretKey || '',
         stripeWebhookSecret: data?.stripeWebhookSecret || '',
@@ -78,7 +76,6 @@ export const useSettings = () => {
   };
 
   const updateField = useCallback((field: string, value: unknown) => {
-    if (field === 'usdToMmkRate') return;
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
