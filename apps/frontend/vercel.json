@@ -1,9 +1,5 @@
 {
   "framework": "nextjs",
   "buildCommand": "npm run backend:build && npm run build",
-  "installCommand": "npm install",
-  "devDependencies": {
-    "@types/node": "^20",
-    "typescript": "^5"
-  }
+  "installCommand": "npm install"
 }

@@ -1,8 +1,5 @@
 {
   "framework": "nodejs",
   "buildCommand": "npm run prisma:generate && npm run build",
-  "installCommand": "npm install",
-  "devDependencies": {
-    "@types/node": "^20"
-  }
+  "installCommand": "npm install"
 }
