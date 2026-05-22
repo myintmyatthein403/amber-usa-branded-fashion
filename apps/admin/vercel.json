@@ -1,0 +1,9 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  }
+}
