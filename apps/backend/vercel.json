@@ -1,5 +1,5 @@
 {
-  "framework": "nodejs",
+  "framework": "nestjs",
   "buildCommand": "npm run prisma:generate && npm run build",
   "installCommand": "npm install",
   "outputDirectory": "dist",
