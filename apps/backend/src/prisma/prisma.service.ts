@@ -17,8 +17,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     }
     const pool = new Pool({
       connectionString: url,
-      max: 3, // Reduced for Supabase free tier limits
-      idleTimeoutMillis: 10000,
+      max: 1, // Optimized for Vercel/Serverless + Supabase free tier
+      idleTimeoutMillis: 1000, // Quickly release connections
       connectionTimeoutMillis: 5000,
     });
     const adapter = new PrismaPg(pool);
