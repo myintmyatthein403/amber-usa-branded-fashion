@@ -8,11 +8,11 @@
   "scripts": {
     "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:dev\" \"npm run admin:dev\"",
     "frontend:dev": "npm run dev -w frontend",
-    "frontend:build": "npm run build -w frontend",
+    "frontend:build": "npm run build -w packages/shared && npm run build -w frontend",
     "backend:dev": "npm run start:dev -w backend",
     "backend:build": "npm run build -w packages/shared && npm run prisma:generate -w backend && npm run build -w backend",
     "admin:dev": "npm run dev -w admin",
-    "admin:build": "npm run build -w admin",
+    "admin:build": "npm run build -w packages/shared && npm run build -w admin",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:test:up": "docker compose up postgres_test -d",

@@ -1,7 +1,7 @@
 {
   "framework": "vite",
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
+  "buildCommand": "cd ../.. && npm run admin:build",
+  "installCommand": "cd ../.. && npm install",
   "outputDirectory": "dist",
   "regions": ["iad1"]
 }

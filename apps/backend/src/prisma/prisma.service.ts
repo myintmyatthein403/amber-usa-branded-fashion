@@ -7,7 +7,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   private readonly logger = new Logger(PrismaService.name);
-  private readonly maxRetries = 5;
+  private readonly maxRetries = process.env.NODE_ENV === 'production' ? 2 : 5;
   private readonly retryDelay = 2000;
 
   constructor(config: ConfigService) {
