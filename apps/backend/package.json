@@ -48,7 +48,7 @@
     "cloudinary": "^1.41.3",
     "dotenv": "^17.2.3",
     "google-auth-library": "^10.6.2",
-    "isomorphic-dompurify": "^3.9.0",
+    "isomorphic-dompurify": "2.19.0",
     "multer-storage-cloudinary": "^4.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
