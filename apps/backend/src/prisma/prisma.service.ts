@@ -11,32 +11,53 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   private readonly retryDelay = 2000;
 
   constructor(config: ConfigService) {
-    const url = config.get<string>('DATABASE_URL');
+    const url = config.get<string>('DATABASE_URL') || process.env.DATABASE_URL;
     if (!url) {
       throw new Error('DATABASE_URL is not defined in environment variables');
     }
-    const pool = new Pool({ connectionString: url });
+    const pool = new Pool({
+      connectionString: url,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
     const adapter = new PrismaPg(pool);
-    super({ adapter });
+    super({
+      datasources: {
+        db: {
+          url,
+        },
+      },
+      adapter,
+      log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+    });
   }
 
   async onModuleInit() {
+    let connected = false;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         await this.$connect();
         this.logger.log('Successfully connected to database');
-        return;
+        connected = true;
+        break;
       } catch (error) {
         this.logger.error(
           `Database connection attempt ${attempt}/${this.maxRetries} failed. ` +
-          `Error: ${error.message}. Stack: ${error.stack}`,
+            `Error: ${error.message}`,
         );
         if (attempt < this.maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
         }
       }
     }
-    throw new Error('Failed to connect to database after multiple attempts');
+
+    if (!connected) {
+      this.logger.warn(
+        'Application starting without an active database connection. ' +
+          'Database operations will fail until a connection is established.',
+      );
+    }
   }
 
   sanitizeData<T>(data: T): T {

@@ -14,23 +14,36 @@ export class SettingsService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    try {
-      const settings = await this.settingsRepository.findById('global');
+    const maxRetries = 3;
+    const retryDelay = 2000;
 
-      if (!settings) {
-        await this.settingsRepository.create({
-          id: 'global',
-          stripePublishableKey: null,
-          stripeSecretKey: null,
-          stripeWebhookSecret: null,
-        });
-        this.logger.log('Created global settings');
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const settings = await this.settingsRepository.findById('global');
+
+        if (!settings) {
+          await this.settingsRepository.create({
+            id: 'global',
+            stripePublishableKey: null,
+            stripeSecretKey: null,
+            stripeWebhookSecret: null,
+          });
+          this.logger.log('Created global settings');
+        }
+        return;
+      } catch (error) {
+        this.logger.warn(
+          `Failed to initialize global settings (attempt ${attempt}/${maxRetries}): ${error.message}`,
+        );
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        } else {
+          this.logger.error(
+            'Failed to initialize global settings after multiple attempts. Application will continue, but defaults may be missing.',
+            error.stack,
+          );
+        }
       }
-    } catch (error) {
-      this.logger.error(
-        `Failed to initialize global settings: ${error.message}`,
-        error.stack,
-      );
     }
   }
 

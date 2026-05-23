@@ -20,14 +20,27 @@ export class CurrenciesService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    try {
-      await this.ensureDefaultCurrenciesAndRate();
-      this.logger.log('Currency defaults verified (USD, MMK, USD→MMK rate)');
-    } catch (error) {
-      this.logger.error(
-        `Failed to bootstrap currencies: ${(error as Error).message}`,
-        (error as Error).stack,
-      );
+    const maxRetries = 3;
+    const retryDelay = 2000;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.ensureDefaultCurrenciesAndRate();
+        this.logger.log('Currency defaults verified (USD, MMK, USD→MMK rate)');
+        return;
+      } catch (error) {
+        this.logger.warn(
+          `Failed to bootstrap currencies (attempt ${attempt}/${maxRetries}): ${error.message}`,
+        );
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        } else {
+          this.logger.error(
+            'Failed to bootstrap currencies after multiple attempts. Application will continue, but defaults may be missing.',
+            error.stack,
+          );
+        }
+      }
     }
   }
 
