@@ -10,7 +10,7 @@
     "frontend:dev": "npm run dev -w frontend",
     "frontend:build": "npm run build -w frontend",
     "backend:dev": "npm run start:dev -w backend",
-    "backend:build": "npm run prisma:generate -w backend && npm run build -w backend",
+    "backend:build": "npm run build -w packages/shared && npm run prisma:generate -w backend && npm run build -w backend",
     "admin:dev": "npm run dev -w admin",
     "admin:build": "npm run build -w admin",
     "db:up": "docker compose up -d",

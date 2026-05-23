@@ -1,7 +1,7 @@
 {
   "framework": "nestjs",
-  "buildCommand": "npm run prisma:generate && npm run build",
-  "installCommand": "npm install",
+  "buildCommand": "cd ../.. && npm run backend:build",
+  "installCommand": "cd ../.. && npm install",
   "outputDirectory": "dist",
   "regions": ["iad1"]
 }
