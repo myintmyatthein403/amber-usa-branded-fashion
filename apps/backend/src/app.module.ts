@@ -45,7 +45,7 @@ import { AddressesModule } from './addresses/addresses.module';
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', '..', 'public'),
+      rootPath: join(__dirname, '..', 'public'),
       serveRoot: '/',
     }),
     PrismaModule,

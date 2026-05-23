@@ -27,8 +27,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         this.logger.log('Successfully connected to database');
         return;
       } catch (error) {
-        this.logger.warn(
-          `Database connection attempt ${attempt}/${this.maxRetries} failed: ${error.message}`,
+        this.logger.error(
+          `Database connection attempt ${attempt}/${this.maxRetries} failed. ` +
+          `Error: ${error.message}. Stack: ${error.stack}`,
         );
         if (attempt < this.maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
