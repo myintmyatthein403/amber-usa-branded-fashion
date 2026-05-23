@@ -23,13 +23,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     });
     const adapter = new PrismaPg(pool);
     super({
-      datasources: {
-        db: {
-          url,
-        },
-      },
       adapter,
-      log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+      log:
+        process.env.NODE_ENV === 'development'
+          ? ['query', 'info', 'warn', 'error']
+          : ['error'],
     });
   }
 
