@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Edit2, Trash2, BarChart3, Search, AlertCircle, ChevronLeft, Save, Image as ImageIcon, X, Link as LinkIcon, Grid3X3, Layers } from 'lucide-react';
+import { Plus, Edit2, Trash2, BarChart3, Search, AlertCircle, ChevronLeft, Save, Image as ImageIcon, X, Link as LinkIcon, Grid3X3, Layers, RefreshCw } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -103,6 +103,29 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
   const [selectedAttributes, setSelectedAttributes] = React.useState<Record<string, string>>({});
   
   const warehouseList = warehouses?.data || warehouses || [];
+
+  const regenerateSku = () => {
+    if (!productSlug) return;
+    let parts: string;
+    if (attributes.length > 0) {
+      const selections = (newVariant as any)?.attributeSelections || {};
+      parts = attributes
+        .map((attr) => {
+          const valId = selections[attr.id];
+          const val = attr.values?.find((v) => v.id === valId);
+          return val ? val.value.toUpperCase() : null;
+        })
+        .filter(Boolean)
+        .join('-');
+    } else {
+      parts = [newVariant.size, newVariant.color]
+        .filter(Boolean)
+        .map((s) => String(s).toUpperCase())
+        .join('-');
+    }
+    if (!parts) return;
+    setNewVariant({ ...newVariant, sku: `${productSlug}-${parts}`.replace(/\s+/g, '-') });
+  };
 
   const generateBulkVariants = () => {
     if (attributes.length > 0) {
@@ -392,7 +415,18 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
         <>
         <div className={`grid gap-6 mb-6 ${attributes.length > 0 ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
           <div className="space-y-2">
-             <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Unique SKU</label>
+             <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground flex justify-between">
+               <span>Unique SKU</span>
+               {productSlug && (
+                 <button
+                   type="button"
+                   onClick={regenerateSku}
+                   className="flex items-center gap-1 text-primary hover:text-primary/70 transition-colors normal-case tracking-normal"
+                 >
+                   <RefreshCw size={10} /> Regenerate
+                 </button>
+               )}
+             </label>
              <input type="text" placeholder="AMB-SKU-001" value={newVariant.sku || ''} onChange={(e) => setNewVariant({...newVariant, sku: e.target.value})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
           <div className="space-y-2">
@@ -434,29 +468,41 @@ className="w-full h-10 border-b border-input bg-background px-2 text-sm text-for
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-2">
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground flex items-center gap-2">
               Variant Price <span className="text-[9px] font-normal text-muted-foreground/50">(optional)</span>
             </label>
-            <input 
-              type="text" 
-              placeholder="Inherits base price" 
-              value={newVariant.price || ''} 
+            <input
+              type="text"
+              placeholder="Inherits base price"
+              value={newVariant.price || ''}
               onChange={(e) => setNewVariant({...newVariant, price: e.target.value ? parseFloat(e.target.value) : undefined})}
-              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300" 
+              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300"
             />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground flex items-center gap-2">
               Compare at Price <span className="text-[9px] font-normal text-muted-foreground/50">(optional)</span>
             </label>
-            <input 
-              type="text" 
-              placeholder="Inherits base compare" 
-              value={(newVariant as any).compareAtPrice || ''} 
+            <input
+              type="text"
+              placeholder="Inherits base compare"
+              value={(newVariant as any).compareAtPrice || ''}
               onChange={(e) => setNewVariant({...newVariant, compareAtPrice: e.target.value ? parseFloat(e.target.value) : undefined} as any)}
-              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300" 
+              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground flex items-center gap-2">
+              Cost <span className="text-[9px] font-normal text-muted-foreground/50">(optional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="For margin calculation"
+              value={(newVariant as any).buyPrice ?? ''}
+              onChange={(e) => setNewVariant({...newVariant, buyPrice: e.target.value ? parseFloat(e.target.value) : undefined} as any)}
+              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none transition-colors duration-300"
             />
           </div>
           <div className="space-y-2">
@@ -468,6 +514,19 @@ className="w-full h-10 border-b border-input bg-background px-2 text-sm text-for
              <input type="number" value={newVariant.lowStockThreshold || 5} onChange={(e) => setNewVariant({...newVariant, lowStockThreshold: parseInt(e.target.value)})} className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none transition-colors duration-300" />
           </div>
         </div>
+        {(() => {
+          const variantPriceNum = parseFloat(String(newVariant.price ?? ''));
+          const variantCostNum = parseFloat(String((newVariant as any).buyPrice ?? ''));
+          const hasVariantMargin = !isNaN(variantPriceNum) && variantPriceNum > 0 && !isNaN(variantCostNum);
+          if (!hasVariantMargin) return null;
+          const variantProfit = variantPriceNum - variantCostNum;
+          const variantMargin = (variantProfit / variantPriceNum) * 100;
+          return (
+            <div className={`text-xs font-bold uppercase tracking-widest mb-6 ${variantMargin < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+              Profit: {variantProfit.toFixed(2)} · Margin: {variantMargin.toFixed(1)}%
+            </div>
+          );
+        })()}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="space-y-2">

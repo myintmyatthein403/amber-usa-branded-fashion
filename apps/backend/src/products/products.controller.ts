@@ -16,6 +16,7 @@ import {
 import type { Response } from 'express';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -42,8 +43,9 @@ export class ProductsController {
   }
 
   @Get()
-  async findAll(@Query() query: ProductQueryDto, @Req() req: { user?: { roleName?: string } }) {
-    const isAdmin = req.user && ['ADMIN', 'SUPERADMIN'].includes(req.user.roleName ?? '');
+  @UseGuards(OptionalJwtAuthGuard)
+  async findAll(@Query() query: ProductQueryDto, @Req() req: { user?: { role?: string } }) {
+    const isAdmin = req.user && ['ADMIN', 'SUPERADMIN'].includes(req.user.role ?? '');
     let attributeFilters: Record<string, string> | undefined;
     if (query.attributeFilters) {
       try {
@@ -122,8 +124,9 @@ export class ProductsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() req: { user?: { roleName?: string } }) {
-    const isAdmin = req.user && ['ADMIN', 'SUPERADMIN'].includes(req.user.roleName ?? '');
+  @UseGuards(OptionalJwtAuthGuard)
+  findOne(@Param('id') id: string, @Req() req: { user?: { role?: string } }) {
+    const isAdmin = req.user && ['ADMIN', 'SUPERADMIN'].includes(req.user.role ?? '');
     return this.productsService.getProductById(id, !isAdmin);
   }
 

@@ -37,6 +37,14 @@ export class ProductsService {
     private attributesService: AttributesService,
   ) {}
 
+  private stripCostFields<T extends Record<string, unknown>>(product: T): T {
+    const { cost, ...rest } = product as Record<string, unknown>;
+    const variants = Array.isArray(rest.variants)
+      ? rest.variants.map(({ buyPrice, ...v }: Record<string, unknown>) => v)
+      : rest.variants;
+    return { ...rest, variants } as unknown as T;
+  }
+
   private async normalizeVariants<T extends { attributeSelections?: unknown }>(
     variants?: T[],
   ): Promise<T[] | undefined> {
@@ -165,7 +173,9 @@ export class ProductsService {
     );
 
     return {
-      data,
+      data: params.publicOnly
+        ? data.map((p) => this.stripCostFields(p as unknown as Record<string, unknown>))
+        : data,
       meta: {
         total,
         page: currentPage,
@@ -181,7 +191,9 @@ export class ProductsService {
     if (publicOnly && product.status !== 'PUBLISHED') {
       throw new NotFoundException('Product not found');
     }
-    return product;
+    return publicOnly
+      ? this.stripCostFields(product as unknown as Record<string, unknown>) as unknown as Product
+      : product;
   }
 
   async getProductBySlug(slug: string): Promise<Product | null> {
@@ -189,7 +201,7 @@ export class ProductsService {
     if (!product || product.status !== 'PUBLISHED') {
       throw new NotFoundException('Product not found');
     }
-    return product;
+    return this.stripCostFields(product as unknown as Record<string, unknown>) as unknown as Product;
   }
 
   async updateProduct(

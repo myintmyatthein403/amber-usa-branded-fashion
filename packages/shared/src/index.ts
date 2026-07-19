@@ -1,4 +1,5 @@
 export * from './product.schema';
+export * from './slug.util';
 export * from './currency.utils';
 export * from './category.utils';
 export * from './category.schema';

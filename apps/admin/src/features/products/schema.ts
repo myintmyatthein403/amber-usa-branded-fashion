@@ -10,6 +10,7 @@ export const VariantSchema = z.object({
   lowStockThreshold: z.number().min(0).default(5),
   price: z.union([z.number(), z.string()]).optional().nullable(),
   compareAtPrice: z.union([z.number(), z.string()]).optional().nullable(),
+  buyPrice: z.union([z.number(), z.string()]).optional().nullable(),
   weight: z.union([z.number(), z.string()]).optional().nullable(),
   images: z.array(z.string()).default([]),
   isPreOrder: z.boolean().default(false),
@@ -28,6 +29,7 @@ export const ProductSchema = z.object({
   note: z.string().optional().nullable(),
   price: z.union([z.number(), z.string()]).refine(val => val !== '', 'Price is required'),
   compareAtPrice: z.union([z.number(), z.string()]).optional().nullable(),
+  cost: z.union([z.number(), z.string()]).optional().nullable(),
   isUsdPrice: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
   onSale: z.boolean().default(false),
@@ -36,6 +38,7 @@ export const ProductSchema = z.object({
   isPreOrder: z.boolean().default(false),
   preOrderShippingDate: z.string().optional().nullable(),
   preOrderNote: z.string().optional().nullable(),
+  expiryDate: z.string().optional().nullable(),
   metaTitle: z.string().optional().nullable(),
   metaDescription: z.string().optional().nullable(),
   tags: z.array(z.string()).default([]),
@@ -55,6 +58,7 @@ export const CategorySchema = z.object({
   image: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
+  hasExpiry: z.boolean().optional(),
   displayOrder: z.number().int().optional(),
   parentId: z.string().uuid().optional().nullable(),
   metaTitle: z.string().optional().nullable(),
@@ -92,6 +96,7 @@ export type CreateProductInput = {
   note?: string | null;
   price: string | number;
   compareAtPrice?: string | number | null;
+  cost?: string | number | null;
   isUsdPrice?: boolean;
   isFeatured?: boolean;
   onSale?: boolean;
@@ -100,6 +105,7 @@ export type CreateProductInput = {
   isPreOrder?: boolean;
   preOrderShippingDate?: string | null;
   preOrderNote?: string | null;
+  expiryDate?: string | null;
   metaTitle?: string | null;
   metaDescription?: string | null;
   tags?: string[];
@@ -118,6 +124,7 @@ export type CreateProductInput = {
     lowStockThreshold?: number;
     price?: string | number | null;
     compareAtPrice?: string | number | null;
+    buyPrice?: string | number | null;
     weight?: string | number | null;
     images?: string[];
     isPreOrder?: boolean;
@@ -134,6 +141,7 @@ export type CreateVariantInput = {
   lowStockThreshold?: number;
   price?: string | number | null;
   compareAtPrice?: string | number | null;
+  buyPrice?: string | number | null;
   weight?: string | number | null;
   images?: string[];
   isPreOrder?: boolean;

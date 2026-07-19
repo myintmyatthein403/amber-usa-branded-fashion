@@ -164,6 +164,7 @@ export class ProductsRepository {
       currencyCode,
       isUsdPrice: currencyCode === 'USD',
       publishAt: data.publishAt ? new Date(data.publishAt as string) : undefined,
+      expiryDate: data.expiryDate ? new Date(data.expiryDate as string) : undefined,
     };
   }
 

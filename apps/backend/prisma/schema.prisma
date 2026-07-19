@@ -189,6 +189,7 @@ model Product {
   // Pricing & Sale
   price            Decimal       @db.Decimal(10, 2)
   compareAtPrice   Decimal?      @db.Decimal(10, 2) // Original price for "Sale" display
+  cost             Decimal?      @db.Decimal(10, 2) // Cost of goods, for margin calculation
   currencyCode     String        @default("USD")
   isUsdPrice       Boolean       @default(true)      // Deprecated: derived from currencyCode === "USD"
   isFeatured       Boolean       @default(false)
@@ -201,7 +202,10 @@ model Product {
   isPreOrder       Boolean       @default(false)
   preOrderShippingDate DateTime?
   preOrderNote     String?       @db.Text
-  
+
+  // Expiry
+  expiryDate       DateTime?
+
   // SEO Fields
   metaTitle        String?
   metaDescription  String?
@@ -462,8 +466,9 @@ model Category {
   image           String?
   isActive        Boolean     @default(true)
   isFeatured      Boolean     @default(false)
+  hasExpiry       Boolean     @default(false)
   displayOrder    Int         @default(0)
-  
+
   metaTitle       String?
   metaDescription String?
   

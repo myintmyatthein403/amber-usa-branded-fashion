@@ -8,6 +8,7 @@ export const CategorySchema = z.object({
   image: z.string().url().optional(),
   isActive: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
+  hasExpiry: z.boolean().default(false),
   displayOrder: z.number().int().default(0),
   parentId: z.string().uuid().optional().nullable(),
   metaTitle: z.string().optional(),

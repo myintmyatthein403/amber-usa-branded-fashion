@@ -14,6 +14,7 @@ const DEFAULT_FORM_DATA: CategoryFormState = {
   image: '',
   isActive: true,
   isFeatured: false,
+  hasExpiry: false,
   displayOrder: 0,
   parentId: undefined,
   metaTitle: '',
@@ -28,6 +29,7 @@ function categoryToFormData(category: Category): CategoryFormState {
     image: category.image ?? '',
     isActive: category.isActive ?? true,
     isFeatured: category.isFeatured ?? false,
+    hasExpiry: category.hasExpiry ?? false,
     displayOrder: category.displayOrder ?? 0,
     parentId: category.parentId ?? undefined,
     metaTitle: category.metaTitle ?? '',
@@ -40,6 +42,7 @@ function formDataToPayload(data: CategoryFormState): Record<string, unknown> {
     name: data.name,
     isActive: data.isActive,
     isFeatured: data.isFeatured,
+    hasExpiry: data.hasExpiry,
     displayOrder: data.displayOrder,
     parentId: data.parentId || null,
   };
@@ -66,6 +69,7 @@ export const useCategories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [mediaSelectorOpen, setMediaSelectorOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState<CategoryFormState>(DEFAULT_FORM_DATA);
@@ -91,6 +95,10 @@ export const useCategories = () => {
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  const handleMediaSelect = (url: string) => {
+    setFormData((prev) => ({ ...prev, image: url }));
+  };
 
   const reorderCategories = useCallback(
     async (payload: CategoryReorderFlatItem[]) => {
@@ -194,10 +202,13 @@ export const useCategories = () => {
     loading,
     modalOpen,
     setModalOpen,
+    mediaSelectorOpen,
+    setMediaSelectorOpen,
     submitting,
     editingCategory,
     formData,
     setFormData,
+    handleMediaSelect,
     handleSubmit,
     handleDelete,
     openAddModal,

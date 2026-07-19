@@ -44,6 +44,7 @@ export const ProductBaseSchema = z.object({
     { message: 'Price is required' }
   ),
   compareAtPrice: z.union([z.number(), z.string()]).optional().nullable(),
+  cost: z.union([z.number(), z.string()]).optional().nullable(),
   currencyCode: z.enum(['USD', 'MMK', 'THB']).default('USD'),
   isUsdPrice: z.boolean().default(true),
   nameMy: z.string().optional().nullable(),
@@ -56,6 +57,7 @@ export const ProductBaseSchema = z.object({
   isPreOrder: z.boolean().default(false),
   preOrderShippingDate: z.string().optional().nullable(),
   preOrderNote: z.string().optional().nullable(),
+  expiryDate: z.string().optional().nullable(),
   metaTitle: z.string().optional().nullable(),
   metaDescription: z.string().optional().nullable(),
   tags: z.array(z.string()).default([]),
@@ -74,6 +76,7 @@ export const CategoryBaseSchema = z.object({
   image: z.string().url().or(z.literal('')).optional().nullable(),
   isActive: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
+  hasExpiry: z.boolean().default(false),
   displayOrder: z.number().int().default(0),
   parentId: z.string().uuid().optional().nullable(),
   metaTitle: z.string().optional().nullable(),

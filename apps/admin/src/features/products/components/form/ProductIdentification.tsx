@@ -1,4 +1,6 @@
 import React from 'react';
+import { RefreshCw } from 'lucide-react';
+import { slugify } from '@amber/shared';
 
 interface ProductIdentificationProps {
   name: string;
@@ -25,8 +27,19 @@ export const ProductIdentification: React.FC<ProductIdentificationProps> = ({
         />
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Unique Slug</label>
-        <input 
+        <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground flex justify-between">
+          <span>Unique Slug</span>
+          {name && (
+            <button
+              type="button"
+              onClick={() => onChange('slug', slugify(name))}
+              className="flex items-center gap-1 text-primary hover:text-primary/70 transition-colors normal-case tracking-normal font-bold"
+            >
+              <RefreshCw size={10} /> Regenerate
+            </button>
+          )}
+        </label>
+        <input
           type="text" 
           required 
           value={slug} 

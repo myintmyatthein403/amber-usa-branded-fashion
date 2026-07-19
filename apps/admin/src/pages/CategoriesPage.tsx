@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Layers } from 'lucide-react';
 import { Modal } from '../components/admin/Modal';
+import { MediaSelector } from '../components/admin/MediaSelector';
 import { PageHeader } from '../components/admin/PageHeader';
 import { useCategories } from '../features/categories/useCategories';
 import { CategoryTree } from '../features/categories/CategoryTree';
@@ -12,10 +13,13 @@ export const CategoriesPage: React.FC = () => {
     loading,
     modalOpen,
     setModalOpen,
+    mediaSelectorOpen,
+    setMediaSelectorOpen,
     submitting,
     editingCategory,
     formData,
     setFormData,
+    handleMediaSelect,
     handleSubmit,
     handleDelete,
     openAddModal,
@@ -63,6 +67,7 @@ export const CategoriesPage: React.FC = () => {
           submitting={submitting}
           editingCategory={editingCategory}
           availableCategories={availableCategories}
+          onMediaSelectorOpen={() => setMediaSelectorOpen(true)}
         />
       </Modal>
 
@@ -101,6 +106,13 @@ export const CategoriesPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      <MediaSelector
+        isOpen={mediaSelectorOpen}
+        onClose={() => setMediaSelectorOpen(false)}
+        onSelect={handleMediaSelect}
+        selectedUrls={formData.image ? [formData.image] : []}
+      />
     </div>
   );
 };

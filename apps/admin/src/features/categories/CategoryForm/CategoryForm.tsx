@@ -1,8 +1,9 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Image as ImageIcon, Plus, RefreshCw } from 'lucide-react';
 import {
   formatCategoryOptionLabel,
   getSelectableParentCategories,
+  slugify,
   type CategoryNode,
 } from '@amber/shared';
 import type { CategoryFormState } from '../useCategories';
@@ -15,6 +16,7 @@ interface CategoryFormProps {
   submitting: boolean;
   editingCategory: { id: string } | null;
   availableCategories: CategoryNode[];
+  onMediaSelectorOpen: () => void;
 }
 
 export const CategoryForm: React.FC<CategoryFormProps> = ({
@@ -25,6 +27,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
   submitting,
   editingCategory,
   availableCategories,
+  onMediaSelectorOpen,
 }) => {
   const parentOptions = getSelectableParentCategories(
     availableCategories,
@@ -55,8 +58,17 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">
-          Slug
+        <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground flex justify-between">
+          <span>Slug</span>
+          {formData.name && (
+            <button
+              type="button"
+              onClick={() => handleInputChange('slug', slugify(formData.name))}
+              className="flex items-center gap-1 text-primary hover:text-primary/70 transition-colors"
+            >
+              <RefreshCw size={10} /> Regenerate
+            </button>
+          )}
         </label>
         <input
           type="text"
@@ -82,17 +94,40 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">
-          Image URL
+      <div className="space-y-4">
+        <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground flex items-center gap-2">
+          <ImageIcon size={14}/> Category Image
         </label>
-        <input
-          type="url"
-          value={formData.image ?? ''}
-          onChange={(e) => handleInputChange('image', e.target.value)}
-          className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-base font-medium placeholder:text-muted-foreground/20 focus:border-primary focus:outline-none transition-colors duration-300 rounded-none"
-          placeholder="https://example.com/image.jpg"
-        />
+        <div className="flex items-start gap-6">
+          <div className="w-24 h-24 border border-border bg-secondary flex items-center justify-center overflow-hidden">
+            {formData.image ? (
+              <img src={formData.image} className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon size={24} className="text-muted-foreground/20" />
+            )}
+          </div>
+          <div className="flex-1 space-y-3">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onMediaSelectorOpen}
+                className="h-10 flex-1 border border-border flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:bg-muted/50 transition-colors"
+              >
+                <Plus size={14} className="mr-2" />
+                Select Media
+              </button>
+              <div className="flex-[2]">
+                <input
+                  type="text"
+                  value={formData.image ?? ''}
+                  onChange={(e) => handleInputChange('image', e.target.value)}
+                  className="w-full h-10 border border-border bg-transparent px-4 text-[10px] font-mono focus:border-primary focus:outline-none transition-colors"
+                  placeholder="Or paste image URL here..."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-8">
@@ -130,7 +165,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-8">
+      <div className="grid grid-cols-3 gap-8">
         <div className="flex items-center space-x-3">
           <input
             type="checkbox"
@@ -154,6 +189,19 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
           />
           <label htmlFor="isFeatured" className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">
             Featured
+          </label>
+        </div>
+
+        <div className="flex items-center space-x-3">
+          <input
+            type="checkbox"
+            id="hasExpiry"
+            checked={formData.hasExpiry}
+            onChange={(e) => handleInputChange('hasExpiry', e.target.checked)}
+            className="w-4 h-4"
+          />
+          <label htmlFor="hasExpiry" className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">
+            Requires Expiry Date
           </label>
         </div>
       </div>

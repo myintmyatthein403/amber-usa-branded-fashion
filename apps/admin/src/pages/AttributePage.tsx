@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { Plus, AlertTriangle, RefreshCw, Box } from 'lucide-react';
 import type { AttributeFormData, AttributeWithValues } from '@amber/shared';
+import { slugify } from '@amber/shared';
 import { Modal } from '../components/admin/Modal';
 import { MediaSelector } from '../components/admin/MediaSelector';
 import { PageHeader } from '../components/admin/PageHeader';
@@ -272,8 +273,19 @@ export const AttributePage: React.FC = () => {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
-              Slug
+            <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground flex justify-between">
+              <span>Slug</span>
+              {formData.name && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData({ ...formData, slug: slugify(formData.name) })
+                  }
+                  className="flex items-center gap-1 text-primary hover:text-primary/70 transition-colors normal-case tracking-normal"
+                >
+                  <RefreshCw size={10} /> Regenerate
+                </button>
+              )}
             </label>
             <input
               type="text"

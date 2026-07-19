@@ -46,6 +46,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     setProductForm({ ...productForm, [field]: value });
   };
 
+  const selectedCategory = (categories || []).find((c) => c.id === productForm.categoryId);
+
   const handleCurrencyChange = (code: string) => {
     setProductForm({
       ...productForm,
@@ -127,10 +129,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         />
       </div>
 
-      <PricingSection 
-        price={productForm.price?.toString() || ""} 
-        compareAtPrice={productForm.compareAtPrice?.toString() || ""} 
-        currency={productForm.currency || productForm.currencyCode || 'USD'} 
+      <PricingSection
+        price={productForm.price?.toString() || ""}
+        compareAtPrice={productForm.compareAtPrice?.toString() || ""}
+        cost={productForm.cost?.toString() || ""}
+        currency={productForm.currency || productForm.currencyCode || 'USD'}
         onChange={handleFieldChange}
         onCurrencyChange={handleCurrencyChange}
       />
@@ -245,16 +248,33 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         )}
       </div>
 
-      <ClassificationSection 
-        brandId={productForm.brandId || undefined} 
-        categoryId={productForm.categoryId || undefined} 
+      <ClassificationSection
+        brandId={productForm.brandId || undefined}
+        categoryId={productForm.categoryId || undefined}
         collectionIds={productForm.collectionIds || []}
-        status={productForm.status} 
-        brands={brands || []} 
+        status={productForm.status}
+        brands={brands || []}
         categories={categories || []}
         collections={collections || []}
-        onChange={handleFieldChange} 
+        onChange={handleFieldChange}
       />
+
+      {selectedCategory?.hasExpiry && (
+        <div className="space-y-6 p-6 border border-dashed border-primary/20 bg-secondary/30">
+          <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Expiry</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Expiry Date</label>
+              <input
+                type="date"
+                value={productForm.expiryDate || ''}
+                onChange={(e) => handleFieldChange('expiryDate', e.target.value)}
+                className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-end pt-10 border-t border-border">
         <button type="submit" disabled={submitting} className="flex items-center gap-3 bg-foreground text-primary-foreground px-10 py-4 text-xs font-bold uppercase tracking-[0.3em] hover:bg-primary transition-colors duration-500 disabled:opacity-50">

@@ -4,6 +4,7 @@ import { useCurrencies } from '../../../currencies/useCurrencies';
 interface PricingSectionProps {
   price: string | number;
   compareAtPrice: string | number | null;
+  cost?: string | number | null;
   currency: string;
   onChange: (field: string, value: unknown) => void;
   onCurrencyChange?: (code: string) => void;
@@ -12,6 +13,7 @@ interface PricingSectionProps {
 export const PricingSection: React.FC<PricingSectionProps> = ({
   price,
   compareAtPrice,
+  cost,
   currency,
   onChange,
   onCurrencyChange,
@@ -33,8 +35,15 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
     return curr?.symbol || '$';
   };
 
+  const priceNum = parseFloat(String(price));
+  const costNum = parseFloat(String(cost ?? ''));
+  const hasMargin = !isNaN(priceNum) && priceNum > 0 && !isNaN(costNum);
+  const profit = hasMargin ? priceNum - costNum : 0;
+  const margin = hasMargin ? (profit / priceNum) * 100 : 0;
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+    <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
       <div className="space-y-2">
         <div className="flex justify-between items-end">
           <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Retail Price</label>
@@ -85,6 +94,27 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
           Original price for comparison (optional)
         </div>
       </div>
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Cost</label>
+        </div>
+        <input
+          type="text"
+          value={cost ?? ''}
+          onChange={(e) => onChange('cost', e.target.value)}
+          className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-mono focus:border-primary focus:outline-none transition-colors duration-300 rounded-none text-muted-foreground"
+          placeholder="0.00"
+        />
+        <div className="text-[9px] text-muted-foreground/50">
+          Cost of goods, for margin calculation (optional)
+        </div>
+      </div>
+    </div>
+    {hasMargin && (
+      <div className={`text-xs font-bold uppercase tracking-widest ${margin < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+        Profit: {getSymbol(currency || 'USD')}{profit.toFixed(2)} · Margin: {margin.toFixed(1)}%
+      </div>
+    )}
     </div>
   );
 };
