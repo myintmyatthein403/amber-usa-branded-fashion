@@ -23,6 +23,7 @@ export const ProductSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
   slug: z.string().min(1, 'Slug is required'),
   status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).default('DRAFT'),
+  visibility: z.enum(['USA', 'MYANMAR', 'BOTH', 'PRE_ORDER_ONLY']).optional().nullable(),
   shortDescription: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   detail: z.string().optional().nullable(),
@@ -38,6 +39,7 @@ export const ProductSchema = z.object({
   isPreOrder: z.boolean().default(false),
   preOrderShippingDate: z.string().optional().nullable(),
   preOrderNote: z.string().optional().nullable(),
+  depositAmount: z.union([z.number(), z.string()]).optional().nullable(),
   expiryDate: z.string().optional().nullable(),
   metaTitle: z.string().optional().nullable(),
   metaDescription: z.string().optional().nullable(),
@@ -90,6 +92,7 @@ export type CreateProductInput = {
   name: string;
   slug: string;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  visibility?: 'USA' | 'MYANMAR' | 'BOTH' | 'PRE_ORDER_ONLY' | null;
   shortDescription?: string | null;
   description?: string | null;
   detail?: string | null;
@@ -105,6 +108,7 @@ export type CreateProductInput = {
   isPreOrder?: boolean;
   preOrderShippingDate?: string | null;
   preOrderNote?: string | null;
+  depositAmount?: string | number | null;
   expiryDate?: string | null;
   metaTitle?: string | null;
   metaDescription?: string | null;

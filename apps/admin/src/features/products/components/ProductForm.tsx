@@ -14,7 +14,6 @@ interface ProductFormProps {
   productForm: Partial<Product> & {
     currency?: string;
     currencyCode?: string;
-    nameMy?: string;
     descriptionMy?: string;
     publishAt?: string;
     tags?: string[];
@@ -80,16 +79,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
         <div className="space-y-2">
-          <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Name (Burmese)</label>
-          <input
-            type="text"
-            value={productForm.nameMy || ''}
-            onChange={(e) => handleFieldChange('nameMy', e.target.value)}
-            className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-lg font-serif focus:border-primary focus:outline-none transition-colors duration-300 rounded-none"
-            placeholder="မြန်မာအမည်..."
-          />
-        </div>
-        <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Market Visibility</label>
           <select
             value={productForm.visibility || 'BOTH'}
@@ -101,6 +90,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             <option value="MYANMAR">Myanmar Market Only</option>
             <option value="PRE_ORDER_ONLY">Pre-order Only</option>
           </select>
+          <div className="text-[9px] text-muted-foreground/50">
+            {productForm.visibility === 'PRE_ORDER_ONLY'
+              ? 'Shown only in the Myanmar storefront, even before regular stock arrives — never visible in the USA market.'
+              : productForm.visibility === 'USA'
+              ? 'Shown only to shoppers in the USA market.'
+              : productForm.visibility === 'MYANMAR'
+              ? 'Shown only to shoppers in the Myanmar market (Pre-order Only items also always appear there).'
+              : 'Shown to shoppers in both the USA and Myanmar markets.'}
+          </div>
         </div>
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Scheduled Publish</label>
@@ -225,7 +223,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Enable Preorder</span>
         </label>
         {productForm.isPreOrder && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Shipping Date</label>
               <input
@@ -243,6 +241,17 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 onChange={(e) => handleFieldChange('preOrderNote', e.target.value)}
                 className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Deposit Amount</label>
+              <input
+                type="text"
+                value={productForm.depositAmount || ''}
+                onChange={(e) => handleFieldChange('depositAmount', e.target.value)}
+                className="w-full h-10 border-b border-input bg-transparent px-0 text-sm font-mono focus:border-primary focus:outline-none"
+                placeholder="0.00"
+              />
+              <p className="text-[9px] text-muted-foreground/50">Reference only — checkout still charges the full price today.</p>
             </div>
           </div>
         )}

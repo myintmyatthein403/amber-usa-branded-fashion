@@ -119,7 +119,7 @@ export const useProducts = () => {
     currency: 'USD' as 'USD' | 'MMK' | 'THB',
     currencyCode: 'USD' as 'USD' | 'MMK' | 'THB',
     isUsdPrice: true,
-    nameMy: '',
+    visibility: 'BOTH' as 'USA' | 'MYANMAR' | 'BOTH' | 'PRE_ORDER_ONLY',
     descriptionMy: '',
     publishAt: '',
     isFeatured: false,
@@ -129,6 +129,7 @@ export const useProducts = () => {
     isPreOrder: false,
     preOrderShippingDate: '',
     preOrderNote: '',
+    depositAmount: '',
     expiryDate: '',
     images: [] as string[],
     categoryId: '',
@@ -274,7 +275,7 @@ export const useProducts = () => {
       cost: productForm.cost?.toString() || undefined,
       currencyCode,
       isUsdPrice: currencyCode === 'USD',
-      nameMy: productForm.nameMy || undefined,
+      visibility: productForm.visibility || 'BOTH',
       descriptionMy: productForm.descriptionMy || undefined,
       publishAt: productForm.publishAt || undefined,
       isFeatured: productForm.isFeatured ?? false,
@@ -284,6 +285,7 @@ export const useProducts = () => {
       isPreOrder: productForm.isPreOrder ?? false,
       preOrderShippingDate: productForm.preOrderShippingDate || undefined,
       preOrderNote: productForm.preOrderNote || undefined,
+      depositAmount: productForm.depositAmount?.toString() || undefined,
       expiryDate: productForm.expiryDate || undefined,
       images: productForm.images || [],
       categoryId: productForm.categoryId || undefined,
@@ -435,7 +437,7 @@ export const useProducts = () => {
       isUsdPrice: (product as { currencyCode?: string }).currencyCode
         ? (product as { currencyCode?: string }).currencyCode === 'USD'
         : product.isUsdPrice,
-      nameMy: (product as { nameMy?: string }).nameMy || '',
+      visibility: product.visibility || 'BOTH',
       descriptionMy: (product as { descriptionMy?: string }).descriptionMy || '',
       publishAt: (product as { publishAt?: string }).publishAt
         ? new Date((product as { publishAt?: string }).publishAt!).toISOString().slice(0, 16)
@@ -447,6 +449,7 @@ export const useProducts = () => {
       isPreOrder: product.isPreOrder,
       preOrderShippingDate: product.preOrderShippingDate ? new Date(product.preOrderShippingDate).toISOString().split('T')[0] : '',
       preOrderNote: product.preOrderNote || '',
+      depositAmount: String((product as { depositAmount?: string | number }).depositAmount ?? ''),
       expiryDate: product.expiryDate ? new Date(product.expiryDate).toISOString().split('T')[0] : '',
       images: product.images || [],
       categoryId: product.categoryId || '',

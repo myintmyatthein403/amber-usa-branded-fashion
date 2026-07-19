@@ -175,7 +175,6 @@ enum ProductVisibility {
 model Product {
   id               String        @id @default(uuid())
   name             String
-  nameMy           String?
   slug             String        @unique
   status           ProductStatus @default(DRAFT)
   visibility       ProductVisibility @default(BOTH)
@@ -202,6 +201,7 @@ model Product {
   isPreOrder       Boolean       @default(false)
   preOrderShippingDate DateTime?
   preOrderNote     String?       @db.Text
+  depositAmount    Decimal?      @db.Decimal(10, 2) // Upfront deposit for preorder items, informational only
 
   // Expiry
   expiryDate       DateTime?
