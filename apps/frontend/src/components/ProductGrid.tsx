@@ -80,10 +80,12 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
   const handleAddToCart = (e: React.MouseEvent, product: ExtendedProduct) => {
     e.stopPropagation();
     e.preventDefault();
+    const added = addToCart(product);
+    if (!added) {
+      setQuickViewProduct(product);
+      return;
+    }
     setAddingId(product.id!);
-    addToCart(
-      product,
-    );
     setTimeout(() => setAddingId(null), 1000);
   };
 

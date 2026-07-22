@@ -14,15 +14,20 @@ export default function CheckoutSuccessPage() {
   const redirectStatus = searchParams.get("redirect_status");
   
   const clearCart = useStore((state) => state.clearCart);
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "pending" | "success" | "error">("loading");
+
+  const MAX_ATTEMPTS = 5;
+  const RETRY_DELAY_MS = 2000;
 
   useEffect(() => {
-    const verifyPayment = async () => {
-      if (!orderId) {
-        setStatus("error");
-        return;
-      }
+    if (!orderId) {
+      setStatus("error");
+      return;
+    }
 
+    let cancelled = false;
+
+    const verifyPayment = async (attempt: number) => {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/verify-payment`, {
           method: 'POST',
@@ -30,33 +35,34 @@ export default function CheckoutSuccessPage() {
             'Content-Type': 'application/json',
           }
         });
-        
+
         const data = await res.json();
         const response = data.data || data;
-        
+
+        if (cancelled) return;
+
         if (response.success && response.status === 'PAID') {
           setStatus("success");
           clearCart();
         } else if (response.status === 'FAILED') {
           setStatus("error");
+        } else if (attempt < MAX_ATTEMPTS) {
+          setTimeout(() => verifyPayment(attempt + 1), RETRY_DELAY_MS);
         } else {
-          // If still PENDING, we could retry or just show loading/error
-          // For now, let's treat it as loading and it will re-run if needed
-          // but we probably shouldn't clear the cart yet.
-          setStatus("loading");
+          setStatus("pending");
         }
       } catch (error) {
         console.error("Payment verification failed:", error);
-        setStatus("error");
+        if (!cancelled) setStatus("error");
       }
     };
 
-    if (orderId && status === 'loading') {
-      verifyPayment();
-    } else if (!orderId) {
-      setStatus("error");
-    }
-  }, [orderId, clearCart, status]);
+    verifyPayment(1);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, clearCart]);
 
   return (
     <main className="min-h-screen bg-[#FDFDFD] flex items-center justify-center p-6">
@@ -117,6 +123,37 @@ export default function CheckoutSuccessPage() {
                 className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40 hover:text-[#1A1A1A] transition-colors"
               >
                 Continue Shopping
+              </Link>
+            </div>
+          </>
+        )}
+
+        {status === "pending" && (
+          <>
+            <div className="flex justify-center">
+              <div className="w-20 h-20 bg-[#F5F0E1] rounded-full flex items-center justify-center">
+                <AlertCircle className="w-10 h-10 text-[#D4AF37]" />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <h1 className="text-4xl font-serif text-[#1A1A1A]">Payment Still Processing</h1>
+              <p className="text-[#1A1A1A]/60 text-sm leading-relaxed">
+                Your payment is taking longer than expected to confirm. This can happen with some
+                payment methods — check your order history shortly, or contact support if it
+                doesn&apos;t update within a few minutes.
+              </p>
+              {orderId && (
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37]">
+                  Order ID: {orderId}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col space-y-4 pt-4">
+              <Link
+                href="/profile"
+                className="block w-full bg-[#1A1A1A] text-white py-5 uppercase tracking-[0.3em] text-[10px] font-bold hover:bg-[#D4AF37] transition-all shadow-xl"
+              >
+                View Order History
               </Link>
             </div>
           </>

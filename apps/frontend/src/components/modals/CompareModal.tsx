@@ -88,9 +88,10 @@ export default function CompareModal({ products, isOpen, onClose, onRemove }: Co
                       <div className="text-center h-12 flex items-center justify-center px-2">
                          <h3 className="text-sm font-serif font-bold text-[#1A1A1A] line-clamp-2">{product.name}</h3>
                       </div>
-                      <button 
+                      <button
                         onClick={() => addToCart(product as any)}
-                        disabled={!(product as any).variants?.length}
+                        disabled={Boolean((product as any).variants?.length)}
+                        title={(product as any).variants?.length ? "Open the product page to select options" : undefined}
                         className="w-full bg-[#1A1A1A] text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all disabled:opacity-50"
                       >
                         Add to Bag

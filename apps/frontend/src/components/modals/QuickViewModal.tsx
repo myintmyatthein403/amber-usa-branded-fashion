@@ -127,18 +127,26 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
       alert("Please select all options");
       return;
     }
-    setIsAdding(true);
-    
-    addToCart(
-      product, 
-      selectedVariant?.size || undefined, 
+
+    const added = addToCart(
+      product,
+      selectedVariant?.size || undefined,
       selectedVariant?.id,
       product.isPreOrder,
       product.preOrderShippingDate || undefined,
       selectedVariant?.color || undefined,
       selectedVariant?.price ? Number(selectedVariant.price) : undefined,
-      selectedVariant?.images?.[0] || undefined
+      selectedVariant?.images?.[0] || undefined,
+      undefined,
+      (selectedVariant as { stock?: number } | null)?.stock,
     );
+
+    if (!added) {
+      alert("Please select all options");
+      return;
+    }
+
+    setIsAdding(true);
     setTimeout(() => {
       setIsAdding(false);
     }, 800);

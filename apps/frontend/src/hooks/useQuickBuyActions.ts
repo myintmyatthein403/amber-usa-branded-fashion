@@ -70,20 +70,28 @@ export function useQuickBuyActions() {
       alert("Please select a size");
       return;
     }
-    setIsAdding(true);
-    
+
     const selectedVariant = product.variants?.find((v) => v.size === selectedSize);
-    
-    addToCart(
-      product as any, 
-      selectedSize || undefined, 
+
+    const added = addToCart(
+      product as any,
+      selectedSize || undefined,
       selectedVariant?.id,
       undefined,
       undefined,
       undefined,
       selectedVariant?.price ? Number(selectedVariant.price) : undefined,
-      selectedVariant?.images?.[0] || undefined
+      selectedVariant?.images?.[0] || undefined,
+      undefined,
+      selectedVariant?.stock,
     );
+
+    if (!added) {
+      alert("Please select options");
+      return;
+    }
+
+    setIsAdding(true);
     setTimeout(() => setIsAdding(false), 1000);
   };
 

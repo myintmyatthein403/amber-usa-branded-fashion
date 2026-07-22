@@ -246,6 +246,7 @@ export default function ProductDetailPage() {
       selectedVariant?.price ? Number(selectedVariant.price) : undefined,
       selectedVariant?.images?.[0] || undefined,
       (product as { currencyCode?: string }).currencyCode,
+      product.isPreOrder ? undefined : warehouseStock,
     );
     if (added) setTimeout(() => setAddingId(null), 1000);
   };

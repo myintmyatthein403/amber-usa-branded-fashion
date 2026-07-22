@@ -21,6 +21,7 @@ export interface CartItem {
   color?: string;
   isPreOrder?: boolean;
   expectedShippingDate?: string;
+  maxStock?: number;
 }
 
 function cartItemMatches(
@@ -48,6 +49,7 @@ interface AppState {
     price?: number,
     image?: string,
     currencyCode?: string,
+    maxStock?: number,
   ) => boolean;
   removeFromCart: (id: string, size?: string, variantId?: string) => void;
   updateQuantity: (
@@ -116,6 +118,7 @@ export const useStore = create<AppState>()(
         price,
         image,
         currencyCode,
+        maxStock,
       ) => {
         const hasVariants = Boolean(product.variants && product.variants.length > 0);
         if (hasVariants && !variantId) {
@@ -137,7 +140,19 @@ export const useStore = create<AppState>()(
         if (existingItem) {
           newItems = cartItems.map((item) =>
             cartItemMatches(item, productId, variantId, size, color)
-              ? { ...item, quantity: item.quantity + 1, isPreOrder, expectedShippingDate }
+              ? {
+                  ...item,
+                  quantity: Math.min(
+                    maxStock ?? item.maxStock ?? Infinity,
+                    item.quantity + 1,
+                  ),
+                  isPreOrder,
+                  expectedShippingDate,
+                  maxStock: maxStock ?? item.maxStock,
+                  ...(price !== undefined && { price }),
+                  currencyCode: resolvedCurrency,
+                  ...(image && { image }),
+                }
               : item,
           );
         } else {
@@ -150,6 +165,7 @@ export const useStore = create<AppState>()(
             variantId,
             isPreOrder,
             expectedShippingDate,
+            maxStock,
             color: color || (product as { color?: string }).color,
             price: price !== undefined ? price : Number(product.price),
             image: image || product.images[0],
@@ -184,7 +200,13 @@ export const useStore = create<AppState>()(
               ? item.variantId === variantId
               : item.id === id && item.size === size;
             if (matches) {
-              return { ...item, quantity: Math.max(1, item.quantity + delta) };
+              return {
+                ...item,
+                quantity: Math.min(
+                  item.maxStock ?? Infinity,
+                  Math.max(1, item.quantity + delta),
+                ),
+              };
             }
             return item;
           }),

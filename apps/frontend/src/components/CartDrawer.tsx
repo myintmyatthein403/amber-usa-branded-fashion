@@ -160,33 +160,16 @@ export default function CartDrawer() {
             {cartItems.length > 0 && (
               <div className="p-8 bg-[#FDFDFD] border-t border-[#1A1A1A]/5 space-y-6">
                 
-                {/* Discount & Referral */}
-                <div className="space-y-3">
-                  <div className="flex space-x-2">
-                    <input 
-                      type="text" 
-                      placeholder="Discount Code" 
-                      className="flex-1 p-3 bg-[#F5F0E1]/30 border border-[#1A1A1A]/5 text-[10px] uppercase tracking-widest font-bold outline-none focus:border-[#D4AF37]"
-                    />
-                    <button className="px-4 py-3 bg-[#1A1A1A] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all">Apply</button>
-                  </div>
-                  <input 
-                    type="text" 
-                    placeholder="Referral Code (Optional)" 
-                    className="w-full p-3 bg-[#F5F0E1]/30 border border-[#1A1A1A]/5 text-[10px] uppercase tracking-widest font-bold outline-none focus:border-[#D4AF37]"
-                  />
-                </div>
-
                 {/* Quick Delivery Estimate */}
-                <div className="space-y-3 pt-4 border-t border-[#1A1A1A]/5">
+                <div className="space-y-3">
                   <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#1A1A1A]/60">Delivery Option</h4>
-                  <div className="flex gap-2">
-                    <button className="flex-1 p-3 border border-[#D4AF37] bg-[#F5F0E1]/30 text-[9px] font-bold uppercase tracking-widest">Standard ({formatPrice(3000, false)})</button>
-                    <button className="flex-1 p-3 border border-[#1A1A1A]/5 text-[9px] font-bold uppercase tracking-widest text-[#1A1A1A]/40 hover:border-[#D4AF37] transition-all">Express ({formatPrice(6500, false)})</button>
+                  <div className="p-3 border border-[#D4AF37] bg-[#F5F0E1]/30 text-[9px] font-bold uppercase tracking-widest text-center">
+                    Standard ({formatPrice(3000, false)})
                   </div>
+                  <p className="text-[9px] text-[#1A1A1A]/40">Delivery method can be finalized at checkout.</p>
                 </div>
 
-                <div className="space-y-2 pt-4">
+                <div className="space-y-2 pt-4 border-t border-[#1A1A1A]/5">
                   <div className="flex justify-between text-sm">
                     <span className="text-[#1A1A1A]/40 font-medium">Subtotal</span>
                     <span className="font-bold">{formattedSubtotal}</span>
