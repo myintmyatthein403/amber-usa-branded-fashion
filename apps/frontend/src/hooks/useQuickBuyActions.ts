@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import { Product } from "@amber/shared";
+import { getProductStock } from "@/lib/product";
+import { toast } from "@/store/useToastStore";
 
 interface FormattedProduct {
   id: string;
@@ -15,6 +17,9 @@ interface FormattedProduct {
   onSale?: boolean;
   shortDescription?: string | null;
   variants?: any[];
+  stock?: number;
+  isPreOrder?: boolean;
+  depositAmount?: number | string | null;
 }
 
 export function useQuickBuyActions() {
@@ -41,7 +46,10 @@ export function useQuickBuyActions() {
             isUsdPrice: p.isUsdPrice !== false,
             image: p.images?.[0] || "https://images.unsplash.com/photo-1556905055-8f358a7a4bb4?auto=format&fit=crop&q=80&w=800",
             sizes: Array.from(new Set(p.variants?.map((v) => v.size) || [])),
-            variants: p.variants
+            variants: p.variants,
+            stock: p.stock,
+            isPreOrder: p.isPreOrder,
+            depositAmount: p.depositAmount
           });
         }
       } catch (error) {
@@ -67,7 +75,7 @@ export function useQuickBuyActions() {
   const handleQuickAdd = () => {
     if (!product) return;
     if (!selectedSize && product.sizes?.length > 0) {
-      alert("Please select a size");
+      toast.error("Please select a size");
       return;
     }
 
@@ -77,17 +85,18 @@ export function useQuickBuyActions() {
       product as any,
       selectedSize || undefined,
       selectedVariant?.id,
-      undefined,
+      product.isPreOrder,
       undefined,
       undefined,
       selectedVariant?.price ? Number(selectedVariant.price) : undefined,
       selectedVariant?.images?.[0] || undefined,
       undefined,
-      selectedVariant?.stock,
+      getProductStock(product, selectedVariant),
+      product.depositAmount != null ? Number(product.depositAmount) : undefined,
     );
 
     if (!added) {
-      alert("Please select options");
+      toast.error("Please select options");
       return;
     }
 

@@ -44,6 +44,7 @@ export const OrdersPage: React.FC = () => {
     handleRefund,
     handleConfirmManualPayment,
     handleRejectManualPayment,
+    handleSettleBalance,
     handleDelete
   } = useOrders();
 
@@ -147,6 +148,7 @@ export const OrdersPage: React.FC = () => {
             onRefund={handleRefund}
             onConfirmManualPayment={handleConfirmManualPayment}
             onRejectManualPayment={handleRejectManualPayment}
+            onSettleBalance={handleSettleBalance}
           />
         )}
       </Modal>

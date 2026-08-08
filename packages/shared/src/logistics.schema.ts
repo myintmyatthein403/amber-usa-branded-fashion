@@ -11,13 +11,69 @@ export const WarehouseSchema = z.object({
 
 export type Warehouse = z.infer<typeof WarehouseSchema>;
 
+export const UpdateWarehouseSchema = WarehouseSchema.partial();
+
+export type UpdateWarehouseInput = z.infer<typeof UpdateWarehouseSchema>;
+
 export const InventorySchema = z.object({
-  variantId: z.string().uuid(),
+  variantId: z.string().uuid().optional(),
+  productId: z.string().uuid().optional(),
   warehouseId: z.string().uuid(),
   quantity: z.number().min(0, 'Quantity cannot be negative'),
+}).refine((d) => !!d.variantId !== !!d.productId, {
+  message: 'Exactly one of variantId or productId is required',
 });
 
 export type Inventory = z.infer<typeof InventorySchema>;
+
+export const UpdateStockSchema = z.object({
+  variantId: z.string().uuid().optional(),
+  productId: z.string().uuid().optional(),
+  warehouseId: z.string().uuid(),
+  quantity: z.number().min(0, 'Quantity cannot be negative'),
+  reason: z.enum(['ADJUSTMENT', 'RECEIVING']).optional(),
+  note: z.string().optional(),
+}).refine((d) => !!d.variantId !== !!d.productId, {
+  message: 'Exactly one of variantId or productId is required',
+});
+
+export type UpdateStockInput = z.infer<typeof UpdateStockSchema>;
+
+export const TransferStockSchema = z.object({
+  variantId: z.string().uuid().optional(),
+  productId: z.string().uuid().optional(),
+  fromWarehouseId: z.string().uuid(),
+  toWarehouseId: z.string().uuid(),
+  quantity: z.number().positive('Quantity must be greater than zero'),
+  note: z.string().optional(),
+}).refine((d) => !!d.variantId !== !!d.productId, {
+  message: 'Exactly one of variantId or productId is required',
+}).refine((d) => d.fromWarehouseId !== d.toWarehouseId, {
+  message: 'Origin and destination warehouse must differ',
+  path: ['toWarehouseId'],
+});
+
+export type TransferStockInput = z.infer<typeof TransferStockSchema>;
+
+export const BulkTransferStockSchema = z.object({
+  fromWarehouseId: z.string().uuid(),
+  toWarehouseId: z.string().uuid(),
+  items: z.array(
+    z.object({
+      variantId: z.string().uuid().optional(),
+      productId: z.string().uuid().optional(),
+      quantity: z.number().positive('Quantity must be greater than zero'),
+    }).refine((d) => !!d.variantId !== !!d.productId, {
+      message: 'Exactly one of variantId or productId is required',
+    }),
+  ).min(1, 'At least one item is required'),
+  note: z.string().optional(),
+}).refine((d) => d.fromWarehouseId !== d.toWarehouseId, {
+  message: 'Origin and destination warehouse must differ',
+  path: ['toWarehouseId'],
+});
+
+export type BulkTransferStockInput = z.infer<typeof BulkTransferStockSchema>;
 
 export const CargoStatusSchema = z.enum([
   'PREPARING',

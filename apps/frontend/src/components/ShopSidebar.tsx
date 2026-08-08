@@ -56,6 +56,7 @@ function CategoryTreeItems({
   expandedIds,
   onToggleExpand,
   onSelect,
+  categoryCounts,
 }: {
   nodes: CategoryTreeNode[];
   depth: number;
@@ -63,6 +64,7 @@ function CategoryTreeItems({
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
   onSelect: (id: string | null) => void;
+  categoryCounts: Map<string, number>;
 }) {
   return (
     <>
@@ -71,6 +73,7 @@ function CategoryTreeItems({
         const isExpanded = expandedIds.has(node.id);
         const isSelected = selectedCategoryId === node.id;
         const paddingLeft = depth * 12;
+        const count = categoryCounts.get(node.name);
 
         return (
           <div key={node.id} className="space-y-1">
@@ -79,11 +82,16 @@ function CategoryTreeItems({
                 type="button"
                 onClick={() => onSelect(node.id)}
                 className={cn(
-                  "flex-1 text-left text-sm font-medium transition-all hover:text-[#D4AF37] py-1",
+                  "flex-1 text-left text-sm font-medium transition-all hover:text-[#D4AF37] py-1 flex items-center justify-between",
                   isSelected ? "text-[#D4AF37] translate-x-2" : "text-[#1A1A1A]/60",
                 )}
               >
-                {node.name}
+                <span>{node.name}</span>
+                {count !== undefined && (
+                  <span className="text-[10px] font-bold text-[#1A1A1A]/30 tabular-nums">
+                    {count}
+                  </span>
+                )}
               </button>
               {hasChildren && (
                 <button
@@ -106,6 +114,7 @@ function CategoryTreeItems({
                 expandedIds={expandedIds}
                 onToggleExpand={onToggleExpand}
                 onSelect={onSelect}
+                categoryCounts={categoryCounts}
               />
             )}
           </div>
@@ -146,29 +155,50 @@ export default function ShopSidebar({
 
   const maxPrice = currency === "USD" ? 3000 : 3000 * exchangeRate;
 
+  const brandCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      if (!p.brand) continue;
+      counts.set(p.brand, (counts.get(p.brand) ?? 0) + 1);
+    }
+    return counts;
+  }, [products]);
+
   const brands = useMemo(() => {
-    const uniqueBrands = new Set(
-      products.map((p) => p.brand).filter((b): b is string => Boolean(b)),
-    );
-    return ["All", ...Array.from(uniqueBrands).sort()];
+    return ["All", ...Array.from(brandCounts.keys()).sort()];
+  }, [brandCounts]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      if (!p.category) continue;
+      counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+    }
+    return counts;
   }, [products]);
 
   const fallbackCategories = useMemo(() => {
-    const uniqueCategories = new Set(
-      products.map((p) => p.category).filter((c): c is string => Boolean(c)),
-    );
-    return Array.from(uniqueCategories).sort();
-  }, [products]);
+    return Array.from(categoryCounts.keys()).sort();
+  }, [categoryCounts]);
 
   const collections = useMemo(() => {
     const uniqueCollections = new Set(products.flatMap((p) => p.collections || []));
     return ["All", ...Array.from(uniqueCollections).sort()];
   }, [products]);
 
-  const sizes = useMemo(() => {
-    const allSizes = products.flatMap((p) => p.sizes || []);
-    return ["All", ...Array.from(new Set(allSizes)).sort()];
+  const sizeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      for (const size of p.sizes || []) {
+        counts.set(size, (counts.get(size) ?? 0) + 1);
+      }
+    }
+    return counts;
   }, [products]);
+
+  const sizes = useMemo(() => {
+    return ["All", ...Array.from(sizeCounts.keys()).sort()];
+  }, [sizeCounts]);
 
   const handleToggleExpand = useCallback((id: string) => {
     setExpandedCategoryIds((prev) => {
@@ -324,11 +354,16 @@ export default function ShopSidebar({
               key={brand}
               onClick={() => setSelectedBrand(brand)}
               className={cn(
-                "text-left text-sm font-medium transition-all hover:text-[#D4AF37]",
+                "text-left text-sm font-medium transition-all hover:text-[#D4AF37] flex items-center justify-between",
                 selectedBrand === brand ? "text-[#D4AF37] translate-x-2" : "text-[#1A1A1A]/60",
               )}
             >
-              {brand}
+              <span>{brand}</span>
+              {brand !== "All" && (
+                <span className="text-[10px] font-bold text-[#1A1A1A]/30 tabular-nums">
+                  {brandCounts.get(brand) ?? 0}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -355,15 +390,19 @@ export default function ShopSidebar({
               expandedIds={expandedCategoryIds}
               onToggleExpand={handleToggleExpand}
               onSelect={setSelectedCategoryId}
+              categoryCounts={categoryCounts}
             />
           ) : (
             fallbackCategories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategoryId(cat)}
-                className="text-left text-sm font-medium transition-all hover:text-[#D4AF37] text-[#1A1A1A]/60"
+                className="text-left text-sm font-medium transition-all hover:text-[#D4AF37] text-[#1A1A1A]/60 flex items-center justify-between"
               >
-                {cat}
+                <span>{cat}</span>
+                <span className="text-[10px] font-bold text-[#1A1A1A]/30 tabular-nums">
+                  {categoryCounts.get(cat) ?? 0}
+                </span>
               </button>
             ))
           )}

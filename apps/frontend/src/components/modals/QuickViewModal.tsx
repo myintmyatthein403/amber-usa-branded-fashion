@@ -10,6 +10,7 @@ import { useStore } from "@/store/useStore";
 import Price from "../Price";
 import { Product } from "@amber/shared";
 import { getApiUrl } from "@/lib/api";
+import { getProductStock, isProductPurchasable, resolveAttributeValues } from "@/lib/product";
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -35,12 +36,20 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [userSelectedImage, setUserSelectedImage] = useState<string | null>(null);
   const [filterableAttributes, setFilterableAttributes] = useState<FilterableAttribute[]>([]);
+  const [validationError, setValidationError] = useState<string | null>(null);
   
   const addToCart = useStore((state) => state.addToCart);
   const addToCompare = useStore((state) => state.addToCompare);
   const currency = useStore((state) => state.currency);
   const exchangeRate = useStore((state) => state.exchangeRate);
   const [isAdding, setIsAdding] = useState(false);
+  const [lastProductId, setLastProductId] = useState<string | undefined>(product?.id);
+
+  if (product?.id !== lastProductId) {
+    setLastProductId(product?.id);
+    setSelectedAttributes({});
+    setValidationError(null);
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -124,7 +133,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
 
   const handleAddToCart = () => {
     if (productAttributes.length > 0 && !selectedVariant) {
-      alert("Please select all options");
+      setValidationError("Please select all options");
       return;
     }
 
@@ -138,14 +147,17 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
       selectedVariant?.price ? Number(selectedVariant.price) : undefined,
       selectedVariant?.images?.[0] || undefined,
       undefined,
-      (selectedVariant as { stock?: number } | null)?.stock,
+      getProductStock(product, selectedVariant),
+      product.depositAmount != null ? Number(product.depositAmount) : undefined,
+      resolveAttributeValues(productAttributes, selectedVariant?.attributeSelections),
     );
 
     if (!added) {
-      alert("Please select all options");
+      setValidationError("Please select all options");
       return;
     }
 
+    setValidationError(null);
     setIsAdding(true);
     setTimeout(() => {
       setIsAdding(false);
@@ -181,14 +193,18 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
 
               <div className="w-full md:w-1/2 flex flex-col bg-[#FAF8F5] overflow-hidden group">
                 <div className="relative flex-1 min-h-[400px]">
-                  <Image
-                    src={activeImage || product.images?.[0] || ""}
-                    alt={product.name}
-                    fill
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    priority
-                  />
-                  
+                  {(activeImage || product.images?.[0]) ? (
+                    <Image
+                      src={activeImage || product.images?.[0] || ""}
+                      alt={product.name}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      priority
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-100" />
+                  )}
+
                   <div className="absolute top-8 left-8 bg-[#0F0F0F] text-[#C9A962] px-5 py-2.5 text-[10px] font-bold tracking-[0.2em] shadow-xl">
                     100% AUTHENTIC
                   </div>
@@ -275,7 +291,10 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                             return (
                               <button
                                 key={val.id}
-                                onClick={() => setSelectedAttributes(prev => ({ ...prev, [attr.id]: val.id }))}
+                                onClick={() => {
+                                  setSelectedAttributes(prev => ({ ...prev, [attr.id]: val.id }));
+                                  setValidationError(null);
+                                }}
                                 className={cn(
                                   "px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all border flex items-center gap-2",
                                   isSelected
@@ -299,9 +318,14 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                   </div>
 
                   <div className="space-y-4 pt-4">
+                    {validationError && (
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-red-500">
+                        {validationError}
+                      </p>
+                    )}
                     <button
                       onClick={handleAddToCart}
-                      disabled={(!product.isPreOrder && !product.variants?.some(v => v.stock > 0)) || isAdding}
+                      disabled={!isProductPurchasable(product, selectedVariant) || isAdding}
                       className={cn(
                         "group relative w-full h-16 uppercase tracking-[0.25em] text-[13px] font-bold transition-all duration-500 overflow-hidden rounded-none",
                         isAdding ? "bg-[#C9A962] text-white" : "bg-[#0F0F0F] text-white hover:bg-[#C9A962]"

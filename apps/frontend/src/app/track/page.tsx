@@ -44,6 +44,8 @@ function TrackingContent() {
 
     if (order.paymentStatus === 'PAID') {
       timeline.push({ status: "Payment Verified", date: formatTimelineDate(order.updatedAt), completed: true });
+    } else if (order.paymentStatus === 'PARTIALLY_PAID') {
+      timeline.push({ status: "Deposit Received — Balance Due", date: formatTimelineDate(order.updatedAt), completed: true });
     } else {
       timeline.push({ status: "Awaiting Payment", date: "Pending verification", completed: false });
     }

@@ -14,6 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
 import { Product } from "@amber/shared";
+import { getApiUrl } from "@/lib/api";
+import { productApiPath } from "@/lib/product";
 
 interface GiftCardOptionParsed {
   id: string;
@@ -46,6 +48,33 @@ export default function GiftCardsPage() {
   const [selectedAmount, setSelectedAmount] = useState<GiftCardOptionParsed | null>(null);
   const addToCart = useStore((state) => state.addToCart);
   const [isAdding, setIsAdding] = useState(false);
+  const [giftCardProducts, setGiftCardProducts] = useState<Record<number, Product>>({});
+
+  useEffect(() => {
+    const fetchGiftCardProducts = async () => {
+      const denominations = [50000, 100000, 200000, 500000];
+      const results = await Promise.all(
+        denominations.map(async (value) => {
+          try {
+            const slug = `gift-card-${value}-mmk`;
+            const res = await fetch(`${getApiUrl()}${productApiPath(slug)}`);
+            if (!res.ok) return null;
+            const result = await res.json();
+            const product = (result?.data ?? result) as Product;
+            return { value, product };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const map: Record<number, Product> = {};
+      results.forEach((entry) => {
+        if (entry) map[entry.value] = entry.product;
+      });
+      setGiftCardProducts(map);
+    };
+    fetchGiftCardProducts();
+  }, []);
 
   useEffect(() => {
     // Set initial selected amount if not set
@@ -78,21 +107,18 @@ export default function GiftCardsPage() {
       });
   }, []);
 
+  const selectedGiftCardProduct = selectedAmount
+    ? giftCardProducts[selectedAmount.value]
+    : undefined;
+
   const handleAddGiftCard = () => {
-    if (!selectedAmount) return;
+    if (!selectedAmount || !selectedGiftCardProduct) return;
     setIsAdding(true);
-    const giftCardProduct = {
-      id: selectedAmount.id,
-      name: `Amber Premium Gift Card - ${selectedAmount.label}`,
-      price: selectedAmount.value,
-      image:
-        "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=800&auto=format&fit=crop",
-      category: "Gift Card",
-      inStock: true,
-      sizes: ["Digital"],
-      isUsdPrice: false,
-    };
-    addToCart(giftCardProduct as unknown as Product);
+    const added = addToCart(selectedGiftCardProduct);
+    if (!added) {
+      setIsAdding(false);
+      return;
+    }
     setTimeout(() => setIsAdding(false), 1000);
   };
 
@@ -214,7 +240,7 @@ export default function GiftCardsPage() {
             >
               <button
                 onClick={handleAddGiftCard}
-                disabled={isAdding}
+                disabled={isAdding || !selectedGiftCardProduct}
                 className={cn(
                   "w-full py-7 uppercase tracking-[0.5em] text-[11px] font-bold transition-all duration-500 flex items-center justify-center space-x-4 shadow-2xl active:scale-[0.98]",
                   isAdding

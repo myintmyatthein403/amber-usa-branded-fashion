@@ -1,9 +1,9 @@
 import React from 'react';
 import { Package, Minus, Plus, Loader2 } from 'lucide-react';
-import { Warehouse } from '../schema';
+import { GroupedInventory, Warehouse } from '../schema';
 
 interface InventoryAdjustmentFormProps {
-  selectedVariant: any;
+  selectedItem: GroupedInventory | null;
   selectedWarehouseId: string;
   adjustmentQty: number;
   warehouses: Warehouse[];
@@ -15,7 +15,7 @@ interface InventoryAdjustmentFormProps {
 }
 
 export const InventoryAdjustmentForm: React.FC<InventoryAdjustmentFormProps> = ({
-  selectedVariant,
+  selectedItem,
   selectedWarehouseId,
   adjustmentQty,
   warehouses,
@@ -25,22 +25,26 @@ export const InventoryAdjustmentForm: React.FC<InventoryAdjustmentFormProps> = (
   onSubmit,
   onCancel
 }) => {
-  if (!selectedVariant) return null;
+  if (!selectedItem) return null;
 
   return (
     <form onSubmit={onSubmit} className="space-y-8 py-4 animate-in fade-in slide-in-from-bottom-4">
        <div className="flex items-center gap-6 p-6 bg-muted/30 border border-border">
           <div className="w-20 h-20 bg-background border border-border flex items-center justify-center overflow-hidden">
-             {selectedVariant.product.images?.[0] ? (
-               <img src={selectedVariant.product.images[0]} alt="" className="w-full h-full object-cover" />
+             {selectedItem.images?.[0] ? (
+               <img src={selectedItem.images[0]} alt="" className="w-full h-full object-cover" />
              ) : (
                <Package size={24} className="text-muted-foreground/30" />
              )}
           </div>
           <div>
              <div className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Target Specification</div>
-             <div className="text-lg font-serif font-bold text-foreground leading-tight">{selectedVariant.product.name}</div>
-             <div className="text-[9px] font-mono text-muted-foreground uppercase mt-1">{selectedVariant.sku} • {selectedVariant.size} • {selectedVariant.color}</div>
+             <div className="text-lg font-serif font-bold text-foreground leading-tight">{selectedItem.displayName}</div>
+             {selectedItem.kind === 'variant' ? (
+               <div className="text-[9px] font-mono text-muted-foreground uppercase mt-1">{selectedItem.sku} • {selectedItem.size} • {selectedItem.color}</div>
+             ) : (
+               <span className="inline-block mt-1 px-2 py-0.5 bg-secondary text-[8px] font-bold uppercase tracking-widest border border-border">No Variants</span>
+             )}
           </div>
        </div>
 

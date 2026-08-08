@@ -63,6 +63,14 @@ export class CategoriesRepository {
     return this.prisma.category.delete({ where: { id } });
   }
 
+  async countSubcategories(id: string): Promise<number> {
+    return this.prisma.category.count({ where: { parentId: id } });
+  }
+
+  async countProducts(id: string): Promise<number> {
+    return this.prisma.product.count({ where: { categoryId: id } });
+  }
+
   async findBySlug(slug: string): Promise<Category | null> {
     return this.prisma.category.findUnique({
       where: { slug },

@@ -18,6 +18,15 @@ import { CargoStatus } from '@prisma/client';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
   WarehouseSchema,
+  type Warehouse,
+  UpdateWarehouseSchema,
+  type UpdateWarehouseInput,
+  UpdateStockSchema,
+  type UpdateStockInput,
+  TransferStockSchema,
+  type TransferStockInput,
+  BulkTransferStockSchema,
+  type BulkTransferStockInput,
   CreateCargoShipmentSchema,
   CargoStatusSchema,
   type CreateCargoShipmentInput,
@@ -46,14 +55,17 @@ export class LogisticsController {
 
   @Post('warehouses')
   @ApiOperation({ summary: 'Create a new warehouse' })
-  createWarehouse(@Body(new ZodValidationPipe(WarehouseSchema)) data: any) {
+  createWarehouse(@Body(new ZodValidationPipe(WarehouseSchema)) data: Warehouse) {
     return this.logisticsService.createWarehouse(data);
   }
 
   @Patch('warehouses/:id')
   @ApiOperation({ summary: 'Update a warehouse' })
   @ApiParam({ name: 'id', description: 'Warehouse ID' })
-  updateWarehouse(@Param('id') id: string, @Body() data: any) {
+  updateWarehouse(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateWarehouseSchema)) data: UpdateWarehouseInput,
+  ) {
     return this.logisticsService.updateWarehouse(id, data);
   }
 
@@ -67,7 +79,14 @@ export class LogisticsController {
   @ApiOperation({ summary: 'Get inventory for a specific variant' })
   @ApiParam({ name: 'variantId', description: 'Variant ID' })
   getInventoryByVariant(@Param('variantId') variantId: string) {
-    return this.logisticsService.getInventoryByVariant(variantId);
+    return this.logisticsService.getInventoryForItem({ variantId });
+  }
+
+  @Get('inventory/product/:productId')
+  @ApiOperation({ summary: 'Get inventory for a specific simple product' })
+  @ApiParam({ name: 'productId', description: 'Product ID' })
+  getInventoryByProduct(@Param('productId') productId: string) {
+    return this.logisticsService.getInventoryForItem({ productId });
   }
 
   @Get('inventory/warehouse/:warehouseId')
@@ -92,17 +111,10 @@ export class LogisticsController {
   @Patch('inventory/update')
   @ApiOperation({ summary: 'Update stock level' })
   updateStock(
-    @Body()
-    data: {
-      variantId: string;
-      warehouseId: string;
-      quantity: number;
-      reason?: 'ADJUSTMENT' | 'RECEIVING';
-      note?: string;
-    },
+    @Body(new ZodValidationPipe(UpdateStockSchema)) data: UpdateStockInput,
   ) {
     return this.logisticsService.updateStock(
-      data.variantId,
+      { variantId: data.variantId, productId: data.productId },
       data.warehouseId,
       data.quantity,
       data.reason,
@@ -113,14 +125,7 @@ export class LogisticsController {
   @Post('inventory/transfer')
   @ApiOperation({ summary: 'Transfer stock between warehouses' })
   transferStock(
-    @Body()
-    data: {
-      variantId: string;
-      fromWarehouseId: string;
-      toWarehouseId: string;
-      quantity: number;
-      note?: string;
-    },
+    @Body(new ZodValidationPipe(TransferStockSchema)) data: TransferStockInput,
   ) {
     return this.logisticsService.transferStock(data);
   }
@@ -128,21 +133,15 @@ export class LogisticsController {
   @Post('inventory/bulk-transfer')
   @ApiOperation({ summary: 'Bulk transfer stock between warehouses' })
   bulkTransfer(
-    @Body()
-    data: {
-      fromWarehouseId: string;
-      toWarehouseId: string;
-      items: { variantId: string; quantity: number }[];
-      note?: string;
-    },
+    @Body(new ZodValidationPipe(BulkTransferStockSchema)) data: BulkTransferStockInput,
   ) {
     return this.logisticsService.bulkTransferStock(data);
   }
 
   @Get('inventory/low-stock')
-  @ApiOperation({ summary: 'Get variants at or below low stock threshold' })
+  @ApiOperation({ summary: 'Get variants/products at or below low stock threshold' })
   getLowStock() {
-    return this.logisticsService.getLowStockVariants();
+    return this.logisticsService.getLowStockItems();
   }
 
   @Get('cargo')
@@ -172,7 +171,7 @@ export class LogisticsController {
   @ApiParam({ name: 'id', description: 'Cargo Shipment ID' })
   updateCargoStatus(
     @Param('id') id: string,
-    @Body('status') status: CargoStatus,
+    @Body('status', new ZodValidationPipe(CargoStatusSchema)) status: CargoStatus,
   ) {
     return this.logisticsService.updateCargoStatus(id, status);
   }

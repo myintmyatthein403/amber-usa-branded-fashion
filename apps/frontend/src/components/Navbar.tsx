@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ShoppingBag, Menu, X, Search, User } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ShoppingBag, Menu, X, Search, User, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
@@ -10,12 +10,22 @@ import Link from "next/link";
 import SearchOverlay from "./SearchOverlay";
 import CurrencySwitcher from "./CurrencySwitcher";
 
+interface NavCategory {
+  id: string;
+  name: string;
+  isActive?: boolean;
+  parentId?: string | null;
+}
+
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [ads, setAds] = useState<any[]>([]);
   const [avatarError, setAvatarError] = useState(false);
+  const [categories, setCategories] = useState<NavCategory[]>([]);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
 
   const isSearchOpen = useStore((state) => state.isSearchOpen);
   const setSearchOpen = useStore((state) => state.setSearchOpen);
@@ -70,8 +80,31 @@ export default function Navbar() {
     };
     fetchAds();
 
+    // Fetch top-level categories for the nav dropdown
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories?limit=100`);
+        const result = await response.json();
+        const data: NavCategory[] = result?.data ?? result ?? [];
+        setCategories(data.filter((c) => c.isActive !== false && !c.parentId));
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+      }
+    };
+    fetchCategories();
+
     return () => window.removeEventListener("scroll", handleScroll);
   }, [setExchangeRate]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target as Node)) {
+        setIsCategoryMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const announcementMessages = ads.length > 0 
     ? ads.map(ad => ad.title)
@@ -110,8 +143,39 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-8 text-[10px] uppercase tracking-widest font-bold">
             <Link href="/shop" className="hover:text-[#D4AF37] transition-colors">Shop All</Link>
             <Link href="/gift-cards" className="hover:text-[#D4AF37] transition-colors">Gift Cards</Link>
-            <Link href="#" className="hover:text-[#D4AF37] transition-colors">USA Brands</Link>
-            <Link href="#" className="hover:text-[#D4AF37] transition-colors">Authenticity</Link>
+            {categories.length > 0 && (
+              <div className="relative" ref={categoryMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryMenuOpen((v) => !v)}
+                  className="flex items-center gap-1 hover:text-[#D4AF37] transition-colors"
+                >
+                  <span>Categories</span>
+                  <ChevronDown className={cn("w-3 h-3 transition-transform", isCategoryMenuOpen && "rotate-180")} />
+                </button>
+                <AnimatePresence>
+                  {isCategoryMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute left-0 mt-4 w-56 bg-white border border-[#1A1A1A]/5 shadow-xl z-[90] py-2 normal-case"
+                    >
+                      {categories.map((cat) => (
+                        <Link
+                          key={cat.id}
+                          href={`/shop?category=${cat.id}`}
+                          onClick={() => setIsCategoryMenuOpen(false)}
+                          className="block px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/60 hover:text-[#1A1A1A] hover:bg-zinc-50 transition-colors"
+                        >
+                          {cat.name}
+                        </Link>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
 
           {/* Center: Logo */}
@@ -203,12 +267,20 @@ export default function Navbar() {
             exit={{ opacity: 0, y: -20 }}
             className="fixed inset-0 z-40 bg-background flex flex-col items-center justify-center p-8 md:hidden"
           >
-            <div className="flex flex-col space-y-8 text-center text-3xl font-serif">
+            <div className="flex flex-col space-y-8 text-center text-3xl font-serif overflow-y-auto max-h-[70vh] px-4">
               <Link href="/shop" className="hover:text-[#D4AF37] transition-colors" onClick={() => setIsMenuOpen(false)}>Shop</Link>
               <Link href="/gift-cards" className="hover:text-[#D4AF37] transition-colors" onClick={() => setIsMenuOpen(false)}>Gift Cards</Link>
               <Link href="/profile" className="hover:text-[#D4AF37] transition-colors" onClick={() => setIsMenuOpen(false)}>My Profile</Link>
-              <Link href="#" className="hover:text-[#D4AF37] transition-colors" onClick={() => setIsMenuOpen(false)}>USA Brands</Link>
-              <Link href="#" className="hover:text-[#D4AF37] transition-colors" onClick={() => setIsMenuOpen(false)}>Best Sellers</Link>
+              {categories.map((cat) => (
+                <Link
+                  key={cat.id}
+                  href={`/shop?category=${cat.id}`}
+                  className="text-lg text-[#1A1A1A]/60 hover:text-[#D4AF37] transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  {cat.name}
+                </Link>
+              ))}
             </div>
             
             <div className="mt-12">

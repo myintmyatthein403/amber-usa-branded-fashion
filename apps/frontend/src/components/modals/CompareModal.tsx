@@ -5,6 +5,7 @@ import Image from "next/image";
 import { X, Check, Minus, Scale } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import Price from "@/components/Price";
+import { getProductStock, isProductPurchasable } from "@/lib/product";
 
 interface Product {
   id: string;
@@ -14,9 +15,13 @@ interface Product {
   category: string;
   color: string;
   sizes: string[];
-  inStock: boolean;
   image: string;
   description?: string;
+  stock?: number;
+  variants?: { stock?: number }[] | null;
+  isPreOrder?: boolean;
+  visibility?: string;
+  depositAmount?: number | string | null;
 }
 
 interface CompareModalProps {
@@ -89,9 +94,23 @@ export default function CompareModal({ products, isOpen, onClose, onRemove }: Co
                          <h3 className="text-sm font-serif font-bold text-[#1A1A1A] line-clamp-2">{product.name}</h3>
                       </div>
                       <button
-                        onClick={() => addToCart(product as any)}
-                        disabled={Boolean((product as any).variants?.length)}
-                        title={(product as any).variants?.length ? "Open the product page to select options" : undefined}
+                        onClick={() =>
+                          addToCart(
+                            product as any,
+                            undefined,
+                            undefined,
+                            product.isPreOrder,
+                            undefined,
+                            undefined,
+                            undefined,
+                            undefined,
+                            undefined,
+                            getProductStock(product),
+                            product.depositAmount != null ? Number(product.depositAmount) : undefined,
+                          )
+                        }
+                        disabled={Boolean(product.variants?.length) || !isProductPurchasable(product)}
+                        title={product.variants?.length ? "Open the product page to select options" : undefined}
                         className="w-full bg-[#1A1A1A] text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all disabled:opacity-50"
                       >
                         Add to Bag
@@ -135,7 +154,7 @@ export default function CompareModal({ products, isOpen, onClose, onRemove }: Co
                   <div className="h-20 flex items-center text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40 border-b border-[#1A1A1A]/5">Availability</div>
                   {products.map((product) => (
                     <div key={`stock-${product.id}`} className="h-20 flex items-center justify-center border-b border-[#1A1A1A]/5">
-                      {product.inStock ? (
+                      {isProductPurchasable(product) ? (
                         <div className="flex items-center space-x-2 text-green-600">
                           <Check className="w-4 h-4" />
                           <span className="text-[10px] font-bold uppercase tracking-widest">In Stock</span>

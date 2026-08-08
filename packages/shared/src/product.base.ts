@@ -1,5 +1,32 @@
 import { z } from 'zod';
 
+// Shared cross-field pre-order validation, previously duplicated across
+// VariantSchema, ProductSchema (product.schema.ts), and PreOrderValidation
+// (product.input.ts) — each with its own copy of the same two predicates and
+// error messages. Deliberately exported as plain functions/constants applied
+// via `.refine(fn, message)` at each call site (rather than a generic
+// "wrap the whole schema" helper) — a generic function returning ZodEffects
+// doesn't survive packages/shared's .d.ts emission losslessly, which
+// silently erased unrelated fields (e.g. warehouseAllocations) from the
+// inferred type in downstream packages when tried.
+type PreOrderShape = { isPreOrder?: boolean; preOrderShippingDate?: string | null };
+
+export function isPreOrderShippingDateValid(data: PreOrderShape): boolean {
+  return !(data.isPreOrder && !data.preOrderShippingDate);
+}
+export const PRE_ORDER_SHIPPING_DATE_REQUIRED_ISSUE: { message: string; path: string[] } = {
+  message: 'preOrderShippingDate is required when isPreOrder is true',
+  path: ['preOrderShippingDate'],
+};
+
+export function isPreOrderShippingDateAbsent(data: PreOrderShape): boolean {
+  return !(!data.isPreOrder && data.preOrderShippingDate);
+}
+export const PRE_ORDER_SHIPPING_DATE_FORBIDDEN_ISSUE: { message: string; path: string[] } = {
+  message: 'preOrderShippingDate should not be set when isPreOrder is false',
+  path: ['preOrderShippingDate'],
+};
+
 export const WarehouseAllocationSchema = z.object({
   warehouseId: z.string().uuid(),
   quantity: z.number().min(0),
@@ -45,9 +72,13 @@ export const ProductBaseSchema = z.object({
   ),
   compareAtPrice: z.union([z.number(), z.string()]).optional().nullable(),
   cost: z.union([z.number(), z.string()]).optional().nullable(),
+  stock: z.number().min(0, 'Stock cannot be negative').default(0),
+  lowStockThreshold: z.number().min(0).default(5),
+  warehouseId: z.string().uuid().optional(),
+  warehouseAllocations: z.array(WarehouseAllocationSchema).optional(),
+  isDigital: z.boolean().default(false),
   currencyCode: z.enum(['USD', 'MMK', 'THB']).default('USD'),
   isUsdPrice: z.boolean().default(true),
-  descriptionMy: z.string().optional().nullable(),
   publishAt: z.string().optional().nullable(),
   isFeatured: z.boolean().default(false),
   onSale: z.boolean().default(false),

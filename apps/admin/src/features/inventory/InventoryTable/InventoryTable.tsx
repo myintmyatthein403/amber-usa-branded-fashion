@@ -43,40 +43,41 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
         </thead>
 <tbody className="divide-y divide-border">
           {groupedInventory.map((group) => {
-            const prod = group.variant.product;
-            const images = prod?.images || [];
-            const name = prod?.name || '';
             return (
-              <tr key={group.variant.id} className="group hover:bg-muted/50 transition-colors duration-300">
+              <tr key={`${group.kind}-${group.id}`} className="group hover:bg-muted/50 transition-colors duration-300">
                 <td className="px-8 py-5">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-muted border border-border flex items-center justify-center overflow-hidden">
-                      {images[0] ? (
-                        <img src={images[0]} alt="" className="w-full h-full object-cover" />
+                      {group.images[0] ? (
+                        <img src={group.images[0]} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <Package size={16} className="text-muted-foreground/30" />
                       )}
                     </div>
                     <div className="space-y-1">
-                      <div className="text-sm font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{name}</div>
-                      <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Master ID: {group.variant.id.substring(0,8)}</div>
+                      <div className="text-sm font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{group.displayName}</div>
+                      <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Master ID: {group.id.substring(0,8)}</div>
                     </div>
                   </div>
                 </td>
                 <td className="px-8 py-5">
-                  <div className="space-y-1.5">
-                    <div className="text-xs font-mono font-bold text-foreground">{group.variant.sku}</div>
-                    <div className="flex gap-2">
-                      <span className="px-2 py-0.5 bg-secondary text-[8px] font-bold uppercase tracking-widest border border-border">{group.variant.size}</span>
-                      <span className="px-2 py-0.5 bg-secondary text-[8px] font-bold uppercase tracking-widest border border-border">{group.variant.color}</span>
+                  {group.kind === 'variant' ? (
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-mono font-bold text-foreground">{group.sku}</div>
+                      <div className="flex gap-2">
+                        <span className="px-2 py-0.5 bg-secondary text-[8px] font-bold uppercase tracking-widest border border-border">{group.size}</span>
+                        <span className="px-2 py-0.5 bg-secondary text-[8px] font-bold uppercase tracking-widest border border-border">{group.color}</span>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-secondary text-[8px] font-bold uppercase tracking-widest border border-border">No Variants</span>
+                  )}
                 </td>
                 {warehouses.map(w => {
                   const qty = group.stocks[w.id!] || 0;
                   return (
                     <td key={w.id} className="px-8 py-5 text-center">
-                      <button 
+                      <button
                         onClick={() => onAdjust(group, w.id)}
                         className={cn(
                           "text-sm font-mono font-bold hover:text-primary hover:underline underline-offset-4 decoration-dashed",

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Product } from "@amber/shared";
+import { toast } from "./useToastStore";
 
 export type Market = "US" | "MM";
 export type Locale = "en" | "my";
@@ -22,6 +23,8 @@ export interface CartItem {
   isPreOrder?: boolean;
   expectedShippingDate?: string;
   maxStock?: number;
+  depositAmount?: number;
+  attributes?: string[];
 }
 
 function cartItemMatches(
@@ -50,6 +53,8 @@ interface AppState {
     image?: string,
     currencyCode?: string,
     maxStock?: number,
+    depositAmount?: number,
+    attributes?: string[],
   ) => boolean;
   removeFromCart: (id: string, size?: string, variantId?: string) => void;
   updateQuantity: (
@@ -119,6 +124,8 @@ export const useStore = create<AppState>()(
         image,
         currencyCode,
         maxStock,
+        depositAmount,
+        attributes,
       ) => {
         const hasVariants = Boolean(product.variants && product.variants.length > 0);
         if (hasVariants && !variantId) {
@@ -152,6 +159,8 @@ export const useStore = create<AppState>()(
                   ...(price !== undefined && { price }),
                   currencyCode: resolvedCurrency,
                   ...(image && { image }),
+                  depositAmount: depositAmount ?? item.depositAmount,
+                  attributes: attributes ?? item.attributes,
                 }
               : item,
           );
@@ -166,6 +175,8 @@ export const useStore = create<AppState>()(
             isPreOrder,
             expectedShippingDate,
             maxStock,
+            depositAmount,
+            attributes,
             color: color || (product as { color?: string }).color,
             price: price !== undefined ? price : Number(product.price),
             image: image || product.images[0],
@@ -223,7 +234,7 @@ export const useStore = create<AppState>()(
       addToCompare: (product) => {
         const compareList = get().compareList;
         if (compareList.length >= 4) {
-          alert("You can compare up to 4 products at once.");
+          toast.error("You can compare up to 4 products at once.");
           return;
         }
         if (compareList.find((p) => p.id === product.id)) {

@@ -65,6 +65,8 @@ export class SettingsService implements OnApplicationBootstrap {
     stripePublishableKey?: string;
     stripeSecretKey?: string;
     stripeWebhookSecret?: string;
+    codDepositAmount?: number | null;
+    codDepositOrderThreshold?: number | null;
   }) {
     const sanitizedData = sanitizeData(data) as {
       privacyPolicy?: string;
@@ -72,6 +74,8 @@ export class SettingsService implements OnApplicationBootstrap {
       stripePublishableKey?: string | null;
       stripeSecretKey?: string | null;
       stripeWebhookSecret?: string | null;
+      codDepositAmount?: number | null;
+      codDepositOrderThreshold?: number | null;
     };
     const updateData = { ...sanitizedData };
 

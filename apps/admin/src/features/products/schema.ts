@@ -31,6 +31,8 @@ export const ProductSchema = z.object({
   price: z.union([z.number(), z.string()]).refine(val => val !== '', 'Price is required'),
   compareAtPrice: z.union([z.number(), z.string()]).optional().nullable(),
   cost: z.union([z.number(), z.string()]).optional().nullable(),
+  stock: z.number().min(0, 'Stock cannot be negative').default(0),
+  isDigital: z.boolean().default(false),
   isUsdPrice: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
   onSale: z.boolean().default(false),
@@ -100,6 +102,8 @@ export type CreateProductInput = {
   price: string | number;
   compareAtPrice?: string | number | null;
   cost?: string | number | null;
+  stock?: number;
+  isDigital?: boolean;
   isUsdPrice?: boolean;
   isFeatured?: boolean;
   onSale?: boolean;

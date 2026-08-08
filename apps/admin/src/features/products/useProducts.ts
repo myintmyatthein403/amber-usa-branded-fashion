@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFetch, useDelete } from '../../hooks/useCrud';
 import { API_ROUTES } from '../../config/constants';
-import { apiService } from '../../services/api.service';
+import { apiService, formatApiErrorMessage } from '../../services/api.service';
 import { toast } from '../../store/useToastStore';
 import type { Category } from '@amber/shared';
 import { Product, Variant, Brand, Sale, Meta, Collection, Warehouse, ProductWithRelations } from './schema';
@@ -116,11 +116,15 @@ export const useProducts = () => {
     price: '',
     compareAtPrice: '',
     cost: '',
+    stock: '0',
+    lowStockThreshold: '5',
+    warehouseId: '',
+    warehouseAllocations: [] as { warehouseId: string; quantity: number }[],
+    isDigital: false,
     currency: 'USD' as 'USD' | 'MMK' | 'THB',
     currencyCode: 'USD' as 'USD' | 'MMK' | 'THB',
     isUsdPrice: true,
     visibility: 'BOTH' as 'USA' | 'MYANMAR' | 'BOTH' | 'PRE_ORDER_ONLY',
-    descriptionMy: '',
     publishAt: '',
     isFeatured: false,
     onSale: false,
@@ -273,10 +277,16 @@ export const useProducts = () => {
       price: productForm.price?.toString(),
       compareAtPrice: productForm.compareAtPrice?.toString() || undefined,
       cost: productForm.cost?.toString() || undefined,
+      stock: Number(productForm.stock) || 0,
+      lowStockThreshold: Number(productForm.lowStockThreshold) || 5,
+      warehouseId: productForm.warehouseId || undefined,
+      warehouseAllocations: productForm.warehouseAllocations?.length
+        ? productForm.warehouseAllocations
+        : undefined,
+      isDigital: productForm.isDigital ?? false,
       currencyCode,
       isUsdPrice: currencyCode === 'USD',
       visibility: productForm.visibility || 'BOTH',
-      descriptionMy: productForm.descriptionMy || undefined,
       publishAt: productForm.publishAt || undefined,
       isFeatured: productForm.isFeatured ?? false,
       onSale: productForm.onSale ?? false,
@@ -397,8 +407,7 @@ export const useProducts = () => {
       resetForm();
       toast.success(editingProduct ? 'Product specifications refined' : 'Product successfully archived');
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to save product';
+      const message = formatApiErrorMessage(error, 'Failed to save product');
       console.error('Failed to save product:', error);
       setSubmitError(message);
       toast.error(message);
@@ -432,13 +441,17 @@ export const useProducts = () => {
       price: String(product.price),
       compareAtPrice: String(product.compareAtPrice || ''),
       cost: String((product as { cost?: string | number }).cost ?? ''),
+      stock: String((product as { stock?: number }).stock ?? 0),
+      lowStockThreshold: String((product as { lowStockThreshold?: number }).lowStockThreshold ?? 5),
+      warehouseId: '',
+      warehouseAllocations: [],
+      isDigital: (product as { isDigital?: boolean }).isDigital ?? false,
       currency: (((product as { currencyCode?: string }).currencyCode || 'USD') as 'USD' | 'MMK' | 'THB'),
       currencyCode: (((product as { currencyCode?: string }).currencyCode || 'USD') as 'USD' | 'MMK' | 'THB'),
       isUsdPrice: (product as { currencyCode?: string }).currencyCode
         ? (product as { currencyCode?: string }).currencyCode === 'USD'
         : product.isUsdPrice,
       visibility: product.visibility || 'BOTH',
-      descriptionMy: (product as { descriptionMy?: string }).descriptionMy || '',
       publishAt: (product as { publishAt?: string }).publishAt
         ? new Date((product as { publishAt?: string }).publishAt!).toISOString().slice(0, 16)
         : '',

@@ -3,6 +3,7 @@ import { Loader2, Info } from 'lucide-react';
 import { useSettings } from '../features/settings/hooks/useSettings';
 import { SettingsHeader } from '../features/settings/components/SettingsHeader';
 import { StripeSettings } from '../features/settings/components/StripeSettings';
+import { CodSettings } from '../features/settings/components/CodSettings';
 import { PolicySettings } from '../features/settings/components/PolicySettings';
 
 export const SettingsPage: React.FC = () => {
@@ -35,12 +36,17 @@ export const SettingsPage: React.FC = () => {
       />
 
       <div className="grid grid-cols-1 gap-12">
-        <StripeSettings 
+        <StripeSettings
           formData={formData as any}
           onUpdate={updateField}
         />
 
-        <PolicySettings 
+        <CodSettings
+          formData={formData as any}
+          onUpdate={updateField}
+        />
+
+        <PolicySettings
           type="privacy"
           value={formData.privacyPolicy}
           onChange={(val) => updateField('privacyPolicy', val)}

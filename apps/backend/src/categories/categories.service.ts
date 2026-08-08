@@ -4,7 +4,11 @@ import { Category, Prisma } from '@prisma/client';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 import { CreateCategoryDto, UpdateCategoryDto, CategoryReorderDto } from './dto/category.dto';
 import { getCategoryDescendantIds } from '@amber/shared';
+import { MemoryCacheService } from '../common/cache/memory-cache.service';
 import slugify from 'slugify';
+
+const CACHE_PREFIX = 'categories:';
+const CACHE_TTL_MS = 60_000;
 
 export interface PaginatedResult {
   data: Category[];
@@ -18,7 +22,10 @@ export interface PaginatedResult {
 
 @Injectable()
 export class CategoriesService {
-  constructor(private categoriesRepository: CategoriesRepository) {}
+  constructor(
+    private categoriesRepository: CategoriesRepository,
+    private cache: MemoryCacheService,
+  ) {}
 
   async createCategory(data: CreateCategoryDto): Promise<Category> {
     // Always ensure we have a valid slug - generate from name if not provided
@@ -48,28 +55,36 @@ export class CategoriesService {
       await this.validateParentChildRelationship(null, data.parentId);
     }
     
-    return this.categoriesRepository.create(createData);
+    const created = await this.categoriesRepository.create(createData);
+    this.cache.invalidatePrefix(CACHE_PREFIX);
+    return created;
   }
 
   async getAllCategories(
     page: number = 1,
     limit: number = 10,
   ): Promise<PaginatedResult> {
-    const skip = (page - 1) * limit;
-    const [data, total] = await Promise.all([
-      this.categoriesRepository.findMany(skip, limit),
-      this.categoriesRepository.count(),
-    ]);
+    return this.cache.getOrSet(
+      `${CACHE_PREFIX}list:${page}:${limit}`,
+      CACHE_TTL_MS,
+      async () => {
+        const skip = (page - 1) * limit;
+        const [data, total] = await Promise.all([
+          this.categoriesRepository.findMany(skip, limit),
+          this.categoriesRepository.count(),
+        ]);
 
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        return {
+          data,
+          meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        };
       },
-    };
+    );
   }
 
   async updateCategory(id: string, data: UpdateCategoryDto): Promise<Category> {
@@ -109,15 +124,39 @@ export class CategoriesService {
       await this.validateParentChildRelationship(id, data.parentId);
     }
     
-    return this.categoriesRepository.update(id, updateData);
+    const updated = await this.categoriesRepository.update(id, updateData);
+    this.cache.invalidatePrefix(CACHE_PREFIX);
+    return updated;
   }
 
-  async deleteCategory(id: string): Promise<Category> {
+  // Deleting a category cascades to its subcategories at the DB level and
+  // silently nulls categoryId on any products under it — force=false (the
+  // default) blocks that blast radius unless the admin explicitly confirms.
+  async deleteCategory(id: string, force = false): Promise<Category> {
     const category = await this.categoriesRepository.findById(id);
     if (!category) {
       throw new NotFoundException(`Category with ID ${id} not found`);
     }
-    return this.categoriesRepository.delete(id);
+
+    if (!force) {
+      const [subcategoryCount, productCount] = await Promise.all([
+        this.categoriesRepository.countSubcategories(id),
+        this.categoriesRepository.countProducts(id),
+      ]);
+      if (subcategoryCount > 0 || productCount > 0) {
+        throw new BadRequestException({
+          message:
+            `This category has ${subcategoryCount} subcategor${subcategoryCount === 1 ? 'y' : 'ies'} and ${productCount} product(s). ` +
+            `Deleting it will also delete the subcategories and un-categorize the products. Confirm to proceed.`,
+          subcategoryCount,
+          productCount,
+        });
+      }
+    }
+
+    const deleted = await this.categoriesRepository.delete(id);
+    this.cache.invalidatePrefix(CACHE_PREFIX);
+    return deleted;
   }
 
   async getCategoryBySlug(slug: string): Promise<Category | null> {
@@ -163,7 +202,9 @@ export class CategoriesService {
       }
     }
 
-    return this.categoriesRepository.reorderMany(items);
+    const reordered = await this.categoriesRepository.reorderMany(items);
+    this.cache.invalidatePrefix(CACHE_PREFIX);
+    return reordered;
   }
 
   private generateSlug(name: string): string {

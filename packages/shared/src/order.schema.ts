@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const OrderStatusSchema = z.enum(['PENDING', 'PROCESSING', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'REFUNDED']);
-export const PaymentStatusSchema = z.enum(['PENDING', 'PAID', 'FAILED', 'REFUNDED', 'REJECTED']);
+export const PaymentStatusSchema = z.enum(['PENDING', 'PAID', 'PARTIALLY_PAID', 'FAILED', 'REFUNDED', 'REJECTED']);
 
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
@@ -50,6 +50,10 @@ export const OrderSchema = z.object({
   manualPaymentReviewedAt: z.string().optional().nullable(),
   manualPaymentReviewedBy: z.string().optional().nullable(),
   manualPaymentRejectionReason: z.string().optional().nullable(),
+  depositAmount: z.number().optional().nullable(),
+  balanceDue: z.number().optional().nullable(),
+  balanceSettledAt: z.string().optional().nullable(),
+  balanceSettledBy: z.string().optional().nullable(),
   lockedExchangeRate: z.number().optional().nullable(),
   shippingAddress: z.string().min(1, 'Shipping address is required'),
   customerName: z.string().optional(),
@@ -94,6 +98,10 @@ export const CreateOrderSchema = OrderSchema.omit({
   manualPaymentReviewedAt: true,
   manualPaymentReviewedBy: true,
   manualPaymentRejectionReason: true,
+  depositAmount: true,
+  balanceDue: true,
+  balanceSettledAt: true,
+  balanceSettledBy: true,
   lockedExchangeRate: true,
 }).extend({
   customerName: z.string().min(1).optional(),

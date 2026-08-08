@@ -124,6 +124,7 @@ export const API_ROUTES = {
     PAYMENT_PROOF: (id: string) => `/orders/${id}/payment-proof`,
     CONFIRM_MANUAL_PAYMENT: (id: string) => `/orders/${id}/confirm-manual-payment`,
     REJECT_MANUAL_PAYMENT: (id: string) => `/orders/${id}/reject-manual-payment`,
+    SETTLE_BALANCE: (id: string) => `/orders/${id}/settle-balance`,
     },
   LOGISTICS: {
     WAREHOUSES: '/logistics/warehouses',

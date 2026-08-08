@@ -25,6 +25,8 @@ export class SettingsController {
       stripePublishableKey?: string;
       stripeSecretKey?: string;
       stripeWebhookSecret?: string;
+      codDepositAmount?: number | null;
+      codDepositOrderThreshold?: number | null;
     },
   ) {
     return this.settingsService.updateSettings(data);

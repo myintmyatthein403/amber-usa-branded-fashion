@@ -181,6 +181,18 @@ export class OrdersController {
     );
   }
 
+  @Post(':id/settle-balance')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark the remaining balance of a partially paid order as settled' })
+  settleBalance(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.ordersService.settleBalance(id, req.user!.userId);
+  }
+
   @Post(':id/verify-payment')
   @ApiOperation({ summary: 'Verify order payment status with Stripe' })
   @ApiParam({ name: 'id', description: 'Order ID' })

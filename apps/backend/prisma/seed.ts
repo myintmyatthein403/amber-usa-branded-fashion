@@ -116,6 +116,17 @@ async function main() {
     },
   });
 
+  const giftCardCategory = await prisma.category.upsert({
+    where: { name: 'Gift Card' },
+    update: {},
+    create: {
+      name: 'Gift Card',
+      slug: 'gift-card',
+      description: 'Digital gift cards',
+      displayOrder: 4
+    },
+  });
+
   const coachBrand = await prisma.brand.upsert({
     where: { name: 'Coach' },
     update: {},
@@ -134,6 +145,26 @@ async function main() {
       logo: 'https://logo.clearbit.com/nike.com',
       note: 'Global leader in athletic footwear and apparel'
     }
+  });
+
+  const usaWarehouse = await prisma.warehouse.upsert({
+    where: { name: 'USA Main Warehouse' },
+    update: {},
+    create: {
+      name: 'USA Main Warehouse',
+      location: 'USA',
+      address: '1 Amber Way, Los Angeles, CA',
+    },
+  });
+
+  const myanmarWarehouse = await prisma.warehouse.upsert({
+    where: { name: 'Myanmar Distribution Center' },
+    update: {},
+    create: {
+      name: 'Myanmar Distribution Center',
+      location: 'MYANMAR',
+      address: '1 Amber Road, Yangon',
+    },
   });
 
   const tote = await prisma.product.upsert({
@@ -169,6 +200,35 @@ async function main() {
       tags: ['athletic', 'lifestyle', 'sneakers'],
     }
   });
+
+  const giftCardDenominations = [
+    { value: 50000, label: '50,000 MMK' },
+    { value: 100000, label: '100,000 MMK' },
+    { value: 200000, label: '200,000 MMK' },
+    { value: 500000, label: '500,000 MMK' },
+  ];
+
+  for (const denom of giftCardDenominations) {
+    const slug = `gift-card-${denom.value}-mmk`;
+    await prisma.product.upsert({
+      where: { slug },
+      update: {},
+      create: {
+        name: `Amber Gift Card - ${denom.label}`,
+        slug,
+        status: ProductStatus.PUBLISHED,
+        categoryId: giftCardCategory.id,
+        shortDescription: 'Digital gift card redeemable across Amber Premium.',
+        description: 'Give the gift of choice. This digital gift card can be redeemed for any authentic USA brand product on Amber Premium.',
+        price: denom.value,
+        currencyCode: 'MMK',
+        isUsdPrice: false,
+        isDigital: true,
+        images: ['https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=800&auto=format&fit=crop'],
+        tags: ['gift-card', 'digital'],
+      },
+    });
+  }
 
   await prisma.heroSection.upsert({
     where: { id: 'default-hero' },
@@ -342,7 +402,7 @@ async function main() {
   });
 
   // Add a variant with barcode
-  await prisma.variant.upsert({
+  const toteVariant = await prisma.variant.upsert({
     where: { sku: 'COA-TOTE-BRN-01' },
     update: {},
     create: {
@@ -355,6 +415,35 @@ async function main() {
       weight: 1.2,
       productId: tote.id
     }
+  });
+
+  // Split the variant's stock across both warehouses (7 + 3 = 10, matching variant.stock above)
+  await prisma.inventory.upsert({
+    where: { variantId_warehouseId: { variantId: toteVariant.id, warehouseId: usaWarehouse.id } },
+    update: {},
+    create: { variantId: toteVariant.id, warehouseId: usaWarehouse.id, quantity: 7 },
+  });
+  await prisma.inventory.upsert({
+    where: { variantId_warehouseId: { variantId: toteVariant.id, warehouseId: myanmarWarehouse.id } },
+    update: {},
+    create: { variantId: toteVariant.id, warehouseId: myanmarWarehouse.id, quantity: 3 },
+  });
+
+  // airmax is a simple (no-variant) product — give it warehouse-tracked inventory too,
+  // to demo/test multi-warehouse inventory for products without size/color variants.
+  await prisma.inventory.upsert({
+    where: { productId_warehouseId: { productId: airmax.id, warehouseId: usaWarehouse.id } },
+    update: {},
+    create: { productId: airmax.id, warehouseId: usaWarehouse.id, quantity: 8 },
+  });
+  await prisma.inventory.upsert({
+    where: { productId_warehouseId: { productId: airmax.id, warehouseId: myanmarWarehouse.id } },
+    update: {},
+    create: { productId: airmax.id, warehouseId: myanmarWarehouse.id, quantity: 4 },
+  });
+  await prisma.product.update({
+    where: { id: airmax.id },
+    data: { stock: 12 },
   });
 
   const thingyanSale = await prisma.collection.upsert({
@@ -419,6 +508,7 @@ async function main() {
       type: 'MANUAL',
       instructions: 'Pay with cash upon delivery.',
       isActive: true,
+      isCod: true,
       markets: ['MM'],
     },
   ];

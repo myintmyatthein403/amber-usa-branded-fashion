@@ -13,6 +13,8 @@ export const SettingsSchema = z.object({
   stripePublishableKey: z.string().nullable().optional(),
   stripeSecretKey: z.string().nullable().optional(),
   stripeWebhookSecret: z.string().nullable().optional(),
+  codDepositAmount: z.union([z.string(), z.number()]).nullable().optional(),
+  codDepositOrderThreshold: z.union([z.string(), z.number()]).nullable().optional(),
 });
 
 export type Settings = z.infer<typeof SettingsSchema> & { id: string };

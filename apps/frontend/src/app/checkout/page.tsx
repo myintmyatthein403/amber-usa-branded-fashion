@@ -24,10 +24,11 @@ import {
 import {
   buildOrderPayload,
   computeCheckoutTotal,
+  computeCheckoutDeposit,
   filterDeliveryMethodsByMarket,
   uploadPaymentProof,
 } from "@/lib/checkout";
-import { getApiUrl } from "@/lib/api";
+import { getApiUrl, unwrapApiResponse } from "@/lib/api";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -45,6 +46,8 @@ export default function CheckoutPage() {
   const [isValidatingStock, setIsValidatingStock] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [manualPaymentSubmitted, setManualPaymentSubmitted] = useState(false);
+  const [codDepositAmount, setCodDepositAmount] = useState<number | null>(null);
+  const [codDepositOrderThreshold, setCodDepositOrderThreshold] = useState<number | null>(null);
 
   const cartItems: CartItem[] = useStore((state) => state.cartItems);
   const subtotal = useStore((state) => state.getSubtotal());
@@ -55,7 +58,7 @@ export default function CheckoutPage() {
   const market = useStore((state) => state.market);
   const setMarket = useStore((state) => state.setMarket);
 
-  const { user: authUser, token: authToken, isAuthenticated } = useAuthStore();
+  const { user: authUser, token: authToken, isAuthenticated, updateUser } = useAuthStore();
 
   const [step, setStep] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -118,6 +121,34 @@ export default function CheckoutPage() {
       })
       .catch(console.error)
       .finally(() => setLoadingPayments(false));
+
+    fetch(`${getApiUrl()}/settings`)
+      .then((res) => res.json())
+      .then((result) => {
+        const data = result?.data || result || {};
+        setCodDepositAmount(
+          data.codDepositAmount != null ? Number(data.codDepositAmount) : null,
+        );
+        setCodDepositOrderThreshold(
+          data.codDepositOrderThreshold != null
+            ? Number(data.codDepositOrderThreshold)
+            : null,
+        );
+      })
+      .catch(console.error);
+
+    if (authToken && !authUser?.orders) {
+      fetch(`${getApiUrl()}/auth/profile`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+        .then((res) => res.json())
+        .then((json) => {
+          const profile = unwrapApiResponse<typeof authUser>(json);
+          if (profile) updateUser(profile);
+        })
+        .catch(console.error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, isAuthenticated, router, market]);
 
   useEffect(() => {
@@ -166,6 +197,26 @@ export default function CheckoutPage() {
   );
 
   const calculateTotal = () => total;
+
+  const pastPaidOrderCount = (authUser?.orders || []).filter(
+    (o) => o.paymentStatus === "PAID" || o.paymentStatus === "PARTIALLY_PAID",
+  ).length;
+
+  const codDepositApplies =
+    (selectedPayment?.isCod ?? false) &&
+    codDepositOrderThreshold != null &&
+    pastPaidOrderCount < codDepositOrderThreshold;
+
+  const { depositAmount, balanceDue } = computeCheckoutDeposit(
+    cartItems,
+    shippingCost,
+    currency,
+    exchangeRate,
+    isShippingUsd,
+    shippingCost,
+    { isCod: codDepositApplies, codDepositAmount },
+    total,
+  );
 
   const handleCreatePaymentIntent = async () => {
     setIsCreatingIntent(true);
@@ -303,8 +354,12 @@ export default function CheckoutPage() {
   };
   const handleComplete = async () => {
     if (selectedPayment?.type !== "STRIPE") {
-      if (!formData.receiptFile || !authToken) {
-        setOrderError("Please upload a payment screenshot and ensure you are signed in.");
+      if (!authToken) {
+        setOrderError("Please sign in to complete your order.");
+        return;
+      }
+      if (depositAmount != null && !formData.receiptFile) {
+        setOrderError("Please upload a payment screenshot for the deposit.");
         return;
       }
       setIsSubmittingOrder(true);
@@ -349,7 +404,9 @@ export default function CheckoutPage() {
         const order = orderResult?.data || orderResult;
         setCurrentOrderId(order.id);
 
-        await uploadPaymentProof(order.id, formData.receiptFile, authToken);
+        if (formData.receiptFile) {
+          await uploadPaymentProof(order.id, formData.receiptFile, authToken);
+        }
 
         clearCart();
         setManualPaymentSubmitted(true);
@@ -486,6 +543,7 @@ export default function CheckoutPage() {
                   formData={formData}
                   onUpdate={updateFormData}
                   onContinue={handleNext}
+                  onBack={() => router.push("/shop")}
                   submitting={isValidatingStock}
                 />
                 {stockError && (
@@ -585,6 +643,8 @@ export default function CheckoutPage() {
                   orderId={currentOrderId || undefined}
                   isSubmittingManual={isSubmittingOrder}
                   orderError={orderError}
+                  depositAmount={depositAmount}
+                  balanceDue={balanceDue}
                 />
               </motion.div>
             )}
@@ -599,6 +659,8 @@ export default function CheckoutPage() {
             getShippingDisplay={getShippingDisplay}
             currency={currency}
             total={total}
+            depositAmount={depositAmount}
+            balanceDue={balanceDue}
           />
         </div>
       </div>

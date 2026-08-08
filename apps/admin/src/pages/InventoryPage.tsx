@@ -21,7 +21,7 @@ export const InventoryPage: React.FC = () => {
     adjustModalOpen,
     setAdjustModalOpen,
     submitting,
-    selectedVariant,
+    selectedItem,
     selectedWarehouseId,
     adjustmentQty,
     setAdjustmentQty,
@@ -92,8 +92,8 @@ export const InventoryPage: React.FC = () => {
         title="Physical Inventory Adjustment"
         size="md"
       >
-        <InventoryAdjustmentForm 
-          selectedVariant={selectedVariant}
+        <InventoryAdjustmentForm
+          selectedItem={selectedItem}
           selectedWarehouseId={selectedWarehouseId}
           adjustmentQty={adjustmentQty}
           warehouses={warehouses}

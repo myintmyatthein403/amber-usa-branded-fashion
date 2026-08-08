@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useCartActions } from "@/hooks/useCartActions";
 import Link from "next/link";
 import Price from "./Price";
+import type { CartItem } from "@/store/useStore";
 
 export default function CartDrawer() {
   const {
@@ -23,6 +24,89 @@ export default function CartDrawer() {
   } = useCartActions();
 
   if (!mounted) return null;
+
+  const preOrderItems = cartItems.filter((item) => item.isPreOrder);
+  const inStockItems = cartItems.filter((item) => !item.isPreOrder);
+  const showGroupHeadings = preOrderItems.length > 0 && inStockItems.length > 0;
+
+  const renderCartItem = (item: CartItem) => {
+    const attributeLabel = item.attributes?.length
+      ? item.attributes.join("-")
+      : [item.size, item.color].filter(Boolean).join("-");
+
+    return (
+      <motion.div
+        layout
+        key={item.variantId ? `${item.id}-${item.variantId}` : `${item.id}-${item.size}`}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex space-x-4"
+      >
+        <div className="relative w-24 aspect-[3/4] bg-[#F5F0E1] rounded-sm overflow-hidden shrink-0">
+          {item.image ? (
+            <Image src={item.image} alt={item.name} fill className="object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Package className="w-8 h-8 text-[#1A1A1A]/20" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 flex flex-col justify-between py-1">
+          <div className="space-y-1">
+            <div className="flex justify-between items-start">
+              <h4 className="text-sm font-serif font-bold text-[#1A1A1A] line-clamp-1">{item.name}</h4>
+              <button
+                onClick={() => removeItem(String(item.id), item.size, item.variantId)}
+                className="text-[#1A1A1A]/20 hover:text-red-500 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+            {attributeLabel && (
+              <p className="text-[10px] text-[#1A1A1A]/40 uppercase tracking-widest font-bold">
+                {attributeLabel}
+              </p>
+            )}
+            {item.isPreOrder && (
+              <div className="flex flex-col gap-0.5 mt-1">
+                <span className="text-[9px] bg-[#D4AF37]/20 text-[#D4AF37] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest w-fit">
+                  Pre-Order
+                </span>
+                {item.expectedShippingDate && (
+                  <span className="text-[9px] text-[#1A1A1A]/50 italic">
+                    Ships: {new Date(item.expectedShippingDate).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            )}
+            <Price
+              amount={item.price * item.quantity}
+              isUsdPrice={item.isUsdPrice !== false}
+              className="text-sm font-bold text-[#D4AF37]"
+            />
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center border border-[#1A1A1A]/10 rounded-full px-2 py-1">
+              <button
+                onClick={() => changeQuantity(String(item.id), item.size, -1, item.variantId)}
+                className="p-1 hover:text-[#D4AF37] transition-colors"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <span className="text-xs font-bold w-8 text-center">{item.quantity}</span>
+              <button
+                onClick={() => changeQuantity(String(item.id), item.size, 1, item.variantId)}
+                className="p-1 hover:text-[#D4AF37] transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
 
   return (
     <AnimatePresence>
@@ -83,76 +167,28 @@ export default function CartDrawer() {
                   </button>
                 </div>
               ) : (
-                cartItems.map((item) => (
-                  <motion.div
-                    layout
-                    key={item.variantId ? `${item.id}-${item.variantId}` : `${item.id}-${item.size}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex space-x-4"
-                  >
-                    <div className="relative w-24 aspect-[3/4] bg-[#F5F0E1] rounded-sm overflow-hidden shrink-0">
-                      {item.image ? (
-                        <Image src={item.image} alt={item.name} fill className="object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-8 h-8 text-[#1A1A1A]/20" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 flex flex-col justify-between py-1">
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-start">
-                          <h4 className="text-sm font-serif font-bold text-[#1A1A1A] line-clamp-1">{item.name}</h4>
-                          <button 
-                            onClick={() => removeItem(String(item.id), item.size, item.variantId)}
-                            className="text-[#1A1A1A]/20 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-[#1A1A1A]/40 uppercase tracking-widest font-bold">
-                          {item.size ? `Size: ${item.size}` : 'Standard Size'}
+                <>
+                  {preOrderItems.length > 0 && (
+                    <div className="space-y-8">
+                      {showGroupHeadings && (
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]/40 pb-2">
+                          Pre-order Items
                         </p>
-                        {item.isPreOrder && (
-                          <div className="flex flex-col gap-0.5 mt-1">
-                            <span className="text-[9px] bg-[#D4AF37]/20 text-[#D4AF37] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest w-fit">
-                              Pre-Order
-                            </span>
-                            {item.expectedShippingDate && (
-                              <span className="text-[9px] text-[#1A1A1A]/50 italic">
-                                Ships: {new Date(item.expectedShippingDate).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        <Price 
-                          amount={item.price * item.quantity} 
-                          isUsdPrice={item.isUsdPrice !== false} 
-                          className="text-sm font-bold text-[#D4AF37]" 
-                        />
-                      </div>
-
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center border border-[#1A1A1A]/10 rounded-full px-2 py-1">
-                          <button 
-                            onClick={() => changeQuantity(String(item.id), item.size, -1, item.variantId)}
-                            className="p-1 hover:text-[#D4AF37] transition-colors"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="text-xs font-bold w-8 text-center">{item.quantity}</span>
-                          <button 
-                            onClick={() => changeQuantity(String(item.id), item.size, 1, item.variantId)}
-                            className="p-1 hover:text-[#D4AF37] transition-colors"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
+                      )}
+                      {preOrderItems.map(renderCartItem)}
                     </div>
-                  </motion.div>
-                ))
+                  )}
+                  {inStockItems.length > 0 && (
+                    <div className="space-y-8">
+                      {showGroupHeadings && (
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]/40 pb-2">
+                          In Stock Items
+                        </p>
+                      )}
+                      {inStockItems.map(renderCartItem)}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

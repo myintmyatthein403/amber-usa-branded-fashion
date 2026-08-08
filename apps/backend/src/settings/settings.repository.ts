@@ -36,6 +36,8 @@ export class SettingsRepository {
         privacyPolicy: true,
         termsConditions: true,
         stripePublishableKey: true,
+        codDepositAmount: true,
+        codDepositOrderThreshold: true,
         updatedAt: true,
       },
     });

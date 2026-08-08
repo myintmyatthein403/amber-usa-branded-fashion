@@ -24,6 +24,8 @@ interface ReviewStepProps {
   orderId?: string;
   isSubmittingManual?: boolean;
   orderError?: string | null;
+  depositAmount?: number | null;
+  balanceDue?: number;
 }
 
 export default function ReviewStep({
@@ -45,6 +47,8 @@ export default function ReviewStep({
   orderId,
   isSubmittingManual,
   orderError,
+  depositAmount,
+  balanceDue,
 }: ReviewStepProps) {
   // Calculate delivery fee
   const deliveryFee = selectedMethod?.price 
@@ -139,6 +143,9 @@ export default function ReviewStep({
                 onBack={onBack}
                 onComplete={onConfirm}
                 submitting={isSubmittingManual}
+                depositAmount={depositAmount}
+                totalAmount={total}
+                balanceDue={balanceDue}
               />
             </>
           ) : (

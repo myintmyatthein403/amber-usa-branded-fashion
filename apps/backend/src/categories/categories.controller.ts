@@ -73,7 +73,7 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.categoriesService.deleteCategory(id);
+  remove(@Param('id') id: string, @Query('force') force?: string) {
+    return this.categoriesService.deleteCategory(id, force === 'true');
   }
 }

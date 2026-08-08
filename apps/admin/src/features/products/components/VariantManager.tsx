@@ -40,6 +40,8 @@ interface VariantManagerProps {
   productSlug?: string;
   attributes?: AttributeOption[];
   submitError?: string | null;
+  productForm?: Record<string, any>;
+  setProductForm?: (form: Record<string, any>) => void;
 }
 
 const sizeAttributePattern = /^size$/i;
@@ -92,6 +94,8 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
   productSlug,
   attributes = [],
   submitError = null,
+  productForm,
+  setProductForm,
 }) => {
   const [urlInput, setUrlInput] = React.useState('');
   const [bulkMode, setBulkMode] = React.useState(false);
@@ -101,8 +105,34 @@ export const VariantManager: React.FC<VariantManagerProps> = ({
   const [bulkWarehouseId, setBulkWarehouseId] = React.useState('');
   const [multiWarehouseStock, setMultiWarehouseStock] = React.useState<MultiWarehouseStock[]>([]);
   const [selectedAttributes, setSelectedAttributes] = React.useState<Record<string, string>>({});
-  
+  const [productBulkWarehouseId, setProductBulkWarehouseId] = React.useState('');
+  const [productBulkQty, setProductBulkQty] = React.useState('10');
+
   const warehouseList = warehouses?.data || warehouses || [];
+  const productWarehouseAllocations: MultiWarehouseStock[] = productForm?.warehouseAllocations || [];
+
+  const updateProductForm = (patch: Record<string, unknown>) => {
+    if (setProductForm && productForm) {
+      setProductForm({ ...productForm, ...patch });
+    }
+  };
+
+  const addProductWarehouseAllocation = () => {
+    if (!productBulkWarehouseId) return;
+    updateProductForm({
+      warehouseAllocations: [
+        ...productWarehouseAllocations,
+        { warehouseId: productBulkWarehouseId, quantity: parseInt(productBulkQty) || 0 },
+      ],
+    });
+    setProductBulkWarehouseId('');
+  };
+
+  const removeProductWarehouseAllocation = (index: number) => {
+    updateProductForm({
+      warehouseAllocations: productWarehouseAllocations.filter((_, i) => i !== index),
+    });
+  };
 
   const regenerateSku = () => {
     if (!productSlug) return;
@@ -656,6 +686,105 @@ className="w-full h-10 border-b border-input bg-background px-2 text-sm text-for
         </div>
       </div>
 
+      {currentVariants.length === 0 && (
+        <div className="space-y-4 p-6 border border-dashed border-primary/20 bg-secondary/30">
+          <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Base Stock (No Variants)</h4>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            This product has no size/color variants — stock is tracked per-warehouse, same as variants.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Primary Warehouse</label>
+              <select
+                value={productForm?.warehouseId || ''}
+                onChange={(e) => updateProductForm({ warehouseId: e.target.value })}
+                className="w-full h-10 border-b border-input bg-background px-2 text-[10px] font-bold uppercase tracking-widest text-foreground focus:border-primary rounded-sm cursor-pointer"
+              >
+                <option value="">Select Warehouse</option>
+                {warehouseList.map((w: Warehouse) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Stock Quantity</label>
+              <input
+                type="number"
+                min={0}
+                value={productForm?.stock ?? 0}
+                onChange={(e) => updateProductForm({ stock: Number(e.target.value) || 0 })}
+                className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Multi-Warehouse Stock (optional)</label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={productBulkWarehouseId}
+                  onChange={(e) => setProductBulkWarehouseId(e.target.value)}
+                  className="h-8 border-b border-input bg-background px-2 text-[10px] font-bold uppercase tracking-widest text-foreground focus:border-primary rounded-sm cursor-pointer"
+                >
+                  <option value="">Select Warehouse</option>
+                  {warehouseList.map((w: Warehouse) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Qty"
+                  value={productBulkQty}
+                  onChange={(e) => setProductBulkQty(e.target.value)}
+                  className="w-20 h-8 border-b border-input bg-transparent px-0 text-center text-sm focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={addProductWarehouseAllocation}
+                  disabled={!productBulkWarehouseId}
+                  className="h-8 px-3 bg-foreground text-background text-[10px] font-bold uppercase hover:bg-primary transition-colors disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+            {productWarehouseAllocations.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {productWarehouseAllocations.map((stock, idx) => {
+                  const wh = warehouseList.find((w: Warehouse) => w.id === stock.warehouseId);
+                  return (
+                    <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-background border border-border">
+                      <span className="text-[10px] font-bold uppercase">{wh?.name || stock.warehouseId}</span>
+                      <span className="text-[10px] text-muted-foreground">-</span>
+                      <span className="text-[10px] font-mono">{stock.quantity} units</span>
+                      <button type="button" onClick={() => removeProductWarehouseAllocation(idx)} className="text-muted-foreground hover:text-destructive">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-[10px] text-muted-foreground/50 italic">
+                {productForm?.stock ? `Single warehouse: ${productForm.stock} units at ${warehouseList.find((w: Warehouse) => w.id === productForm?.warehouseId)?.name || 'N/A'}` : 'Add warehouse stock allocations above'}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2 max-w-[240px]">
+            <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Low Stock Alert</label>
+            <input
+              type="number"
+              value={productForm?.lowStockThreshold ?? 5}
+              onChange={(e) => updateProductForm({ lowStockThreshold: parseInt(e.target.value) || 0 })}
+              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground border-b border-border pb-4 flex items-center gap-2"><BarChart3 size={14} /> ACTIVE INVENTORY STATUS</h4>
         <div className="space-y-0 divide-y divide-border">
@@ -700,8 +829,8 @@ className="w-full h-10 border-b border-input bg-background px-2 text-sm text-for
       <div className="flex justify-between items-center pt-10 border-t border-border">
         <button onClick={() => setStep(1)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-300"><ChevronLeft size={14} /> Core Definition</button>
         <button 
-          onClick={onSave} 
-          disabled={submitting || currentVariants.length === 0}
+          onClick={onSave}
+          disabled={submitting}
           className="bg-primary text-primary-foreground px-10 py-4 text-xs font-bold uppercase tracking-[0.3em] hover:opacity-90 transition-all duration-300 shadow-xl shadow-primary/20 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? (

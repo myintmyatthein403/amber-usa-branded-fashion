@@ -20,15 +20,12 @@ export const InventoryGrid: React.FC<InventoryGridProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
        {groupedInventory.map((group) => {
-         const prod = group.variant.product;
-         const images = prod?.images || [];
-         const name = prod?.name || '';
          return (
-         <div key={group.variant.id} className="bg-card border border-border p-6 space-y-6 hover:border-primary/30 transition-all group shadow-sm">
+         <div key={`${group.kind}-${group.id}`} className="bg-card border border-border p-6 space-y-6 hover:border-primary/30 transition-all group shadow-sm">
             <div className="flex items-start justify-between">
                <div className="w-16 h-16 bg-muted border border-border flex items-center justify-center overflow-hidden">
-                  {images[0] ? (
-                    <img src={images[0]} alt="" className="w-full h-full object-cover" />
+                  {group.images[0] ? (
+                    <img src={group.images[0]} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <Package size={20} className="text-muted-foreground/30" />
                   )}
@@ -40,8 +37,10 @@ export const InventoryGrid: React.FC<InventoryGridProps> = ({
             </div>
 
             <div className="space-y-1">
-               <h4 className="text-sm font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{name}</h4>
-               <p className="text-[10px] font-mono text-muted-foreground">{group.variant.sku} • {group.variant.size} • {group.variant.color}</p>
+               <h4 className="text-sm font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{group.displayName}</h4>
+               <p className="text-[10px] font-mono text-muted-foreground">
+                 {group.kind === 'variant' ? `${group.sku} • ${group.size} • ${group.color}` : 'No Variants'}
+               </p>
             </div>
 
             <div className="pt-6 border-t border-border space-y-3">

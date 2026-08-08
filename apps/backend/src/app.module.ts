@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { MemoryCacheModule } from './common/cache/memory-cache.module';
 import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -44,6 +47,19 @@ import { AddressesModule } from './addresses/addresses.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
+    MemoryCacheModule,
+    // Generous default (120 req/min per IP) — protects public/unauthenticated
+    // endpoints (products, attributes, search) from scraping/DoS without
+    // interfering with normal browsing, which fires several parallel
+    // requests per page load. Individual endpoints can tighten this via
+    // @Throttle(...) (see auth login).
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000,
+        limit: 120,
+      },
+    ]),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       serveRoot: '/',
@@ -84,6 +100,9 @@ import { AddressesModule } from './addresses/addresses.module';
     AddressesModule,
   ],
   controllers: [AppController, HealthController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

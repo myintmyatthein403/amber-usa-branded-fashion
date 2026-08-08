@@ -1,6 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CargoShipment, Warehouse, Inventory, Prisma } from '@prisma/client';
+import {
+  InventoryTarget,
+  inventoryUniqueWhere,
+  inventoryFilterWhere,
+  recomputeAndSyncStock,
+} from './inventory-target.util';
 
 @Injectable()
 export class LogisticsRepository {
@@ -71,6 +77,8 @@ export class LogisticsRepository {
           },
         },
         { variant: { sku: { contains: search, mode: 'insensitive' } } },
+        { product: { name: { contains: search, mode: 'insensitive' } } },
+        { product: { slug: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -79,6 +87,7 @@ export class LogisticsRepository {
         where,
         include: {
           variant: { include: { product: true } },
+          product: true,
         },
         skip,
         take: limit,
@@ -97,9 +106,9 @@ export class LogisticsRepository {
     };
   }
 
-  async findInventoryByVariant(variantId: string) {
+  async findInventoryForItem(target: InventoryTarget) {
     return this.prisma.inventory.findMany({
-      where: { variantId },
+      where: inventoryFilterWhere(target),
       include: { warehouse: true },
     });
   }
@@ -135,45 +144,31 @@ export class LogisticsRepository {
       include: {
         warehouse: true,
         variant: { include: { product: true } },
+        product: true,
       },
-      orderBy: [
-        { variant: { productId: 'asc' } },
-        { warehouse: { location: 'asc' } },
-      ],
+      orderBy: [{ warehouse: { location: 'asc' } }],
     });
   }
 
-  async findInventory(variantId: string, warehouseId: string) {
+  async findInventory(target: InventoryTarget, warehouseId: string) {
     return this.prisma.inventory.findUnique({
-      where: {
-        variantId_warehouseId: { variantId, warehouseId },
-      },
+      where: inventoryUniqueWhere(target, warehouseId) as Prisma.InventoryWhereUniqueInput,
     });
   }
 
   async upsertInventory(
-    variantId: string,
+    target: InventoryTarget,
     warehouseId: string,
     quantity: number,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const inventory = await tx.inventory.upsert({
-        where: {
-          variantId_warehouseId: { variantId, warehouseId },
-        },
+        where: inventoryUniqueWhere(target, warehouseId) as Prisma.InventoryWhereUniqueInput,
         update: { quantity },
-        create: { variantId, warehouseId, quantity },
+        create: { ...target, warehouseId, quantity },
       });
 
-      const totalStock = await tx.inventory.aggregate({
-        where: { variantId },
-        _sum: { quantity: true },
-      });
-
-      await tx.variant.update({
-        where: { id: variantId },
-        data: { stock: totalStock._sum.quantity || 0 },
-      });
+      await recomputeAndSyncStock(tx, target);
 
       return inventory;
     });
@@ -188,7 +183,7 @@ export class LogisticsRepository {
     trackingNumber?: string;
     departureDate?: string;
     notes?: string;
-    items: { variantId: string; quantity: number }[];
+    items: (InventoryTarget & { quantity: number })[];
   }): Promise<CargoShipment> {
     return this.prisma.cargoShipment.create({
       data: {
@@ -202,12 +197,13 @@ export class LogisticsRepository {
         items: {
           create: data.items.map((item) => ({
             variantId: item.variantId,
+            productId: item.productId,
             quantity: item.quantity,
           })),
         },
       },
       include: {
-        items: { include: { variant: true } },
+        items: { include: { variant: true, product: true } },
         origin: true,
         destination: true,
       },
@@ -236,6 +232,7 @@ export class LogisticsRepository {
             variant: {
               include: { product: true },
             },
+            product: true,
           },
         },
       },
@@ -255,74 +252,136 @@ export class LogisticsRepository {
   }
 
   async transferInventory(
-    variantId: string,
+    target: InventoryTarget,
     fromWarehouseId: string,
     toWarehouseId: string,
     quantity: number,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.inventory.update({
-        where: {
-          variantId_warehouseId: { variantId, warehouseId: fromWarehouseId },
-        },
-        data: { quantity: { decrement: quantity } },
-      });
+      await this.guardedDecrementAndCredit(
+        tx,
+        target,
+        fromWarehouseId,
+        toWarehouseId,
+        quantity,
+      );
 
-      await tx.inventory.upsert({
-        where: {
-          variantId_warehouseId: { variantId, warehouseId: toWarehouseId },
-        },
-        update: { quantity: { increment: quantity } },
-        create: { variantId, warehouseId: toWarehouseId, quantity },
-      });
+      await recomputeAndSyncStock(tx, target);
+    });
+  }
 
-      const totalStock = await tx.inventory.aggregate({
-        where: { variantId },
-        _sum: { quantity: true },
-      });
+  // Decrements origin stock only if enough is available (atomic, race-safe
+  // WHERE quantity >= N guard — mirrors the pattern already used for order
+  // stock decrements), then credits the destination. Throws inside the
+  // transaction on insufficient stock so the whole transfer rolls back.
+  private async guardedDecrementAndCredit(
+    tx: Prisma.TransactionClient,
+    target: InventoryTarget,
+    fromWarehouseId: string,
+    toWarehouseId: string,
+    quantity: number,
+  ) {
+    const decremented = await tx.inventory.updateMany({
+      where: {
+        ...inventoryFilterWhere(target),
+        warehouseId: fromWarehouseId,
+        quantity: { gte: quantity },
+      },
+      data: { quantity: { decrement: quantity } },
+    });
+    if (decremented.count === 0) {
+      throw new BadRequestException(
+        `Insufficient stock for item ${target.variantId ?? target.productId} at origin warehouse`,
+      );
+    }
 
-      await tx.variant.update({
-        where: { id: variantId },
-        data: { stock: totalStock._sum.quantity || 0 },
-      });
+    await tx.inventory.upsert({
+      where: inventoryUniqueWhere(target, toWarehouseId) as Prisma.InventoryWhereUniqueInput,
+      update: { quantity: { increment: quantity } },
+      create: { ...target, warehouseId: toWarehouseId, quantity },
+    });
+  }
+
+  // Atomically transfers every item in one transaction, so a mid-batch
+  // insufficient-stock failure rolls back the entire bulk transfer rather
+  // than leaving earlier items committed.
+  async bulkTransferInventory(
+    items: (InventoryTarget & { quantity: number })[],
+    fromWarehouseId: string,
+    toWarehouseId: string,
+    meta: { note?: string; userId?: string } = {},
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const target: InventoryTarget = {
+          variantId: item.variantId,
+          productId: item.productId,
+        };
+
+        await this.guardedDecrementAndCredit(
+          tx,
+          target,
+          fromWarehouseId,
+          toWarehouseId,
+          item.quantity,
+        );
+
+        await recomputeAndSyncStock(tx, target);
+
+        await tx.stockMovement.create({
+          data: {
+            variantId: item.variantId,
+            productId: item.productId,
+            fromWarehouseId,
+            toWarehouseId,
+            quantity: item.quantity,
+            reason: 'TRANSFER',
+            note: meta.note,
+            userId: meta.userId,
+          },
+        });
+      }
     });
   }
 
   async updateCargoWithInventory(
     id: string,
     cargoData: Prisma.CargoShipmentUpdateInput,
-    inventoryUpdates: Array<{
-      variantId: string;
-      warehouseId: string;
-      quantity: number;
-    }>,
+    inventoryUpdates: Array<InventoryTarget & { warehouseId: string; quantity: number }>,
   ) {
     return this.prisma.$transaction(async (tx) => {
       for (const update of inventoryUpdates) {
-        await tx.inventory.upsert({
-          where: {
-            variantId_warehouseId: {
-              variantId: update.variantId,
+        const target: InventoryTarget = { variantId: update.variantId, productId: update.productId };
+
+        if (update.quantity < 0) {
+          // Origin deduction: guard atomically against insufficient stock
+          // instead of trusting a pre-check made outside this transaction.
+          const decremented = await tx.inventory.updateMany({
+            where: {
+              ...inventoryFilterWhere(target),
               warehouseId: update.warehouseId,
+              quantity: { gte: -update.quantity },
             },
-          },
-          update: { quantity: { increment: update.quantity } },
-          create: {
-            variantId: update.variantId,
-            warehouseId: update.warehouseId,
-            quantity: Math.max(0, update.quantity),
-          },
-        });
+            data: { quantity: { decrement: -update.quantity } },
+          });
+          if (decremented.count === 0) {
+            throw new BadRequestException(
+              `Insufficient stock for item ${update.variantId ?? update.productId} in origin warehouse`,
+            );
+          }
+        } else {
+          await tx.inventory.upsert({
+            where: inventoryUniqueWhere(target, update.warehouseId) as Prisma.InventoryWhereUniqueInput,
+            update: { quantity: { increment: update.quantity } },
+            create: {
+              ...target,
+              warehouseId: update.warehouseId,
+              quantity: update.quantity,
+            },
+          });
+        }
 
-        const totalStock = await tx.inventory.aggregate({
-          where: { variantId: update.variantId },
-          _sum: { quantity: true },
-        });
-
-        await tx.variant.update({
-          where: { id: update.variantId },
-          data: { stock: totalStock._sum.quantity || 0 },
-        });
+        await recomputeAndSyncStock(tx, target);
       }
 
       return tx.cargoShipment.update({
@@ -335,5 +394,72 @@ export class LogisticsRepository {
         },
       });
     });
+  }
+
+  // Compares the cached Variant.stock/Product.stock fields against
+  // SUM(Inventory.quantity) for every item that actually has Inventory rows.
+  // Only flags drift — does not correct it, since silently "fixing" the
+  // cache could mask a real bug in whatever wrote it out of sync.
+  async findStockDrift(): Promise<{
+    variantDrift: Array<{ variantId: string; cached: number; actual: number }>;
+    productDrift: Array<{ productId: string; cached: number; actual: number }>;
+  }> {
+    const [variantSums, productSums] = await Promise.all([
+      this.prisma.inventory.groupBy({
+        by: ['variantId'],
+        where: { variantId: { not: null } },
+        _sum: { quantity: true },
+      }),
+      this.prisma.inventory.groupBy({
+        by: ['productId'],
+        where: { productId: { not: null } },
+        _sum: { quantity: true },
+      }),
+    ]);
+
+    const variantIds = variantSums
+      .map((v) => v.variantId)
+      .filter((id): id is string => Boolean(id));
+    const productIds = productSums
+      .map((p) => p.productId)
+      .filter((id): id is string => Boolean(id));
+
+    const [variants, products] = await Promise.all([
+      variantIds.length
+        ? this.prisma.variant.findMany({
+            where: { id: { in: variantIds } },
+            select: { id: true, stock: true },
+          })
+        : Promise.resolve([]),
+      productIds.length
+        ? this.prisma.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, stock: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const variantStockById = new Map(variants.map((v) => [v.id, v.stock]));
+    const productStockById = new Map(products.map((p) => [p.id, p.stock]));
+
+    const variantDrift = variantSums
+      .filter((v) => v.variantId)
+      .map((v) => ({
+        variantId: v.variantId as string,
+        cached: variantStockById.get(v.variantId as string) ?? 0,
+        actual: v._sum.quantity ?? 0,
+      }))
+      .filter((d) => d.cached !== d.actual);
+
+    const productDrift = productSums
+      .filter((p) => p.productId)
+      .map((p) => ({
+        productId: p.productId as string,
+        cached: productStockById.get(p.productId as string) ?? 0,
+        actual: p._sum.quantity ?? 0,
+      }))
+      .filter((d) => d.cached !== d.actual);
+
+    return { variantDrift, productDrift };
   }
 }

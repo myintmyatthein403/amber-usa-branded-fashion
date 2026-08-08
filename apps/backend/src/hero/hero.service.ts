@@ -3,17 +3,26 @@ import { HeroSection } from '@prisma/client';
 import { HeroRepository } from './hero.repository';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 import { HeroSection as HeroSectionInput } from '@amber/shared';
+import { MemoryCacheService } from '../common/cache/memory-cache.service';
+
+const CACHE_KEY = 'hero:active';
+const CACHE_TTL_MS = 60_000;
 
 @Injectable()
 export class HeroService {
-  constructor(private readonly heroRepository: HeroRepository) {}
+  constructor(
+    private readonly heroRepository: HeroRepository,
+    private cache: MemoryCacheService,
+  ) {}
 
   async create(data: HeroSectionInput): Promise<HeroSection> {
     const sanitizedData = sanitizeData(data);
     if (sanitizedData.isActive) {
       await this.heroRepository.deactivateAll();
     }
-    return this.heroRepository.create(sanitizedData);
+    const created = await this.heroRepository.create(sanitizedData);
+    this.cache.invalidate(CACHE_KEY);
+    return created;
   }
 
   async findAll(): Promise<HeroSection[]> {
@@ -21,7 +30,9 @@ export class HeroService {
   }
 
   async findActive(): Promise<HeroSection | null> {
-    return this.heroRepository.findActive();
+    return this.cache.getOrSet(CACHE_KEY, CACHE_TTL_MS, () =>
+      this.heroRepository.findActive(),
+    );
   }
 
   async findOne(id: string): Promise<HeroSection> {
@@ -38,11 +49,15 @@ export class HeroService {
     if (sanitizedData.isActive) {
       await this.heroRepository.deactivateOthers(id);
     }
-    return this.heroRepository.update(id, sanitizedData);
+    const updated = await this.heroRepository.update(id, sanitizedData);
+    this.cache.invalidate(CACHE_KEY);
+    return updated;
   }
 
   async remove(id: string): Promise<HeroSection> {
     await this.findOne(id);
-    return this.heroRepository.delete(id);
+    const deleted = await this.heroRepository.delete(id);
+    this.cache.invalidate(CACHE_KEY);
+    return deleted;
   }
 }

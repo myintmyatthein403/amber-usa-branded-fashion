@@ -12,16 +12,28 @@ import {
   UsePipes,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { LoginSchema, RegisterSchema, UserSchema } from '@amber/shared';
+import {
+  LoginSchema,
+  RegisterSchema,
+  UserSchema,
+  ForgotPasswordSchema,
+  type ForgotPasswordInput,
+  ResetPasswordSchema,
+  type ResetPasswordInput,
+} from '@amber/shared';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Tighter than the global default — brute-force protection on the single
+  // most sensitive public endpoint.
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
@@ -40,6 +52,7 @@ export class AuthController {
     return this.authService.googleLogin(idToken);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
   async register(
     @Body(new ZodValidationPipe(RegisterSchema)) registerDto: any,
@@ -71,18 +84,21 @@ export class AuthController {
     return this.authService.isUsernameAvailable(req.user.userId, username);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  async forgotPassword(@Body('email') email: string) {
-    return this.authService.requestPasswordReset(email);
+  async forgotPassword(
+    @Body(new ZodValidationPipe(ForgotPasswordSchema)) body: ForgotPasswordInput,
+  ) {
+    return this.authService.requestPasswordReset(body.email);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(
-    @Body('token') token: string,
-    @Body('password') password: string,
+    @Body(new ZodValidationPipe(ResetPasswordSchema)) body: ResetPasswordInput,
   ) {
-    return this.authService.resetPassword(token, password);
+    return this.authService.resetPassword(body.token, body.password);
   }
 }

@@ -159,8 +159,11 @@ export type Sale = z.infer<typeof SaleSchema> & {
 export type CreateSaleInput = z.infer<typeof SaleSchema>;
 
 export const CargoItemInputSchema = z.object({
-  variantId: z.string().uuid(),
+  variantId: z.string().uuid().optional(),
+  productId: z.string().uuid().optional(),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
+}).refine((d) => !!d.variantId !== !!d.productId, {
+  message: 'Exactly one of variantId or productId is required',
 });
 
 export const CreateCargoShipmentSchema = z.object({

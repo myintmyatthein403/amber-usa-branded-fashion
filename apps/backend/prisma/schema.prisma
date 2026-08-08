@@ -29,6 +29,19 @@ model User {
   refundRequests  RefundRequest[]
   addresses       SavedAddress[]
   wishlist        WishlistItem[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 enum UserStatus {
@@ -62,6 +75,7 @@ enum OrderStatus {
 enum PaymentStatus {
   PENDING
   PAID
+  PARTIALLY_PAID
   FAILED
   REFUNDED
   REJECTED
@@ -99,6 +113,10 @@ model Order {
   stripePaymentIntentId String? @unique
   hasPreOrderItems Boolean     @default(false)
   restocked       Boolean     @default(false)
+  depositAmount   Decimal?    @db.Decimal(10, 2) // Amount required upfront; null = full payment
+  balanceDue      Decimal?    @db.Decimal(10, 2)
+  balanceSettledAt DateTime?
+  balanceSettledBy String?
   
   userId          String?
   user            User?       @relation(fields: [userId], references: [id])
@@ -111,19 +129,24 @@ model Order {
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+
   productId String
   product   Product @relation(fields: [productId], references: [id])
-  
+
   variantId String?
   variant   Variant? @relation(fields: [variantId], references: [id])
-  
+
   name      String
   price     Decimal @db.Decimal(10, 2)
   currencyCode String @default("USD")
@@ -132,9 +155,14 @@ model OrderItem {
   quantity  Int
   image     String
   size      String?
-  
+
   isPreOrder Boolean @default(false)
   expectedShippingDate DateTime?
+  isDigital  Boolean @default(false)
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
 }
 
 model RefundRequest {
@@ -181,7 +209,6 @@ model Product {
   publishAt        DateTime?
   shortDescription String?
   description      String?       @db.Text
-  descriptionMy    String?       @db.Text
   detail           String?       @db.Text
   note             String?       @db.Text
   
@@ -196,6 +223,8 @@ model Product {
   isNewArrival     Boolean       @default(false)
   isBestSeller     Boolean       @default(false)
   stock            Int           @default(0)
+  lowStockThreshold Int          @default(5)
+  isDigital        Boolean       @default(false)
 
   // Pre-order Fields
   isPreOrder       Boolean       @default(false)
@@ -224,13 +253,24 @@ model Product {
   
   variants         Variant[]
   collections      Collection[]  @relation("ProductCollections")
-  
+
   saleId           String?
   sale             Sale?         @relation(fields: [saleId], references: [id])
-  
+
   reviews          Review[]
   orderItems       OrderItem[]
   wishlistItems    WishlistItem[]
+
+  inventory        Inventory[]
+  cargoItems       CargoItem[]
+  stockMovements   StockMovement[]
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([saleId])
+  @@index([status])
+  @@index([visibility])
+  @@index([createdAt])
 }
 
 model Review {
@@ -241,12 +281,14 @@ model Review {
   userProfileUrl String?  // Link to social profile
   platform       Platform @default(WEBSITE)
   isApproved     Boolean  @default(false)
-  
+
   productId      String
   product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([productId])
 }
 
 enum Platform {
@@ -480,6 +522,8 @@ model Category {
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  @@index([parentId])
 }
 
 model Variant {
@@ -513,6 +557,8 @@ model Variant {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   orderItems        OrderItem[]
+
+  @@index([productId])
 }
 
 model PaymentMethod {
@@ -525,6 +571,7 @@ model PaymentMethod {
   qrCode        String?
   instructions  String?  @db.Text
   isActive      Boolean  @default(true)
+  isCod         Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -533,12 +580,17 @@ model Settings {
   id              String   @id @default("global")
   privacyPolicy   String?  @db.Text
   termsConditions String?  @db.Text
-  
+
   // Stripe configuration
   stripePublishableKey String?
   stripeSecretKey      String?
   stripeWebhookSecret  String?
-  
+
+  // COD deposit configuration (flat MMK amount required upfront for Cash on Delivery orders)
+  codDepositAmount Decimal? @db.Decimal(10, 2)
+  // Deposit only required for customers with fewer than this many past paid orders; null = disabled
+  codDepositOrderThreshold Int?
+
   updatedAt       DateTime @updatedAt
 }
 
@@ -615,13 +667,17 @@ model Warehouse {
 
 model Inventory {
   id          String    @id @default(uuid())
-  variantId   String
-  variant     Variant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variantId   String?
+  variant     Variant?  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id], onDelete: Cascade)
   warehouseId String
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   quantity    Int       @default(0)
 
   @@unique([variantId, warehouseId])
+  @@unique([productId, warehouseId])
+  @@index([warehouseId])
 }
 
 model CargoShipment {
@@ -659,9 +715,15 @@ model CargoItem {
   id          String        @id @default(uuid())
   shipmentId  String
   shipment    CargoShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  variantId   String
-  variant     Variant       @relation(fields: [variantId], references: [id])
+  variantId   String?
+  variant     Variant?      @relation(fields: [variantId], references: [id])
+  productId   String?
+  product     Product?      @relation(fields: [productId], references: [id])
   quantity    Int
+
+  @@index([shipmentId])
+  @@index([variantId])
+  @@index([productId])
 }
 
 model Media {
@@ -688,8 +750,10 @@ enum StockMovementReason {
 
 model StockMovement {
   id              String              @id @default(uuid())
-  variantId       String
-  variant         Variant             @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variantId       String?
+  variant         Variant?            @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?            @relation(fields: [productId], references: [id], onDelete: Cascade)
   fromWarehouseId String?
   toWarehouseId   String?
   quantity        Int
@@ -697,6 +761,12 @@ model StockMovement {
   note            String?
   userId          String?
   createdAt       DateTime            @default(now())
+
+  @@index([variantId])
+  @@index([productId])
+  @@index([fromWarehouseId])
+  @@index([toWarehouseId])
+  @@index([createdAt])
 }
 
 model SavedAddress {
@@ -714,6 +784,8 @@ model SavedAddress {
   isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model WishlistItem {
@@ -726,6 +798,7 @@ model WishlistItem {
   createdAt DateTime @default(now())
 
   @@unique([userId, productId, variantId])
+  @@index([productId])
 }
 
 model Currency {

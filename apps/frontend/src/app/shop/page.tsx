@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useMemo, Suspense, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useMemo, Suspense, useEffect, useCallback, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import QuickViewModal from "@/components/modals/QuickViewModal";
 import CompareDrawer from "@/components/CompareDrawer";
 import ShopSidebar from "@/components/ShopSidebar";
+import { ProductGridSkeleton } from "@/components/ProductCardSkeleton";
 import { useDebounce } from "@/hooks/useDebounce";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
-import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { ShoppingBag, Eye, Filter, X, ChevronDown, Check, Scale, Search, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
 import Price from "@/components/Price";
@@ -20,11 +21,15 @@ import {
   type CategoryNode,
   type CategoryTreeNode,
 } from "@amber/shared";
+import { isProductPurchasable, getProductStock } from "@/lib/product";
 
 interface ShopVariant {
+  id: string;
   stock: number;
   size?: string;
   color?: string;
+  price?: number | string | null;
+  images?: string[];
   attributeSelections?: Record<string, string> | null;
 }
 
@@ -57,6 +62,10 @@ interface ShopProduct {
   colors: string[];
   variants?: ShopVariant[];
   onSale?: boolean;
+  stock?: number;
+  isPreOrder?: boolean;
+  visibility?: string;
+  depositAmount?: number | string | null;
 }
 
 const SORT_OPTIONS = [
@@ -68,8 +77,16 @@ const SORT_OPTIONS = [
 
 function ShopContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const initialSaleFilter = searchParams.get('sale') === 'true';
   const initialCollectionFilter = searchParams.get('collection') || "All";
+  const initialBrandFilter = searchParams.get('brand') || "All";
+  const initialCategoryId = searchParams.get('category') || null;
+  const initialSizeFilter = searchParams.get('size') || "All";
+  const initialSortBy = searchParams.get('sort') || "latest";
+  const initialInStock = searchParams.get('inStock') === 'true';
+  const initialPage = Number(searchParams.get('page')) || 1;
 
   const addToCart = useStore((state) => state.addToCart);
   const addToCompare = useStore((state) => state.addToCompare);
@@ -87,11 +104,11 @@ function ShopContent() {
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [selectedBrand, setSelectedBrand] = useState("All");
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedBrand, setSelectedBrand] = useState(initialBrandFilter);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(initialCategoryId);
   const [shopCategories, setShopCategories] = useState<CategoryNode[]>([]);
   const [selectedCollection, setSelectedCollection] = useState(initialCollectionFilter);
-  const [selectedSize, setSelectedSize] = useState("All");
+  const [selectedSize, setSelectedSize] = useState(initialSizeFilter);
   const [filterableAttributes, setFilterableAttributes] = useState<FilterableAttribute[]>([]);
   const [selectedAttributeFilters, setSelectedAttributeFilters] = useState<
     Record<string, string>
@@ -104,7 +121,7 @@ function ShopContent() {
   const [minPriceInput, setMinPriceInput] = useState("0");
   const [maxPriceInput, setMaxPriceInput] = useState(MAX_PRICE_USD.toLocaleString()); 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || "");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(initialPage);
   const ITEMS_PER_PAGE = 9;
 
   // Sync inputs with priceRangeUsd and currency
@@ -115,9 +132,9 @@ function ShopContent() {
     setMaxPriceInput(Math.round(priceRangeUsd[1] * factor).toLocaleString());
   }, [priceRangeUsd, currency, exchangeRate, mounted]);
 
-  const [onlyInStock, setOnlyInStock] = useState(false);
+  const [onlyInStock, setOnlyInStock] = useState(initialInStock);
   const [onlySale, setOnlySale] = useState(initialSaleFilter);
-  const [sortBy, setSortBy] = useState("latest");
+  const [sortBy, setSortBy] = useState(initialSortBy);
 
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [filterLoading, setFilterLoading] = useState(false);
@@ -145,7 +162,12 @@ function ShopContent() {
     }
   }, [searchParams]);
 
+  const isFirstFilterRender = useRef(true);
   useEffect(() => {
+    if (isFirstFilterRender.current) {
+      isFirstFilterRender.current = false;
+      return;
+    }
     setCurrentPage(1);
   }, [
     selectedBrand,
@@ -158,6 +180,39 @@ function ShopContent() {
     onlyInStock,
     onlySale,
     sortBy,
+  ]);
+
+  // Sync the primary filter/sort/page state to the URL so the current view
+  // is shareable and bookmarkable. Uses replace (not push) to avoid spamming
+  // browser history on every keystroke/click.
+  useEffect(() => {
+    if (!mounted) return;
+    const params = new URLSearchParams();
+    if (debouncedSearchQuery) params.set('search', debouncedSearchQuery);
+    if (selectedCategoryId) params.set('category', selectedCategoryId);
+    if (selectedBrand !== 'All') params.set('brand', selectedBrand);
+    if (selectedCollection !== 'All') params.set('collection', selectedCollection);
+    if (selectedSize !== 'All') params.set('size', selectedSize);
+    if (onlySale) params.set('sale', 'true');
+    if (onlyInStock) params.set('inStock', 'true');
+    if (sortBy !== 'latest') params.set('sort', sortBy);
+    if (currentPage > 1) params.set('page', String(currentPage));
+
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [
+    mounted,
+    debouncedSearchQuery,
+    selectedCategoryId,
+    selectedBrand,
+    selectedCollection,
+    selectedSize,
+    onlySale,
+    onlyInStock,
+    sortBy,
+    currentPage,
+    router,
+    pathname,
   ]);
 
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
@@ -179,13 +234,16 @@ function ShopContent() {
       brand: p.brand?.name || "Unbranded",
       collections: p.collections?.map((c) => c.name) || [],
       image: p.images?.[0] || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800",
-      inStock: p.variants?.some((v) => v.stock > 0) ?? true,
+      inStock: isProductPurchasable(p as { stock?: number; variants?: ShopVariant[]; isPreOrder?: boolean; visibility?: string }),
       sizes: Array.from(new Set(p.variants?.flatMap((v) => v.size ? [v.size] : []) || [])),
       colors: Array.from(new Set(p.variants?.flatMap((v) => v.color ? [v.color] : []) || [])),
       variants: p.variants?.map((v) => ({
+        id: v.id,
         stock: v.stock,
         size: v.size,
         color: v.color,
+        price: v.price,
+        images: v.images,
         attributeSelections:
           v.attributeSelections && typeof v.attributeSelections === 'object'
             ? (v.attributeSelections as Record<string, string>)
@@ -352,7 +410,19 @@ function ShopContent() {
       return;
     }
     setAddingId(product.id);
-    const added = addToCart(product as unknown as Product);
+    const added = addToCart(
+      product as unknown as Product,
+      undefined,
+      undefined,
+      product.isPreOrder,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      getProductStock(product as unknown as Product),
+      product.depositAmount != null ? Number(product.depositAmount) : undefined,
+    );
     if (added) setTimeout(() => setAddingId(null), 800);
   };
 
@@ -583,10 +653,7 @@ function ShopContent() {
             </div>
 
             {loading ? (
-              <div className="py-24 flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">Syncing Master Catalog...</span>
-              </div>
+              <ProductGridSkeleton count={9} />
             ) : (
               <div className="space-y-20">
                 {paginatedProducts.length > 0 ? (

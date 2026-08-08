@@ -27,6 +27,7 @@ export const CategoriesPage: React.FC = () => {
     deleteConfirmOpen,
     confirmDelete,
     cancelDelete,
+    deleteImpact,
     availableCategories,
     reorderCategories,
     toggleCategoryActive,
@@ -84,10 +85,19 @@ export const CategoriesPage: React.FC = () => {
             </div>
             <div className="space-y-2">
               <p className="text-lg font-serif text-foreground">Delete this category?</p>
-              <p className="text-sm text-muted-foreground">
-                This action cannot be undone. Products associated with this category may be
-                affected.
-              </p>
+              {deleteImpact ? (
+                <p className="text-sm text-destructive font-medium">
+                  This category has {deleteImpact.subcategoryCount} subcategor
+                  {deleteImpact.subcategoryCount === 1 ? 'y' : 'ies'} and{' '}
+                  {deleteImpact.productCount} product(s). Deleting it will also delete the
+                  subcategories and un-categorize the products. This cannot be undone.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  This action cannot be undone. Products associated with this category may be
+                  affected.
+                </p>
+              )}
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
@@ -101,7 +111,7 @@ export const CategoriesPage: React.FC = () => {
               onClick={confirmDelete}
               className="px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all duration-300"
             >
-              Delete
+              {deleteImpact ? 'Delete Anyway' : 'Delete'}
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import { CheckoutFormData, Market } from "./index";
 import { useTranslations } from "@/i18n/useTranslations";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ interface ShippingFormProps {
   formData: CheckoutFormData;
   onUpdate: (updates: Partial<CheckoutFormData>) => void;
   onContinue: () => void;
+  onBack: () => void;
   submitting?: boolean;
 }
 
@@ -28,6 +30,7 @@ export default function ShippingForm({
   formData,
   onUpdate,
   onContinue,
+  onBack,
   submitting = false,
 }: ShippingFormProps) {
   const t = useTranslations();
@@ -189,14 +192,23 @@ export default function ShippingForm({
         />
       </div>
 
-      <button
-        type="button"
-        onClick={onContinue}
-        disabled={!isValid || submitting}
-        className="w-full bg-[#1A1A1A] text-white py-5 uppercase tracking-[0.3em] text-[10px] font-bold hover:bg-[#D4AF37] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {submitting ? "Checking Stock..." : t("checkout.continueDelivery")}
-      </button>
+      <div className="flex gap-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="p-5 border border-[#1A1A1A]/10 hover:bg-zinc-50 transition-all"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onContinue}
+          disabled={!isValid || submitting}
+          className="flex-1 bg-[#1A1A1A] text-white py-5 uppercase tracking-[0.3em] text-[10px] font-bold hover:bg-[#D4AF37] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {submitting ? "Checking Stock..." : t("checkout.continueDelivery")}
+        </button>
+      </div>
     </>
   );
 }

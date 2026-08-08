@@ -120,6 +120,20 @@ export const useOrders = () => {
     }
   };
 
+  const handleSettleBalance = async (id: string) => {
+    try {
+      await apiService(API_ROUTES.ORDERS.SETTLE_BALANCE(id), { method: 'POST' });
+      await fetchOrders();
+      if (selectedOrder?.id === id) {
+        const updated = await apiService<unknown, Order>(API_ROUTES.ORDERS.BY_ID(id));
+        setSelectedOrder((updated as { data?: Order })?.data ?? updated);
+      }
+    } catch (error) {
+      console.error('Failed to settle balance:', error);
+      alert('Failed to settle balance.');
+    }
+  };
+
   const handleRefund = async (id: string, amount?: number) => {
     try {
       await apiService(`${API_ROUTES.ORDERS.BASE}/${id}/refund`, {
@@ -208,6 +222,7 @@ export const useOrders = () => {
     handleRefund,
     handleConfirmManualPayment,
     handleRejectManualPayment,
+    handleSettleBalance,
     handleDelete,
     refresh: fetchOrders
   };

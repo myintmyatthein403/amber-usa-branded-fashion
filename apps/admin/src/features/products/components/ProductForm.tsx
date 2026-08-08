@@ -14,7 +14,6 @@ interface ProductFormProps {
   productForm: Partial<Product> & {
     currency?: string;
     currencyCode?: string;
-    descriptionMy?: string;
     publishAt?: string;
     tags?: string[];
   };
@@ -116,17 +115,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         onChange={(val) => handleFieldChange('description', val)} 
       />
 
-      <div className="space-y-2">
-        <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Description (Burmese)</label>
-        <textarea
-          value={productForm.descriptionMy || ''}
-          onChange={(e) => handleFieldChange('descriptionMy', e.target.value)}
-          rows={3}
-          className="w-full border border-input bg-card px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors duration-300"
-          placeholder="မြန်မာဖော်ပြချက်..."
-        />
-      </div>
-
       <PricingSection
         price={productForm.price?.toString() || ""}
         compareAtPrice={productForm.compareAtPrice?.toString() || ""}
@@ -198,6 +186,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           { key: 'isFeatured', label: 'Featured' },
           { key: 'isNewArrival', label: 'New Arrival' },
           { key: 'isBestSeller', label: 'Best Seller' },
+          { key: 'isDigital', label: 'Digital (No Shipping)' },
         ].map(({ key, label }) => (
           <label key={key} className="flex items-center gap-2 cursor-pointer">
             <input

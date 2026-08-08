@@ -2,14 +2,20 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersRepository } from '../users/users.repository';
 import { User, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { RegisterInput, LoginInput, User as UserInput } from '@amber/shared';
+import { PasswordResetRepository } from './password-reset.repository';
+import { EmailService } from './email.service';
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 @Injectable()
 export class AuthService {
@@ -19,6 +25,8 @@ export class AuthService {
     private usersRepository: UsersRepository,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private passwordResetRepository: PasswordResetRepository,
+    private emailService: EmailService,
   ) {
     this.googleClient = new OAuth2Client(
       this.configService.get<string>('GOOGLE_CLIENT_ID'),
@@ -204,23 +212,46 @@ export class AuthService {
     };
   }
 
-  /** Stub: wire to email provider when SMTP is configured */
   async requestPasswordReset(email: string) {
     const user = await this.usersRepository.findByEmail(email);
+    // Always return the same message regardless of whether the account
+    // exists, so this endpoint can't be used to enumerate registered emails.
     if (user) {
-      // TODO: generate token, persist, send email
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+      // Invalidate any earlier outstanding tokens so only the newest link works.
+      await this.passwordResetRepository.invalidateAllForUser(user.id);
+      await this.passwordResetRepository.create(user.id, tokenHash, expiresAt);
+
+      const frontendUrl =
+        this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+      const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+      await this.emailService.sendPasswordResetEmail(user.email, resetUrl);
     }
+
     return {
       message:
-        'If an account exists for this email, password reset instructions will be sent when email delivery is configured.',
+        'If an account exists for this email, password reset instructions have been sent.',
     };
   }
 
-  /** Stub: validate token and update password when reset flow is fully implemented */
-  async resetPassword(_token: string, _newPassword: string) {
-    return {
-      message:
-        'Password reset is not yet enabled. Please contact support or use Google sign-in.',
-    };
+  async resetPassword(token: string, newPassword: string) {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const resetToken = await this.passwordResetRepository.findValidByTokenHash(tokenHash);
+    if (!resetToken) {
+      throw new BadRequestException(
+        'This reset link is invalid or has expired. Please request a new one.',
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.usersRepository.update(resetToken.userId, {
+      password: hashedPassword,
+    });
+    await this.passwordResetRepository.markUsed(resetToken.id);
+
+    return { message: 'Password has been reset successfully. You can now sign in.' };
   }
 }

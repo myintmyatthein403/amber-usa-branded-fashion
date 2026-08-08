@@ -11,7 +11,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrderStatusChangedEvent } from '../common/events/domain.events';
 import { ExchangeRateHelper } from '../currencies/exchange-rate.helper';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
-import { normalizePrice, toUsd } from '@amber/shared';
+import { normalizePrice, toUsd, calculateDepositTotal } from '@amber/shared';
 
 const STRIPE_METHOD_NAMES = ['stripe', 'credit card'];
 
@@ -74,10 +74,12 @@ export class OrdersService {
     const orderCurrency = data.currency || 'USD';
 
     if (!warehouseId) {
-      const firstItem = data.items.find((item) => item.variantId);
-      if (firstItem && firstItem.variantId) {
+      const firstItem = data.items[0];
+      if (firstItem) {
         const inventory = await this.ordersRepository.findWarehouseWithStock(
-          firstItem.variantId,
+          firstItem.variantId
+            ? { variantId: firstItem.variantId }
+            : { productId: firstItem.productId },
           firstItem.quantity,
         );
         warehouseId = inventory?.warehouseId;
@@ -100,8 +102,10 @@ export class OrdersService {
 
     for (const item of data.items) {
       let isPreOrder = false;
+      let isDigital = false;
       let expectedShippingDate = null;
       let dbPrice = 0;
+      let depositAmount: number | null = null;
       let currencyCode = item.currencyCode || (item.isUsd ? 'USD' : 'MMK');
 
       if (item.variantId) {
@@ -119,6 +123,10 @@ export class OrdersService {
         isPreOrder = variant.isPreOrder || variant.product.isPreOrder;
         expectedShippingDate =
           variant.preOrderShippingDate || variant.product.preOrderShippingDate;
+        const productDeposit = (
+          variant.product as { depositAmount?: unknown }
+        ).depositAmount;
+        depositAmount = productDeposit != null ? Number(productDeposit) : null;
       } else {
         const product = await this.ordersRepository.findProductForOrder(
           item.productId,
@@ -130,7 +138,11 @@ export class OrdersService {
         currencyCode =
           (product as { currencyCode?: string }).currencyCode || currencyCode;
         isPreOrder = product.isPreOrder;
+        isDigital = (product as { isDigital?: boolean }).isDigital ?? false;
         expectedShippingDate = product.preOrderShippingDate;
+        const productDeposit = (product as { depositAmount?: unknown })
+          .depositAmount;
+        depositAmount = productDeposit != null ? Number(productDeposit) : null;
       }
 
       const unitPriceUsd = toUsd(dbPrice, currencyCode, lockedExchangeRate);
@@ -149,11 +161,54 @@ export class OrdersService {
         unitPriceUsd,
         isUsd: currencyCode === 'USD',
         isPreOrder,
+        isDigital,
+        depositAmount,
         expectedShippingDate,
       });
     }
 
     calculatedTotal += data.deliveryFee || 0;
+
+    const paymentMethodRow = await this.prisma.paymentMethod.findFirst({
+      where: { name: data.paymentMethod },
+    });
+    const settings = await this.prisma.settings.findUnique({
+      where: { id: 'global' },
+    });
+
+    const isCodMethod =
+      (paymentMethodRow as { isCod?: boolean } | null)?.isCod ?? false;
+    let codDepositApplies = false;
+    if (
+      isCodMethod &&
+      settings?.codDepositAmount != null &&
+      settings?.codDepositOrderThreshold != null
+    ) {
+      const pastPaidOrderCount = data.userId
+        ? await this.prisma.order.count({
+            where: {
+              userId: data.userId,
+              paymentStatus: { in: ['PAID', 'PARTIALLY_PAID'] },
+            },
+          })
+        : 0;
+      codDepositApplies = pastPaidOrderCount < settings.codDepositOrderThreshold;
+    }
+
+    const { depositAmount, balanceDue } = calculateDepositTotal(
+      itemsWithPreOrderInfo,
+      data.deliveryFee || 0,
+      orderCurrency,
+      lockedExchangeRate ?? 1,
+      {
+        isCod: codDepositApplies,
+        codDepositAmount:
+          settings?.codDepositAmount != null
+            ? Number(settings.codDepositAmount)
+            : null,
+      },
+      calculatedTotal,
+    );
 
     return this.ordersRepository.create(
       data,
@@ -161,6 +216,8 @@ export class OrdersService {
       itemsWithPreOrderInfo,
       calculatedTotal,
       lockedExchangeRate,
+      depositAmount,
+      balanceDue,
     );
   }
 
@@ -225,8 +282,11 @@ export class OrdersService {
       throw new BadRequestException('Order is already paid');
     }
 
+    const hasBalanceDue =
+      order.balanceDue != null && Number(order.balanceDue) > 0;
+
     await this.ordersRepository.update(orderId, {
-      paymentStatus: 'PAID',
+      paymentStatus: hasBalanceDue ? 'PARTIALLY_PAID' : 'PAID',
       status: 'PROCESSING',
       manualPaymentReviewedAt: new Date(),
       manualPaymentReviewedBy: adminUserId,
@@ -242,6 +302,24 @@ export class OrdersService {
     }
 
     return updated;
+  }
+
+  async settleBalance(orderId: string, adminUserId: string) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (order.paymentStatus !== 'PARTIALLY_PAID') {
+      throw new BadRequestException(
+        'Only partially paid orders have a balance to settle',
+      );
+    }
+
+    return this.ordersRepository.update(orderId, {
+      paymentStatus: 'PAID',
+      balanceDue: 0,
+      balanceSettledAt: new Date(),
+      balanceSettledBy: adminUserId,
+    });
   }
 
   async rejectManualPayment(

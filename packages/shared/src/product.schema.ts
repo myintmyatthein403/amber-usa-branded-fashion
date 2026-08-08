@@ -1,34 +1,24 @@
 import { z } from 'zod';
-import { ProductBaseSchema, VariantBaseSchema, CategoryBaseSchema, BrandBaseSchema, ProductFiltersBaseSchema } from './product.base';
+import {
+  ProductBaseSchema,
+  VariantBaseSchema,
+  CategoryBaseSchema,
+  BrandBaseSchema,
+  ProductFiltersBaseSchema,
+  isPreOrderShippingDateValid,
+  PRE_ORDER_SHIPPING_DATE_REQUIRED_ISSUE,
+  isPreOrderShippingDateAbsent,
+  PRE_ORDER_SHIPPING_DATE_FORBIDDEN_ISSUE,
+} from './product.base';
 
 const PreOrderFields = z.object({
   isPreOrder: z.boolean().optional().default(false),
   preOrderShippingDate: z.string().optional().nullable(),
 });
 
-export const VariantSchema = VariantBaseSchema.merge(PreOrderFields).refine(
-  (data) => {
-    if (data.isPreOrder && !data.preOrderShippingDate) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: 'preOrderShippingDate is required when isPreOrder is true',
-    path: ['preOrderShippingDate'],
-  }
-).refine(
-  (data) => {
-    if (!data.isPreOrder && data.preOrderShippingDate) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: 'preOrderShippingDate should not be set when isPreOrder is false',
-    path: ['preOrderShippingDate'],
-  }
-);
+export const VariantSchema = VariantBaseSchema.merge(PreOrderFields)
+  .refine(isPreOrderShippingDateValid, PRE_ORDER_SHIPPING_DATE_REQUIRED_ISSUE)
+  .refine(isPreOrderShippingDateAbsent, PRE_ORDER_SHIPPING_DATE_FORBIDDEN_ISSUE);
 
 export const ProductSchema = ProductBaseSchema.extend({
   isPreOrder: z.boolean().default(false),
@@ -43,29 +33,9 @@ export const ProductSchema = ProductBaseSchema.extend({
     name: z.string(),
     logo: z.string().optional().nullable(),
   }).optional().nullable(),
-}).refine(
-  (data) => {
-    if (data.isPreOrder && !data.preOrderShippingDate) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: 'preOrderShippingDate is required when isPreOrder is true',
-    path: ['preOrderShippingDate'],
-  }
-).refine(
-  (data) => {
-    if (!data.isPreOrder && data.preOrderShippingDate) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: 'preOrderShippingDate should not be set when isPreOrder is false',
-    path: ['preOrderShippingDate'],
-  }
-);
+})
+  .refine(isPreOrderShippingDateValid, PRE_ORDER_SHIPPING_DATE_REQUIRED_ISSUE)
+  .refine(isPreOrderShippingDateAbsent, PRE_ORDER_SHIPPING_DATE_FORBIDDEN_ISSUE);
 
 export const ProductFiltersSchema = ProductFiltersBaseSchema;
 

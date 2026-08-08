@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, Loader2, Package, Box, Grid, List } from 'lucide-react';
 import { Warehouse } from '../schema';
 import { Pagination } from '../../../components/admin/Pagination';
+import { formatInventoryRowLabel } from '../../inventory/schema';
 
 interface WarehouseInventoryProps {
   warehouse: Warehouse | null;
@@ -81,11 +82,13 @@ export const WarehouseInventory: React.FC<WarehouseInventoryProps> = ({
         <div className="py-20 text-center text-xs font-medium text-muted-foreground uppercase tracking-widest italic">No matching inventory units found.</div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {inventory.map((item) => (
+          {inventory.map((item) => {
+            const label = formatInventoryRowLabel(item);
+            return (
             <div key={item.id} className="group flex flex-col bg-card border border-border hover:border-primary/30 transition-all duration-300 overflow-hidden">
               <div className="aspect-square bg-secondary border-b border-border overflow-hidden">
-                {item.variant.product.images?.[0] ? (
-                  <img src={item.variant.product.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                {label.images[0] ? (
+                  <img src={label.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Package size={32} className="text-muted-foreground/30" />
@@ -94,36 +97,51 @@ export const WarehouseInventory: React.FC<WarehouseInventoryProps> = ({
               </div>
               <div className="p-4 space-y-3">
                 <div>
-                  <div className="text-sm font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors">{item.variant.product.name}</div>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[9px] font-mono font-bold text-muted-foreground bg-muted px-2 py-0.5 border border-border">{item.variant.sku}</span>
-                  </div>
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-primary mt-1">{item.variant.size} / {item.variant.color}</div>
+                  <div className="text-sm font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors">{label.name}</div>
+                  {label.kind === 'variant' ? (
+                    <>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[9px] font-mono font-bold text-muted-foreground bg-muted px-2 py-0.5 border border-border">{label.sku}</span>
+                      </div>
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-primary mt-1">{label.size} / {label.color}</div>
+                    </>
+                  ) : (
+                    <span className="inline-block mt-1.5 px-2 py-0.5 bg-secondary text-[8px] font-bold uppercase tracking-widest border border-border">No Variants</span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Stock</span>
                   <div className="text-lg font-mono font-bold text-foreground flex items-center gap-1">
                     <Box size={14} className="text-primary/40"/>
-                    {item.stock}
+                    {item.quantity}
                   </div>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2">
-          {inventory.map((item) => (
+          {inventory.map((item) => {
+            const label = formatInventoryRowLabel(item);
+            return (
             <div key={item.id} className="group flex items-center justify-between p-4 bg-card border border-border hover:border-primary/30 transition-all duration-300">
                <div className="flex items-center gap-6">
                   <div className="w-12 h-16 bg-secondary flex-shrink-0 border border-border overflow-hidden">
-                     {item.variant.product.images?.[0] && <img src={item.variant.product.images[0]} className="w-full h-full object-cover" />}
+                     {label.images[0] && <img src={label.images[0]} className="w-full h-full object-cover" />}
                   </div>
                   <div>
-                     <div className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{item.variant.product.name}</div>
+                     <div className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{label.name}</div>
                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-[9px] font-mono font-bold text-muted-foreground bg-muted px-2 py-0.5 border border-border">{item.variant.sku}</span>
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-primary">{item.variant.size} / {item.variant.color}</span>
+                        {label.kind === 'variant' ? (
+                          <>
+                            <span className="text-[9px] font-mono font-bold text-muted-foreground bg-muted px-2 py-0.5 border border-border">{label.sku}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-primary">{label.size} / {label.color}</span>
+                          </>
+                        ) : (
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">No Variants</span>
+                        )}
                      </div>
                   </div>
                </div>
@@ -131,11 +149,12 @@ export const WarehouseInventory: React.FC<WarehouseInventoryProps> = ({
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Available Allocation</div>
                   <div className="text-xl font-mono font-bold text-foreground flex items-center justify-end gap-2">
                      <Box size={16} className="text-primary/40"/>
-                     {item.stock}
+                     {item.quantity}
                   </div>
                </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

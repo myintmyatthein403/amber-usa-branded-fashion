@@ -130,6 +130,8 @@ addVariant,
           productSlug={productSlug}
           attributes={attributes}
           submitError={submitError}
+          productForm={productForm}
+          setProductForm={setProductForm}
         />
       )}
     </Modal>

@@ -48,6 +48,7 @@ export interface PaymentMethod {
   accountNumber?: string;
   qrCode?: string;
   instructions?: string;
+  isCod?: boolean;
 }
 
 export interface StockValidationResult {
@@ -67,4 +68,6 @@ export interface CartItem {
   size?: string;
   category?: string;
   variantId?: string;
+  isPreOrder?: boolean;
+  depositAmount?: number;
 }

@@ -5,10 +5,12 @@ import Image from "next/image";
 import { ShoppingBag, Eye, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import QuickViewModal from "@/components/modals/QuickViewModal";
+import { ProductCardSkeleton } from "@/components/ProductCardSkeleton";
 import { useStore } from "@/store/useStore";
 import { cn } from "@/lib/utils";
 import Price from "./Price";
 import { Product } from "@amber/shared";
+import { getProductStock, isProductPurchasable } from "@/lib/product";
 
 interface ExtendedProduct extends Product {
   data?: {
@@ -54,10 +56,8 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
         const data: Product[] = Array.isArray(result) ? result : (result?.data || []);
         
         const productsWithImages = data.map((p: any) => {
-          const hasVariantStock = p.variants?.some((v: any) => v.stock > 0);
-          const hasProductStock = p.stock !== undefined && p.stock > 0;
-          const inStock = hasVariantStock || (hasProductStock && (!p.variants || p.variants.length === 0));
-          
+          const inStock = isProductPurchasable(p);
+
           return {
             ...p,
             inStock,
@@ -80,7 +80,19 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
   const handleAddToCart = (e: React.MouseEvent, product: ExtendedProduct) => {
     e.stopPropagation();
     e.preventDefault();
-    const added = addToCart(product);
+    const added = addToCart(
+      product,
+      undefined,
+      undefined,
+      product.isPreOrder,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      getProductStock(product),
+      product.depositAmount != null ? Number(product.depositAmount) : undefined,
+    );
     if (!added) {
       setQuickViewProduct(product);
       return;
@@ -110,7 +122,7 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {loading ? (
-            <div className="col-span-full py-20 text-center text-muted-foreground italic">Loading products from Myanmar Heritage...</div>
+            Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
           ) : !products || products.data.length === 0 ? (
              <div className="col-span-full py-20 text-center text-muted-foreground italic">No products available at the moment.</div>
           ) : products.data.map((product, idx) => (
@@ -125,12 +137,14 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
               className="group cursor-pointer"
             >
               <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-neutral-100 shadow-sm">
-                <Image
-                  src={(hoveredProduct === product.id ? product.secondaryImage : product.image) || ""}
-                  alt={product.name}
-                  fill
-                  className="object-cover transition-transform duration-1000 group-hover:scale-110"
-                />
+                {(hoveredProduct === product.id ? product.secondaryImage : product.image) && (
+                  <Image
+                    src={(hoveredProduct === product.id ? product.secondaryImage : product.image) as string}
+                    alt={product.name}
+                    fill
+                    className="object-cover transition-transform duration-1000 group-hover:scale-110"
+                  />
+                )}
 
                 <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 

@@ -17,6 +17,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
     filteredMedia,
     loading,
     uploading,
+    uploadError,
     searchTerm,
     setSearchTerm,
     fetchMedia,
@@ -26,10 +27,11 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-card border border-border">
-      <MediaHeader 
+      <MediaHeader
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         uploading={uploading}
+        uploadError={uploadError}
         onUpload={handleUpload}
         loading={loading}
         onRefresh={fetchMedia}

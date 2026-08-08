@@ -10,7 +10,7 @@ interface BulkTransferFormProps {
   onSubmit: (data: {
     fromWarehouseId: string;
     toWarehouseId: string;
-    items: { variantId: string; quantity: number }[];
+    items: { variantId?: string; productId?: string; quantity: number }[];
     note?: string;
   }) => void;
 }
@@ -30,17 +30,17 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({
 
   const availableVariants = groupedInventory.filter(g => {
     const hasStock = fromWhId ? (g.stocks[fromWhId] || 0) > 0 : true;
-    const matchesSearch = 
-      g.product.name.toLowerCase().includes(search.toLowerCase()) || 
-      g.variant.sku.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch =
+      g.displayName.toLowerCase().includes(search.toLowerCase()) ||
+      (g.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
     return hasStock && matchesSearch;
   });
 
-  const handleQtyChange = (variantId: string, qty: number, max: number) => {
+  const handleQtyChange = (id: string, qty: number, max: number) => {
     const safeQty = Math.max(0, Math.min(qty, max));
     setSelectedItems(prev => ({
       ...prev,
-      [variantId]: safeQty
+      [id]: safeQty
     }));
   };
 
@@ -48,7 +48,12 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({
     e.preventDefault();
     const items = Object.entries(selectedItems)
       .filter(([_, qty]) => qty > 0)
-      .map(([variantId, quantity]) => ({ variantId, quantity }));
+      .map(([id, quantity]) => {
+        const group = groupedInventory.find(g => g.id === id);
+        return group?.kind === 'product'
+          ? { productId: id, quantity }
+          : { variantId: id, quantity };
+      });
 
     if (items.length === 0) return;
 
@@ -120,40 +125,42 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({
           ) : (
             availableVariants.map(group => {
               const max = group.stocks[fromWhId] || 0;
-              const current = selectedItems[group.variant.id] || 0;
+              const current = selectedItems[group.id] || 0;
               return (
-                <div key={group.variant.id} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
+                <div key={`${group.kind}-${group.id}`} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
                   <div className="w-10 h-10 bg-background border border-border flex items-center justify-center overflow-hidden shrink-0">
-                    {group.product.images?.[0] ? (
-                      <img src={group.product.images[0]} alt="" className="w-full h-full object-cover" />
+                    {group.images?.[0] ? (
+                      <img src={group.images[0]} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <Package size={16} className="text-muted-foreground/30" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-bold truncate">{group.product.name}</div>
-                    <div className="text-[8px] font-mono text-muted-foreground uppercase">{group.variant.sku} • {group.variant.size} • {group.variant.color}</div>
+                    <div className="text-[11px] font-bold truncate">{group.displayName}</div>
+                    <div className="text-[8px] font-mono text-muted-foreground uppercase">
+                      {group.kind === 'variant' ? `${group.sku} • ${group.size} • ${group.color}` : 'No Variants'}
+                    </div>
                     <div className="text-[8px] font-bold text-primary uppercase mt-1">Available: {max}</div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button 
-                      type="button" 
-                      onClick={() => handleQtyChange(group.variant.id, current - 1, max)}
+                    <button
+                      type="button"
+                      onClick={() => handleQtyChange(group.id, current - 1, max)}
                       className="w-8 h-8 bg-secondary flex items-center justify-center hover:bg-destructive hover:text-white transition-all"
                     >
                       <Minus size={12} />
                     </button>
-                    <input 
+                    <input
                       type="number"
                       min="0"
                       max={max}
                       value={current}
-                      onChange={(e) => handleQtyChange(group.variant.id, parseInt(e.target.value) || 0, max)}
+                      onChange={(e) => handleQtyChange(group.id, parseInt(e.target.value) || 0, max)}
                       className="w-12 h-8 bg-muted/20 border-b border-border text-center text-xs font-bold focus:border-primary focus:outline-none"
                     />
-                    <button 
-                      type="button" 
-                      onClick={() => handleQtyChange(group.variant.id, current + 1, max)}
+                    <button
+                      type="button"
+                      onClick={() => handleQtyChange(group.id, current + 1, max)}
                       className="w-8 h-8 bg-secondary flex items-center justify-center hover:bg-primary hover:text-white transition-all"
                     >
                       <Plus size={12} />

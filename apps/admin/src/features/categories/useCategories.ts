@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiService } from '../../services/api.service';
+import { apiService, ApiError, formatApiErrorMessage } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
 import { CategoryFormData, type CategoryReorderFlatItem } from '@amber/shared';
 import { Category } from './schema';
@@ -75,6 +75,10 @@ export const useCategories = () => {
   const [formData, setFormData] = useState<CategoryFormState>(DEFAULT_FORM_DATA);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<{
+    subcategoryCount: number;
+    productCount: number;
+  } | null>(null);
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
@@ -162,26 +166,46 @@ export const useCategories = () => {
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
+    setDeleteImpact(null);
     setDeleteConfirmOpen(true);
   };
 
+  // First attempt is a dry-run (no force): if the category has subcategories
+  // or products, the backend rejects with counts instead of silently
+  // cascading — surface those counts and require an explicit second
+  // confirmation (force=true) before actually deleting.
   const confirmDelete = async () => {
     if (!deletingId) return;
     try {
-      await apiService(API_ROUTES.CATEGORIES.BY_ID(deletingId), { method: 'DELETE' });
+      const query = deleteImpact ? '?force=true' : '';
+      await apiService(`${API_ROUTES.CATEGORIES.BY_ID(deletingId)}${query}`, {
+        method: 'DELETE',
+      });
       setDeleteConfirmOpen(false);
       setDeletingId(null);
+      setDeleteImpact(null);
       await fetchCategories();
       toast.success('Category permanently removed');
     } catch (error) {
+      if (
+        error instanceof ApiError &&
+        (error.data.subcategoryCount !== undefined || error.data.productCount !== undefined)
+      ) {
+        setDeleteImpact({
+          subcategoryCount: Number(error.data.subcategoryCount) || 0,
+          productCount: Number(error.data.productCount) || 0,
+        });
+        return;
+      }
       console.error('Failed to delete category:', error);
-      toast.error('Failed to delete category');
+      toast.error(formatApiErrorMessage(error, 'Failed to delete category'));
     }
   };
 
   const cancelDelete = () => {
     setDeleteConfirmOpen(false);
     setDeletingId(null);
+    setDeleteImpact(null);
   };
 
   const openAddModal = () => {
@@ -218,6 +242,7 @@ export const useCategories = () => {
     confirmDelete,
     cancelDelete,
     deletingId,
+    deleteImpact,
     reorderCategories,
     toggleCategoryActive,
     refresh: fetchCategories,

@@ -10,6 +10,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipmentStatusChangedEvent } from '../common/events/domain.events';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 import { PrismaService } from '../prisma/prisma.service';
+import { InventoryTarget, assertValidTarget } from './inventory-target.util';
 
 const CARGO_TRANSITIONS: Record<CargoStatus, CargoStatus[]> = {
   PREPARING: ['DEPARTED', 'PREPARING'],
@@ -53,8 +54,9 @@ export class LogisticsService {
   }
 
   // --- Inventory Management ---
-  async getInventoryByVariant(variantId: string) {
-    return this.logisticsRepository.findInventoryByVariant(variantId);
+  async getInventoryForItem(target: InventoryTarget) {
+    assertValidTarget(target);
+    return this.logisticsRepository.findInventoryForItem(target);
   }
 
   async getInventoryByWarehouse(
@@ -68,22 +70,24 @@ export class LogisticsService {
   }
 
   async updateStock(
-    variantId: string,
+    target: InventoryTarget,
     warehouseId: string,
     quantity: number,
     reason: 'ADJUSTMENT' | 'RECEIVING' = 'ADJUSTMENT',
     note?: string,
     userId?: string,
   ) {
+    assertValidTarget(target);
     const safeQuantity = Math.max(0, quantity);
     const result = await this.logisticsRepository.upsertInventory(
-      variantId,
+      target,
       warehouseId,
       safeQuantity,
     );
     await this.prisma.stockMovement.create({
       data: {
-        variantId,
+        variantId: target.variantId,
+        productId: target.productId,
         toWarehouseId: warehouseId,
         quantity: safeQuantity,
         reason,
@@ -94,21 +98,15 @@ export class LogisticsService {
     return result;
   }
 
-  async transferStock(data: {
-    variantId: string;
+  async transferStock(data: InventoryTarget & {
     fromWarehouseId: string;
     toWarehouseId: string;
     quantity: number;
     note?: string;
     userId?: string;
   }) {
-    const fromInv = await this.logisticsRepository.findInventory(
-      data.variantId,
-      data.fromWarehouseId,
-    );
-    if (!fromInv || fromInv.quantity < data.quantity) {
-      throw new BadRequestException('Insufficient stock at origin warehouse');
-    }
+    assertValidTarget(data);
+    const target: InventoryTarget = { variantId: data.variantId, productId: data.productId };
 
     const fromWh = await this.prisma.warehouse.findUnique({
       where: { id: data.fromWarehouseId },
@@ -118,7 +116,7 @@ export class LogisticsService {
     });
 
     await this.logisticsRepository.transferInventory(
-      data.variantId,
+      target,
       data.fromWarehouseId,
       data.toWarehouseId,
       data.quantity,
@@ -127,6 +125,7 @@ export class LogisticsService {
     await this.prisma.stockMovement.create({
       data: {
         variantId: data.variantId,
+        productId: data.productId,
         fromWarehouseId: data.fromWarehouseId,
         toWarehouseId: data.toWarehouseId,
         quantity: data.quantity,
@@ -147,7 +146,7 @@ export class LogisticsService {
         originId: data.fromWarehouseId,
         destinationId: data.toWarehouseId,
         notes: `Auto-created from stock transfer. ${data.note ?? ''}`,
-        items: [{ variantId: data.variantId, quantity: data.quantity }],
+        items: [{ ...target, quantity: data.quantity }],
       });
     }
 
@@ -157,7 +156,7 @@ export class LogisticsService {
   async bulkTransferStock(data: {
     fromWarehouseId: string;
     toWarehouseId: string;
-    items: { variantId: string; quantity: number }[];
+    items: (InventoryTarget & { quantity: number })[];
     note?: string;
     userId?: string;
   }) {
@@ -172,40 +171,16 @@ export class LogisticsService {
       throw new NotFoundException('One or both warehouses not found');
     }
 
-    // Verify all stock first
-    for (const item of data.items) {
-      const fromInv = await this.logisticsRepository.findInventory(
-        item.variantId,
-        data.fromWarehouseId,
-      );
-      if (!fromInv || fromInv.quantity < item.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for variant ${item.variantId} at origin warehouse`,
-        );
-      }
-    }
+    data.items.forEach(assertValidTarget);
 
-    // Perform transfers
-    for (const item of data.items) {
-      await this.logisticsRepository.transferInventory(
-        item.variantId,
-        data.fromWarehouseId,
-        data.toWarehouseId,
-        item.quantity,
-      );
-
-      await this.prisma.stockMovement.create({
-        data: {
-          variantId: item.variantId,
-          fromWarehouseId: data.fromWarehouseId,
-          toWarehouseId: data.toWarehouseId,
-          quantity: item.quantity,
-          reason: 'TRANSFER',
-          note: data.note,
-          userId: data.userId,
-        },
-      });
-    }
+    // Single transaction: a mid-batch insufficient-stock failure rolls back
+    // every item in the batch rather than leaving earlier items committed.
+    await this.logisticsRepository.bulkTransferInventory(
+      data.items,
+      data.fromWarehouseId,
+      data.toWarehouseId,
+      { note: data.note, userId: data.userId },
+    );
 
     // Create cargo shipment if international
     if (
@@ -224,11 +199,23 @@ export class LogisticsService {
     return { success: true, itemCount: data.items.length };
   }
 
-  async getLowStockVariants() {
+  async getLowStockItems() {
     const variants = await this.prisma.variant.findMany({
       include: { product: true, inventory: { include: { warehouse: true } } },
     });
-    return variants.filter((v) => v.stock <= v.lowStockThreshold);
+    const lowVariants = variants
+      .filter((v) => v.stock <= v.lowStockThreshold)
+      .map((v) => ({ type: 'variant' as const, ...v }));
+
+    const products = await this.prisma.product.findMany({
+      where: { variants: { none: {} } },
+      include: { inventory: { include: { warehouse: true } } },
+    });
+    const lowProducts = products
+      .filter((p) => p.stock <= p.lowStockThreshold)
+      .map((p) => ({ type: 'product' as const, ...p }));
+
+    return [...lowVariants, ...lowProducts];
   }
 
   // --- Cargo Management ---
@@ -238,8 +225,9 @@ export class LogisticsService {
     carrier?: string;
     trackingNumber?: string;
     notes?: string;
-    items: { variantId: string; quantity: number }[];
+    items: (InventoryTarget & { quantity: number })[];
   }) {
+    data.items.forEach(assertValidTarget);
     let retries = 5;
     while (retries > 0) {
       try {
@@ -276,27 +264,18 @@ export class LogisticsService {
     }
 
     const oldStatus = shipment.status;
-    const inventoryUpdates: Array<{
-      variantId: string;
-      warehouseId: string;
-      quantity: number;
-    }> = [];
+    const inventoryUpdates: Array<InventoryTarget & { warehouseId: string; quantity: number }> = [];
     const cargoUpdateData: Prisma.CargoShipmentUpdateInput = { status };
 
     // 1. Handle Origin Deduction (Moving away from PREPARING)
+    // Sufficiency is guarded atomically inside updateCargoWithInventory's
+    // transaction, not here — a pre-check outside the transaction would be
+    // a TOCTOU race against concurrent status transitions on this shipment.
     if (status !== 'PREPARING' && !shipment.originDeducted) {
       for (const item of shipment.items) {
-        const inventory = await this.logisticsRepository.findInventory(
-          item.variantId,
-          shipment.originId,
-        );
-        if (!inventory || inventory.quantity < item.quantity) {
-          throw new BadRequestException(
-            `Insufficient stock for variant ${item.variantId} in origin warehouse`,
-          );
-        }
         inventoryUpdates.push({
           variantId: item.variantId,
+          productId: item.productId,
           warehouseId: shipment.originId,
           quantity: -item.quantity,
         });
@@ -313,6 +292,7 @@ export class LogisticsService {
       for (const item of shipment.items) {
         inventoryUpdates.push({
           variantId: item.variantId,
+          productId: item.productId,
           warehouseId: shipment.destinationId,
           quantity: item.quantity,
         });
@@ -352,5 +332,33 @@ export class LogisticsService {
 
   async getCargoDetails(id: string) {
     return this.logisticsRepository.findCargoById(id);
+  }
+
+  // Detects drift between cached Variant/Product.stock and the true
+  // SUM(Inventory.quantity) — logs a warning per item plus a summary count.
+  // Does not auto-correct: see findStockDrift's comment for why.
+  async reconcileStock(): Promise<{ variantDriftCount: number; productDriftCount: number }> {
+    const { variantDrift, productDrift } = await this.logisticsRepository.findStockDrift();
+
+    for (const d of variantDrift) {
+      this.logger.warn(
+        `Stock drift: Variant ${d.variantId} cached stock=${d.cached} but SUM(Inventory)=${d.actual}`,
+      );
+    }
+    for (const d of productDrift) {
+      this.logger.warn(
+        `Stock drift: Product ${d.productId} cached stock=${d.cached} but SUM(Inventory)=${d.actual}`,
+      );
+    }
+    if (variantDrift.length || productDrift.length) {
+      this.logger.warn(
+        `Stock reconciliation found drift on ${variantDrift.length} variant(s) and ${productDrift.length} product(s)`,
+      );
+    }
+
+    return {
+      variantDriftCount: variantDrift.length,
+      productDriftCount: productDrift.length,
+    };
   }
 }

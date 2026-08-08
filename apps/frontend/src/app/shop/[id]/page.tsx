@@ -16,7 +16,6 @@ import {
   Scale,
   Ruler,
   Check,
-  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useMemo, useEffect } from "react";
@@ -26,8 +25,9 @@ import { useStore } from "@/store/useStore";
 import DOMPurify from "dompurify";
 import Price from "@/components/Price";
 import { getApiUrl } from "@/lib/api";
-import { productApiPath } from "@/lib/product";
+import { productApiPath, getProductStock, resolveAttributeValues } from "@/lib/product";
 import { useTranslations } from "@/i18n/useTranslations";
+import { toast } from "@/store/useToastStore";
 import type { ApiProduct, ApiReview, Product } from "@amber/shared";
 
 interface FilterableAttribute {
@@ -131,9 +131,8 @@ export default function ProductDetailPage() {
   }, [product, productAttributes, selectedAttributes]);
 
   const variantStock = useMemo(() => {
-    if (selectedVariant) return selectedVariant.stock ?? 0;
-    if (!product?.variants?.length) return 0;
-    return product.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
+    if (!product) return 0;
+    return getProductStock(product, selectedVariant);
   }, [selectedVariant, product]);
 
   const warehouseLocation = market === "US" ? "USA" : "MYANMAR";
@@ -232,7 +231,7 @@ export default function ProductDetailPage() {
   const handleAddToCart = () => {
     if (!product) return;
     if (productAttributes.length > 0 && !selectedVariant) {
-      alert(t("product.selectOptions"));
+      toast.error(t("product.selectOptions"));
       return;
     }
     setAddingId(product.id);
@@ -247,6 +246,8 @@ export default function ProductDetailPage() {
       selectedVariant?.images?.[0] || undefined,
       (product as { currencyCode?: string }).currencyCode,
       product.isPreOrder ? undefined : warehouseStock,
+      product.depositAmount != null ? Number(product.depositAmount) : undefined,
+      resolveAttributeValues(productAttributes, selectedVariant?.attributeSelections),
     );
     if (added) setTimeout(() => setAddingId(null), 1000);
   };
@@ -255,12 +256,19 @@ export default function ProductDetailPage() {
     return (
       <main className="relative min-h-screen bg-[#FDFDFD]">
         <Navbar />
-        <div className="pt-48 flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-[#D4AF37]" />
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/40">
-            Fetching Product Details...
-          </p>
-        </div>
+        <section className="pt-48 pb-24 px-6 md:px-12 max-w-7xl mx-auto">
+          <div className="h-4 w-32 bg-neutral-200 rounded-sm mb-12 animate-pulse" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 animate-pulse">
+            <div className="aspect-square bg-neutral-200 rounded-sm" />
+            <div className="space-y-6 pt-4">
+              <div className="h-3 w-24 bg-neutral-200 rounded-sm" />
+              <div className="h-10 w-3/4 bg-neutral-200 rounded-sm" />
+              <div className="h-6 w-32 bg-neutral-200 rounded-sm" />
+              <div className="h-24 w-full bg-neutral-200 rounded-sm" />
+              <div className="h-12 w-full bg-neutral-200 rounded-sm" />
+            </div>
+          </div>
+        </section>
       </main>
     );
   }
@@ -292,6 +300,32 @@ export default function ProductDetailPage() {
       <SizeGuideModal isOpen={isSizeGuideOpen} onClose={() => setIsSizeGuideOpen(false)} />
 
       <section className="pt-48 pb-24 px-6 md:px-12 max-w-7xl mx-auto">
+        <nav
+          aria-label="Breadcrumb"
+          className="flex items-center flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]/40 mb-6"
+        >
+          <Link href="/" className="hover:text-[#1A1A1A] transition-colors">Home</Link>
+          <span>/</span>
+          <Link href="/shop" className="hover:text-[#1A1A1A] transition-colors">Shop</Link>
+          {product.category?.name && (
+            <>
+              <span>/</span>
+              {(product.category as { id?: string }).id ? (
+                <Link
+                  href={`/shop?category=${(product.category as { id?: string }).id}`}
+                  className="hover:text-[#1A1A1A] transition-colors"
+                >
+                  {product.category.name}
+                </Link>
+              ) : (
+                <span>{product.category.name}</span>
+              )}
+            </>
+          )}
+          <span>/</span>
+          <span className="text-[#1A1A1A]/70 normal-case tracking-normal font-medium">{product.name}</span>
+        </nav>
+
         <button
           type="button"
           onClick={() => window.history.back()}

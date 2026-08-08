@@ -8,6 +8,8 @@ import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { RolesGuard } from './roles.guard';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PasswordResetRepository } from './password-reset.repository';
+import { EmailService } from './email.service';
 
 @Module({
   imports: [
@@ -24,7 +26,13 @@ import { PrismaModule } from '../prisma/prisma.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, RolesGuard],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    RolesGuard,
+    PasswordResetRepository,
+    EmailService,
+  ],
   exports: [AuthService, RolesGuard],
 })
 export class AuthModule {}

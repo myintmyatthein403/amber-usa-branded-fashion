@@ -6,6 +6,7 @@ import CompareDrawer from "@/components/CompareDrawer";
 import Footer from "@/components/Footer";
 import AnnouncementModal from "@/components/modals/AnnouncementModal";
 import Preloader from "@/components/Preloader";
+import ToastContainer from "@/components/ToastContainer";
 import { Providers } from "@/context/Providers";
 
 const inter = Inter({
@@ -40,6 +41,7 @@ export default function RootLayout({
           <CartDrawer />
           <CompareDrawer />
           <AnnouncementModal />
+          <ToastContainer />
         </Providers>
       </body>
     </html>

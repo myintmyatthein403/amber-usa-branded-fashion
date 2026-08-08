@@ -10,6 +10,36 @@ interface ApiOptions<T = unknown> {
   isMultipart?: boolean;
 }
 
+// Backend validation failures (ZodValidationPipe) send { message, errors: [{path,message}] };
+// some endpoints attach extra structured fields (e.g. category-delete's
+// subcategoryCount/productCount). Previously only `.message` survived the
+// throw — this preserves the rest so callers can render field-level errors
+// or act on the extra data instead of a generic "Validation failed" toast.
+export class ApiError extends Error {
+  status: number;
+  data: Record<string, unknown>;
+  errors?: Array<{ path: string; message: string }>;
+
+  constructor(message: string, status: number, data: Record<string, unknown>) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+    this.errors = data.errors as Array<{ path: string; message: string }> | undefined;
+  }
+}
+
+// Renders field-level Zod validation errors (e.g. "price: must be positive")
+// when present, falling back to the generic message otherwise.
+export function formatApiErrorMessage(error: unknown, fallback = 'Request failed'): string {
+  if (error instanceof ApiError && error.errors?.length) {
+    const fieldErrors = error.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+    return `${error.message} — ${fieldErrors}`;
+  }
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
 export const apiService = async <T = unknown, R = unknown>(endpoint: string, options: ApiOptions<T> = {}): Promise<R> => {
   const { method = 'GET', body, headers = {}, isMultipart = false } = options;
   const token = useAdminUIStore.getState().token;
@@ -39,7 +69,11 @@ export const apiService = async <T = unknown, R = unknown>(endpoint: string, opt
     if (response.status === 401) {
       useAdminUIStore.getState().logout();
     }
-    throw new Error(errorData.message || `API Error: ${response.status}`);
+    throw new ApiError(
+      errorData.message || `API Error: ${response.status}`,
+      response.status,
+      errorData,
+    );
   }
 
   return response.json();

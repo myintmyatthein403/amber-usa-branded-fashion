@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Product, Prisma, Variant } from '@prisma/client';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
+import { recomputeAndSyncStock } from '../logistics/inventory-target.util';
 type VariantInput = CreateProductDto['variants'][number] & {
   warehouseId?: string;
   warehouseAllocations?: Array<{ warehouseId: string; quantity: number }>;
@@ -87,7 +88,9 @@ export class ProductsRepository {
     v: VariantInput,
   ): Promise<void> {
     const allocations =
-      v.warehouseAllocations?.filter((a) => a.quantity > 0) ?? [];
+      v.warehouseAllocations?.filter(
+        (a: { warehouseId: string; quantity: number }) => a.quantity > 0,
+      ) ?? [];
 
     if (allocations.length > 0) {
       await tx.inventory.deleteMany({ where: { variantId } });
@@ -142,14 +145,75 @@ export class ProductsRepository {
       }
     }
 
-    const total = await tx.inventory.aggregate({
-      where: { variantId },
-      _sum: { quantity: true },
-    });
-    await tx.variant.update({
-      where: { id: variantId },
-      data: { stock: total._sum.quantity ?? 0 },
-    });
+    await recomputeAndSyncStock(tx, { variantId });
+  }
+
+  private async syncProductInventory(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    data: {
+      stock?: number;
+      warehouseId?: string;
+      warehouseAllocations?: Array<{ warehouseId: string; quantity: number }>;
+    },
+  ): Promise<void> {
+    const allocations =
+      data.warehouseAllocations?.filter((a) => a.quantity > 0) ?? [];
+
+    if (allocations.length > 0) {
+      await tx.inventory.deleteMany({ where: { productId } });
+      for (const alloc of allocations) {
+        await tx.inventory.create({
+          data: {
+            productId,
+            warehouseId: alloc.warehouseId,
+            quantity: alloc.quantity,
+          },
+        });
+      }
+    } else if (data.warehouseId && Number(data.stock) > 0) {
+      const existing = await tx.inventory.findUnique({
+        where: {
+          productId_warehouseId: {
+            productId,
+            warehouseId: data.warehouseId,
+          },
+        },
+      });
+      if (existing) {
+        await tx.inventory.update({
+          where: { id: existing.id },
+          data: { quantity: Number(data.stock) },
+        });
+      } else {
+        await tx.inventory.create({
+          data: {
+            productId,
+            warehouseId: data.warehouseId,
+            quantity: Number(data.stock),
+          },
+        });
+      }
+    } else if (Number(data.stock) > 0 && !allocations.length) {
+      const wh =
+        (await tx.warehouse.findFirst({ where: { location: 'USA' } })) ||
+        (await tx.warehouse.findFirst());
+      if (wh) {
+        await tx.inventory.upsert({
+          where: {
+            productId_warehouseId: { productId, warehouseId: wh.id },
+          },
+          create: {
+            productId,
+            warehouseId: wh.id,
+            quantity: Number(data.stock),
+          },
+          update: { quantity: Number(data.stock) },
+        });
+      }
+    }
+
+    await recomputeAndSyncStock(tx, { productId });
   }
 
   private sanitizeProductData(
@@ -175,10 +239,14 @@ export class ProductsRepository {
       categoryId,
       brandId,
       saleId,
+      warehouseId,
+      warehouseAllocations,
       ...productData
     } = data as CreateProductDto & {
       variants?: VariantInput[];
       collectionIds?: string[];
+      warehouseId?: string;
+      warehouseAllocations?: Array<{ warehouseId: string; quantity: number }>;
     };
 
     const sanitized = this.sanitizeProductData({
@@ -214,6 +282,12 @@ export class ProductsRepository {
           });
           await this.syncVariantInventory(tx, variant.id, v);
         }
+      } else {
+        await this.syncProductInventory(tx, product.id, {
+          stock: createData.stock as number | undefined,
+          warehouseId,
+          warehouseAllocations,
+        });
       }
 
       return tx.product.findUnique({
@@ -229,22 +303,32 @@ export class ProductsRepository {
     }) as Promise<Product>;
   }
 
+  // List/grid views never render per-warehouse inventory breakdown (only the
+  // detail page and CSV export do), so the default list include skips the
+  // variants -> inventory -> warehouse join entirely.
+  private listInclude(includeInventory = false): Prisma.ProductInclude {
+    return {
+      category: true,
+      brand: true,
+      variants: includeInventory
+        ? { include: { inventory: { include: { warehouse: true } } } }
+        : true,
+      sale: true,
+      collections: true,
+    };
+  }
+
   async findAll(
     where: Prisma.ProductWhereInput,
     skip?: number,
     take?: number,
+    options?: { includeInventory?: boolean; orderBy?: Prisma.ProductOrderByWithRelationInput },
   ): Promise<[Product[], number]> {
     return Promise.all([
       this.prisma.product.findMany({
         where,
-        include: {
-          category: true,
-          brand: true,
-          variants: { include: { inventory: { include: { warehouse: true } } } },
-          sale: true,
-          collections: true,
-        },
-        orderBy: { createdAt: 'desc' },
+        include: this.listInclude(options?.includeInventory),
+        orderBy: options?.orderBy ?? { createdAt: 'desc' },
         skip,
         take,
       }),
@@ -252,19 +336,21 @@ export class ProductsRepository {
     ]);
   }
 
-  async findAllSimple(where: Prisma.ProductWhereInput): Promise<Product[]> {
+  async findAllSimple(
+    where: Prisma.ProductWhereInput,
+    options?: { includeInventory?: boolean; orderBy?: Prisma.ProductOrderByWithRelationInput },
+  ): Promise<Product[]> {
     return this.prisma.product.findMany({
       where,
-      include: {
-        category: true,
-        brand: true,
-        variants: { include: { inventory: { include: { warehouse: true } } } },
-        sale: true,
-        collections: true,
-      },
-      orderBy: { createdAt: 'desc' },
+      include: this.listInclude(options?.includeInventory),
+      orderBy: options?.orderBy ?? { createdAt: 'desc' },
     });
   }
+
+  // Reasonable cap on approved reviews returned with a product detail page —
+  // previously unbounded, so a heavily-reviewed product could return hundreds
+  // of reviews in a single payload.
+  private static readonly REVIEWS_TAKE = 50;
 
   async findById(id: string): Promise<Product | null> {
     return this.prisma.product.findUnique({
@@ -278,6 +364,7 @@ export class ProductsRepository {
         reviews: {
           where: { isApproved: true },
           orderBy: { createdAt: 'desc' },
+          take: ProductsRepository.REVIEWS_TAKE,
         },
       },
     });
@@ -295,6 +382,7 @@ export class ProductsRepository {
         reviews: {
           where: { isApproved: true },
           orderBy: { createdAt: 'desc' },
+          take: ProductsRepository.REVIEWS_TAKE,
         },
       },
     });
@@ -307,10 +395,14 @@ export class ProductsRepository {
       categoryId,
       brandId,
       saleId,
+      warehouseId,
+      warehouseAllocations,
       ...productData
     } = data as UpdateProductDto & {
       variants?: VariantInput[];
       collectionIds?: string[];
+      warehouseId?: string;
+      warehouseAllocations?: Array<{ warehouseId: string; quantity: number }>;
     };
 
     const sanitized = this.sanitizeProductData({
@@ -373,6 +465,28 @@ export class ProductsRepository {
             await this.syncVariantInventory(tx, newVariant.id, v);
           }
         }
+
+        const remainingVariantCount = await tx.variant.count({
+          where: { productId: id },
+        });
+        if (remainingVariantCount === 0) {
+          await this.syncProductInventory(tx, id, {
+            stock: updateData.stock as number | undefined,
+            warehouseId,
+            warehouseAllocations,
+          });
+        }
+      } else {
+        const existingVariantCount = await tx.variant.count({
+          where: { productId: id },
+        });
+        if (existingVariantCount === 0) {
+          await this.syncProductInventory(tx, id, {
+            stock: updateData.stock as number | undefined,
+            warehouseId,
+            warehouseAllocations,
+          });
+        }
       }
 
       return tx.product.findUnique({
@@ -399,8 +513,27 @@ export class ProductsRepository {
     });
   }
 
+  async findVariantBySku(sku: string) {
+    return this.prisma.variant.findUnique({ where: { sku } });
+  }
+
+  async updateVariantFields(
+    id: string,
+    data: Prisma.VariantUpdateInput,
+  ): Promise<Variant> {
+    return this.prisma.variant.update({ where: { id }, data });
+  }
+
   async findProductSimpleById(id: string) {
     return this.prisma.product.findUnique({ where: { id } });
+  }
+
+  async countVariants(productId: string): Promise<number> {
+    return this.prisma.variant.count({ where: { productId } });
+  }
+
+  async countInventoryRows(productId: string): Promise<number> {
+    return this.prisma.inventory.count({ where: { productId } });
   }
 
   async publishScheduled(): Promise<number> {
@@ -412,5 +545,61 @@ export class ProductsRepository {
       data: { status: 'PUBLISHED' },
     });
     return result.count;
+  }
+
+  async countByBrand(
+    where: Prisma.ProductWhereInput,
+  ): Promise<Array<{ id: string; name: string; count: number }>> {
+    const groups = await this.prisma.product.groupBy({
+      by: ['brandId'],
+      where,
+      _count: { _all: true },
+    });
+    const brandIds = groups
+      .map((g) => g.brandId)
+      .filter((id): id is string => Boolean(id));
+    if (brandIds.length === 0) return [];
+
+    const brands = await this.prisma.brand.findMany({
+      where: { id: { in: brandIds } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(brands.map((b) => [b.id, b.name]));
+
+    return groups
+      .filter((g): g is typeof g & { brandId: string } => Boolean(g.brandId))
+      .map((g) => ({
+        id: g.brandId,
+        name: nameById.get(g.brandId) ?? 'Unknown',
+        count: g._count._all,
+      }));
+  }
+
+  async countByCategory(
+    where: Prisma.ProductWhereInput,
+  ): Promise<Array<{ id: string; name: string; count: number }>> {
+    const groups = await this.prisma.product.groupBy({
+      by: ['categoryId'],
+      where,
+      _count: { _all: true },
+    });
+    const categoryIds = groups
+      .map((g) => g.categoryId)
+      .filter((id): id is string => Boolean(id));
+    if (categoryIds.length === 0) return [];
+
+    const categories = await this.prisma.category.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(categories.map((c) => [c.id, c.name]));
+
+    return groups
+      .filter((g): g is typeof g & { categoryId: string } => Boolean(g.categoryId))
+      .map((g) => ({
+        id: g.categoryId,
+        name: nameById.get(g.categoryId) ?? 'Unknown',
+        count: g._count._all,
+      }));
   }
 }

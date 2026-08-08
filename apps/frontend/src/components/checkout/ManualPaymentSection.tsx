@@ -5,6 +5,7 @@ import { PaymentMethod, CheckoutFormData } from "./index";
 import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "@/i18n/useTranslations";
+import { useStore } from "@/store/useStore";
 
 interface ManualPaymentSectionProps {
   payment: PaymentMethod;
@@ -13,6 +14,9 @@ interface ManualPaymentSectionProps {
   onBack: () => void;
   onComplete: () => void;
   submitting?: boolean;
+  depositAmount?: number | null;
+  totalAmount?: number;
+  balanceDue?: number;
 }
 
 export default function ManualPaymentSection({
@@ -22,8 +26,13 @@ export default function ManualPaymentSection({
   onBack,
   onComplete,
   submitting = false,
+  depositAmount,
+  totalAmount,
+  balanceDue,
 }: ManualPaymentSectionProps) {
   const t = useTranslations();
+  const formatPrice = useStore((state) => state.formatPrice);
+  const currency = useStore((state) => state.currency);
   const [receiptName, setReceiptName] = useState<string | null>(null);
 
   const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,11 +42,36 @@ export default function ManualPaymentSection({
     onUpdate({ receiptFile: file });
   };
 
-  const canComplete =
-    Boolean(formData.transactionRef?.trim()) && Boolean(formData.receiptFile);
+  const proofRequired = depositAmount != null;
+
+  const canComplete = proofRequired
+    ? Boolean(formData.transactionRef?.trim()) && Boolean(formData.receiptFile)
+    : true;
 
   return (
     <>
+      {depositAmount != null && (
+        <div className="p-6 bg-[#1A1A1A] text-white space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37]">
+            Deposit Required
+          </p>
+          <p className="text-sm leading-relaxed">
+            Please transfer exactly{" "}
+            <span className="font-bold text-[#D4AF37]">
+              {formatPrice(depositAmount, currency === "USD")}
+            </span>{" "}
+            now — not the full order total
+            {typeof totalAmount === "number" ? ` of ${formatPrice(totalAmount, currency === "USD")}` : ""}.
+            {balanceDue !== undefined && balanceDue > 0 && (
+              <>
+                {" "}The remaining{" "}
+                <span className="font-bold">{formatPrice(balanceDue, currency === "USD")}</span>{" "}
+                balance will be collected later.
+              </>
+            )}
+          </p>
+        </div>
+      )}
       <div className="p-8 bg-[#F5F0E1]/30 border border-[#D4AF37]/10 space-y-6">
         <div className="space-y-2">
           <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/60">
@@ -82,7 +116,7 @@ export default function ManualPaymentSection({
         <div className="space-y-4 pt-4 border-t border-[#D4AF37]/10">
           <label className="block space-y-2">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/60">
-              {t("checkout.transactionRef")} *
+              {t("checkout.transactionRef")} {proofRequired ? "*" : "(optional)"}
             </span>
             <input
               type="text"
@@ -94,7 +128,7 @@ export default function ManualPaymentSection({
           </label>
           <label className="block space-y-2">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/60">
-              {t("checkout.uploadReceipt")} *
+              {t("checkout.uploadReceipt")} {proofRequired ? "*" : "(optional)"}
             </span>
             <input
               type="file"
@@ -109,8 +143,9 @@ export default function ManualPaymentSection({
         </div>
 
         <p className="text-[10px] text-[#1A1A1A]/40 leading-relaxed italic">
-          Upload your payment screenshot here. Our team will verify your payment and confirm your
-          order — usually within a few hours.
+          {proofRequired
+            ? "Upload your payment screenshot here. Our team will verify your payment and confirm your order — usually within a few hours."
+            : "No payment is due now. You'll pay in person on delivery — a receipt upload isn't required to place this order."}
         </p>
       </div>
 

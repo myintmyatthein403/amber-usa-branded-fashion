@@ -75,6 +75,8 @@ export const ProductQueryDto = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   search: z.string().optional(),
+  sortBy: z.string().optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
 export type ProductQueryDto = z.infer<typeof ProductQueryDto>;
@@ -86,3 +88,25 @@ export const StockValidationItemDto = z.object({
 });
 
 export type StockValidationItemDto = z.infer<typeof StockValidationItemDto>;
+
+// Bulk import updates existing variants only (matched by SKU) — price,
+// currency, buy price, and per-warehouse stock. It deliberately does not
+// create new products/variants from arbitrary CSV rows, since those require
+// category/slug/images and other fields a flat row can't safely supply.
+export const ImportProductRowDto = z.object({
+  sku: z.string().min(1),
+  productName: z.string().min(1),
+  price: z.string().optional(),
+  currencyCode: z.string().optional(),
+  buyPrice: z.string().optional(),
+  stock: z.string().optional(),
+  warehouseLocation: z.enum(['USA', 'MYANMAR']).optional(),
+});
+
+export const ImportProductsDto = z.object({
+  rows: z.array(ImportProductRowDto).min(1, 'At least one row is required'),
+  dryRun: z.boolean().optional(),
+});
+
+export type ImportProductRowDto = z.infer<typeof ImportProductRowDto>;
+export type ImportProductsDto = z.infer<typeof ImportProductsDto>;

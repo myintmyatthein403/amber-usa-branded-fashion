@@ -35,6 +35,7 @@ interface OrderDetailsProps {
   onRefund?: (id: string, amount?: number) => void;
   onConfirmManualPayment?: (id: string) => void;
   onRejectManualPayment?: (id: string, reason: string) => void;
+  onSettleBalance?: (id: string) => void;
 }
 
 export const OrderDetails: React.FC<OrderDetailsProps> = ({
@@ -45,6 +46,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
   onRefund,
   onConfirmManualPayment,
   onRejectManualPayment,
+  onSettleBalance,
 }) => {
   const status = STATUS_CONFIG[order.status];
   const payment = PAYMENT_STATUS_CONFIG[order.paymentStatus];
@@ -198,6 +200,19 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-widest text-foreground">Total:</span>
                 <span className="text-lg font-mono font-bold text-primary">{order.currency} {order.totalAmount.toLocaleString()}</span>
               </div>
+
+              {order.depositAmount != null && (
+                <>
+                  <div className="flex justify-between items-center pt-3 border-t border-border">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Deposit Required:</span>
+                    <span className="text-[10px] font-mono font-bold text-blue-600">{order.currency} {Number(order.depositAmount).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Balance Due:</span>
+                    <span className="text-[10px] font-mono font-bold text-amber-600">{order.currency} {Number(order.balanceDue ?? 0).toLocaleString()}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="pt-6 border-t border-border space-y-4">
@@ -286,6 +301,17 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({
                 </div>
               )}
               
+              {order.paymentStatus === 'PARTIALLY_PAID' && onSettleBalance && (
+                <button
+                  type="button"
+                  onClick={() => order.id && confirm('Mark the remaining balance as collected?') && onSettleBalance(order.id)}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 text-[9px] font-bold uppercase tracking-[0.2em] hover:bg-blue-700 transition-all"
+                >
+                  <CheckCircle2 size={12} />
+                  Mark Balance Settled
+                </button>
+              )}
+
               {/* Refund Action */}
               {order.paymentStatus === 'PAID' && onRefund && (
                 <button

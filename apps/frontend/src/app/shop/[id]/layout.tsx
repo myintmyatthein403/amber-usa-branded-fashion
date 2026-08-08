@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getApiUrl } from "@/lib/api";
-import { productApiPath } from "@/lib/product";
+import { productApiPath, isProductPurchasable } from "@/lib/product";
 import ProductJsonLd from "@/components/ProductJsonLd";
 
 type Props = {
@@ -56,7 +56,7 @@ export default async function ProductLayout({ params, children }: Props) {
           currency={product.currencyCode || "USD"}
           sku={product.variants?.[0]?.sku}
           brand={product.brand?.name}
-          inStock={product.variants?.some((v: { stock: number }) => v.stock > 0)}
+          inStock={isProductPurchasable(product)}
         />
       )}
       {children}

@@ -22,6 +22,8 @@ export class OrdersRepository {
     itemsWithPreOrderInfo: any[],
     calculatedTotal: number,
     lockedExchangeRate?: number,
+    depositAmount?: number | null,
+    balanceDue?: number,
   ): Promise<Order> {
     return this.prisma.$transaction(async (tx) => {
       for (const item of itemsWithPreOrderInfo) {
@@ -54,6 +56,44 @@ export class OrdersRepository {
           if (updatedVariant.count === 0) {
             throw new BadRequestException(
               `Insufficient total stock for item: ${item.name}.`,
+            );
+          }
+        } else if (!item.variantId && !item.isPreOrder && !item.isDigital) {
+          if (warehouseId) {
+            const existingInv = await tx.inventory.findUnique({
+              where: {
+                productId_warehouseId: { productId: item.productId, warehouseId },
+              },
+            });
+            // Only enforce/decrement the per-warehouse row if one exists —
+            // legacy simple products with no Inventory rows yet keep working
+            // exactly as before (stock tracked only on Product.stock).
+            if (existingInv) {
+              const updatedInventory = await tx.inventory.updateMany({
+                where: {
+                  productId: item.productId,
+                  warehouseId,
+                  quantity: { gte: item.quantity },
+                },
+                data: { quantity: { decrement: item.quantity } },
+              });
+
+              if (updatedInventory.count === 0) {
+                throw new BadRequestException(
+                  `Insufficient stock for item: ${item.name} in selected warehouse.`,
+                );
+              }
+            }
+          }
+
+          const updatedProduct = await tx.product.updateMany({
+            where: { id: item.productId, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+
+          if (updatedProduct.count === 0) {
+            throw new BadRequestException(
+              `Insufficient stock for item: ${item.name}.`,
             );
           }
         }
@@ -93,6 +133,8 @@ export class OrdersRepository {
               userId: orderData.userId || null,
               warehouseId,
               hasPreOrderItems: itemsWithPreOrderInfo.some((i) => i.isPreOrder),
+              depositAmount: depositAmount ?? null,
+              balanceDue: depositAmount != null ? balanceDue ?? 0 : null,
               items: {
                 create: itemsWithPreOrderInfo.map((item) => ({
                   productId: item.productId,
@@ -107,6 +149,7 @@ export class OrdersRepository {
                   size: item.size,
                   isPreOrder: item.isPreOrder,
                   expectedShippingDate: item.expectedShippingDate,
+                  isDigital: item.isDigital ?? false,
                 })),
               },
             },
@@ -203,41 +246,22 @@ export class OrdersRepository {
   }
 
   async restock(orderId: string): Promise<void> {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
-    });
-
-    if (!order || order.restocked) return;
-
     await this.prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        if (item.variantId && !item.isPreOrder) {
-          if (order.warehouseId) {
-            await tx.inventory.update({
-              where: {
-                variantId_warehouseId: {
-                  variantId: item.variantId,
-                  warehouseId: order.warehouseId,
-                },
-              },
-              data: { quantity: { increment: item.quantity } },
-            });
-          }
-          await tx.variant.update({
-            where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } },
-          });
-        }
-      }
-      await tx.order.update({
-        where: { id: orderId },
-        data: { restocked: true },
-      });
+      await this.doRestock(tx, orderId);
     });
   }
 
-  async restockWithTransaction(tx: any, orderId: string): Promise<void> {
+  async restockWithTransaction(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<void> {
+    await this.doRestock(tx, orderId);
+  }
+
+  private async doRestock(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<void> {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { items: true },
@@ -259,6 +283,32 @@ export class OrdersRepository {
         }
         await tx.variant.update({
           where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        });
+      } else if (!item.variantId && !item.isPreOrder && !item.isDigital) {
+        if (order.warehouseId) {
+          const existingInv = await tx.inventory.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: item.productId,
+                warehouseId: order.warehouseId,
+              },
+            },
+          });
+          if (existingInv) {
+            await tx.inventory.update({
+              where: {
+                productId_warehouseId: {
+                  productId: item.productId,
+                  warehouseId: order.warehouseId,
+                },
+              },
+              data: { quantity: { increment: item.quantity } },
+            });
+          }
+        }
+        await tx.product.update({
+          where: { id: item.productId },
           data: { stock: { increment: item.quantity } },
         });
       }
@@ -287,9 +337,12 @@ export class OrdersRepository {
     return this.prisma.order.count({ where: { status: 'PENDING' } });
   }
 
-  async findWarehouseWithStock(variantId: string, quantity: number) {
+  async findWarehouseWithStock(
+    target: { variantId?: string; productId?: string },
+    quantity: number,
+  ) {
     return this.prisma.inventory.findFirst({
-      where: { variantId, quantity: { gte: quantity } },
+      where: { ...target, quantity: { gte: quantity } },
     });
   }
 

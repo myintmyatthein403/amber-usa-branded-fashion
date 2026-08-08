@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsService } from './products.service';
 import { ProductsRepository } from './products.repository';
+import { AttributesService } from '../attributes/attributes.service';
+import { LogisticsService } from '../logistics/logistics.service';
 
 describe('ProductsService', () => {
   let service: ProductsService;
@@ -21,6 +23,21 @@ describe('ProductsService', () => {
             delete: jest.fn(),
             findVariantById: jest.fn(),
             findProductSimpleById: jest.fn(),
+            findVariantBySku: jest.fn(),
+            updateVariantFields: jest.fn(),
+          },
+        },
+        {
+          provide: AttributesService,
+          useValue: {
+            validateSelections: jest.fn(),
+          },
+        },
+        {
+          provide: LogisticsService,
+          useValue: {
+            getAllWarehouses: jest.fn(),
+            updateStock: jest.fn(),
           },
         },
       ],

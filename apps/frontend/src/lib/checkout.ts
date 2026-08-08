@@ -1,5 +1,5 @@
 import type { CheckoutFormData, DeliveryMethod, CartItem } from "@/components/checkout";
-import { calculateCheckoutTotal } from "@amber/shared";
+import { calculateCheckoutTotal, calculateDepositTotal } from "@amber/shared";
 import { getApiUrl } from "@/lib/api";
 
 export function buildShippingAddress(form: CheckoutFormData): string {
@@ -117,6 +117,42 @@ export function computeCheckoutTotal(
     exchangeRate,
   );
   return total;
+}
+
+export function computeCheckoutDeposit(
+  cartItems: CartItem[],
+  deliveryFee: number,
+  currency: string,
+  exchangeRate: number,
+  isShippingUsd: boolean,
+  shippingCost: number,
+  options: { isCod: boolean; codDepositAmount?: number | null },
+  orderTotal: number,
+): { depositAmount: number | null; balanceDue: number } {
+  let feeInOrderCurrency = deliveryFee;
+  if (isShippingUsd && currency === "MMK") {
+    feeInOrderCurrency = shippingCost * exchangeRate;
+  } else if (!isShippingUsd && currency === "USD") {
+    feeInOrderCurrency = shippingCost / exchangeRate;
+  } else {
+    feeInOrderCurrency = shippingCost;
+  }
+
+  return calculateDepositTotal(
+    cartItems.map((item) => ({
+      price: item.price,
+      quantity: item.quantity,
+      currencyCode: item.currencyCode || (item.isUsdPrice !== false ? "USD" : "MMK"),
+      isUsd: item.isUsdPrice,
+      isPreOrder: item.isPreOrder,
+      depositAmount: item.depositAmount,
+    })),
+    feeInOrderCurrency,
+    currency,
+    exchangeRate,
+    options,
+    orderTotal,
+  );
 }
 
 export async function uploadPaymentProof(

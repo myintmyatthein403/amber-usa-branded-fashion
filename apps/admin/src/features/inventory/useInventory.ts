@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useFetch } from '../../hooks/useCrud';
 import { apiService } from '../../services/api.service';
 import { API_ROUTES } from '../../config/constants';
-import { GroupedInventory, Warehouse } from './schema';
+import { GroupedInventory, Warehouse, formatInventoryRowLabel } from './schema';
 
 export const useInventory = () => {
   const { data: rawInventory, loading, refresh } = useFetch<any>(API_ROUTES.LOGISTICS.INVENTORY);
@@ -13,7 +13,7 @@ export const useInventory = () => {
   // Adjustment Modal State
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<GroupedInventory | null>(null);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
   const [adjustmentQty, setAdjustmentQty] = useState(0);
 
@@ -27,31 +27,37 @@ export const useInventory = () => {
     const groups: Record<string, GroupedInventory> = {};
 
      rawInventory.forEach((item: any) => {
-       const product = item.variant?.product;
-       if (!groups[item.variantId]) {
-         groups[item.variantId] = {
-           variant: item.variant,
-           product: product || { id: '', name: '', images: [] },
+       const key = item.variantId ?? item.productId;
+       const label = formatInventoryRowLabel(item);
+       if (!groups[key]) {
+         groups[key] = {
+           kind: label.kind,
+           id: key,
+           displayName: label.name,
+           images: label.images,
+           sku: label.sku,
+           size: label.size,
+           color: label.color,
+           product: label.kind === 'variant' ? (item.variant?.product || { id: '', name: '', images: [] }) : (item.product || { id: '', name: '', images: [] }),
            stocks: {},
            totalStock: 0
          };
        }
-       groups[item.variantId].stocks[item.warehouse.id] = item.quantity;
-       groups[item.variantId].totalStock += item.quantity;
+       groups[key].stocks[item.warehouse.id] = item.quantity;
+       groups[key].totalStock += item.quantity;
      });
 
     return Object.values(groups).filter(group => {
-      const prodName = group.product?.name || '';
-      const matchesSearch = prodName.toLowerCase().includes(search.toLowerCase()) || 
-                           group.variant.sku.toLowerCase().includes(search.toLowerCase());
-      
+      const matchesSearch = group.displayName.toLowerCase().includes(search.toLowerCase()) ||
+                           (group.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
+
       if (filterLocation === 'ALL') return matchesSearch;
-      
+
       const hasStockInLocation = Object.keys(group.stocks).some(wId => {
         const warehouse = rawInventory.find(inv => inv.warehouse.id === wId)?.warehouse;
         return warehouse?.location === filterLocation;
       });
-      
+
       return matchesSearch && hasStockInLocation;
     });
   }, [rawInventory, search, filterLocation]);
@@ -66,7 +72,7 @@ export const useInventory = () => {
   }, [rawInventory]);
 
   const openAdjustModal = useCallback((group: GroupedInventory, warehouseId?: string) => {
-    setSelectedVariant(group.variant);
+    setSelectedItem(group);
     setSelectedWarehouseId(warehouseId || '');
     const currentQty = warehouseId ? (group.stocks[warehouseId] || 0) : 0;
     setAdjustmentQty(currentQty);
@@ -75,14 +81,15 @@ export const useInventory = () => {
 
   const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedVariant || !selectedWarehouseId) return;
+    if (!selectedItem || !selectedWarehouseId) return;
 
     setSubmitting(true);
     try {
       await apiService(API_ROUTES.LOGISTICS.UPDATE_STOCK, {
         method: 'PATCH',
         body: {
-          variantId: selectedVariant.id,
+          variantId: selectedItem.kind === 'variant' ? selectedItem.id : undefined,
+          productId: selectedItem.kind === 'product' ? selectedItem.id : undefined,
           warehouseId: selectedWarehouseId,
           quantity: adjustmentQty
         }
@@ -114,9 +121,9 @@ export const useInventory = () => {
 
   const updateAdjustmentQtyByWarehouse = useCallback((warehouseId: string) => {
     setSelectedWarehouseId(warehouseId);
-    const group = groupedInventory.find(g => g.variant.id === selectedVariant?.id);
+    const group = groupedInventory.find(g => g.id === selectedItem?.id && g.kind === selectedItem?.kind);
     if (group) setAdjustmentQty(group.stocks[warehouseId] || 0);
-  }, [groupedInventory, selectedVariant]);
+  }, [groupedInventory, selectedItem]);
 
   return {
     loading,
@@ -130,7 +137,7 @@ export const useInventory = () => {
     adjustModalOpen,
     setAdjustModalOpen,
     submitting,
-    selectedVariant,
+    selectedItem,
     selectedWarehouseId,
     adjustmentQty,
     setAdjustmentQty,

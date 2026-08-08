@@ -15,6 +15,8 @@ export const useSettings = () => {
     stripePublishableKey: '',
     stripeSecretKey: '',
     stripeWebhookSecret: '',
+    codDepositAmount: '',
+    codDepositOrderThreshold: '',
   });
 
   const [rateMeta, setRateMeta] = useState<{
@@ -25,7 +27,8 @@ export const useSettings = () => {
   const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiService<unknown, Settings>(API_ROUTES.SETTINGS);
+      const response = await apiService<unknown, { data: Settings }>(API_ROUTES.SETTINGS);
+      const data = response.data;
       setSettings(data);
       setFormData({
         privacyPolicy: data?.privacyPolicy || '',
@@ -33,6 +36,12 @@ export const useSettings = () => {
         stripePublishableKey: data?.stripePublishableKey || '',
         stripeSecretKey: data?.stripeSecretKey || '',
         stripeWebhookSecret: data?.stripeWebhookSecret || '',
+        codDepositAmount:
+          data?.codDepositAmount != null ? String(data.codDepositAmount) : '',
+        codDepositOrderThreshold:
+          data?.codDepositOrderThreshold != null
+            ? String(data.codDepositOrderThreshold)
+            : '',
       });
       setRateMeta({
         rateUpdatedAt: (data as Settings & { rateUpdatedAt?: string })?.rateUpdatedAt ?? null,
@@ -54,7 +63,7 @@ export const useSettings = () => {
     setSubmitting(true);
     setSuccess(false);
     try {
-      const { privacyPolicy, termsConditions, stripePublishableKey, stripeSecretKey, stripeWebhookSecret } = formData;
+      const { privacyPolicy, termsConditions, stripePublishableKey, stripeSecretKey, stripeWebhookSecret, codDepositAmount, codDepositOrderThreshold } = formData;
       await apiService(API_ROUTES.SETTINGS, {
         method: 'PATCH',
         body: {
@@ -63,6 +72,9 @@ export const useSettings = () => {
           stripePublishableKey,
           stripeSecretKey,
           stripeWebhookSecret,
+          codDepositAmount: codDepositAmount === '' ? null : Number(codDepositAmount),
+          codDepositOrderThreshold:
+            codDepositOrderThreshold === '' ? null : Number(codDepositOrderThreshold),
         },
       });
       setSuccess(true);

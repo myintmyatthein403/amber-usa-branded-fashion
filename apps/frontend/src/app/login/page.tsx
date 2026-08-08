@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { motion } from "motion/react";
 import { Mail, Lock, Loader2, ArrowRight } from "lucide-react";
@@ -178,7 +179,17 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]">Password</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]">Password</label>
+                {isLogin && (
+                  <Link
+                    href="/forgot-password"
+                    className="text-[10px] uppercase tracking-widest font-bold text-[#D4AF37] hover:text-[#1A1A1A] transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
+                )}
+              </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#D4AF37]" />
                 <input

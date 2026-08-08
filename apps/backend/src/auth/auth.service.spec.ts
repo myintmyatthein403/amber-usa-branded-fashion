@@ -3,6 +3,8 @@ import { AuthService } from './auth.service';
 import { UsersRepository } from '../users/users.repository';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { PasswordResetRepository } from './password-reset.repository';
+import { EmailService } from './email.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -33,6 +35,21 @@ describe('AuthService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue('mock-value'),
+          },
+        },
+        {
+          provide: PasswordResetRepository,
+          useValue: {
+            create: jest.fn(),
+            findValidByTokenHash: jest.fn(),
+            markUsed: jest.fn(),
+            invalidateAllForUser: jest.fn(),
+          },
+        },
+        {
+          provide: EmailService,
+          useValue: {
+            sendPasswordResetEmail: jest.fn(),
           },
         },
       ],

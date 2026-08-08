@@ -26,7 +26,12 @@ import {
   UpdateProductDto,
   ProductQueryDto,
   StockValidationItemDto,
+  ImportProductsDto,
 } from './dto/product.dto';
+
+interface AuthenticatedRequest {
+  user?: { userId?: string; role?: string };
+}
 
 @Controller('products')
 export class ProductsController {
@@ -73,6 +78,8 @@ export class ProductsController {
       page: query.page ? parseInt(query.page, 10) : undefined,
       limit: query.limit ? parseInt(query.limit, 10) : undefined,
       search: query.search,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
       publicOnly: !isAdmin,
     });
   }
@@ -82,12 +89,30 @@ export class ProductsController {
     return this.productsService.getProductBySlug(slug);
   }
 
+  @Get('facets')
+  @UseGuards(OptionalJwtAuthGuard)
+  async getFacets(@Query() query: ProductQueryDto, @Req() req: { user?: { role?: string } }) {
+    const isAdmin = req.user && ['ADMIN', 'SUPERADMIN'].includes(req.user.role ?? '');
+    return this.productsService.getProductFacets({
+      categoryId: query.categoryId,
+      brandId: query.brandId,
+      market: query.market as 'US' | 'MM' | undefined,
+      search: query.search,
+      priceMin: query.priceMin ? parseFloat(query.priceMin) : undefined,
+      priceMax: query.priceMax ? parseFloat(query.priceMax) : undefined,
+      publicOnly: !isAdmin,
+    });
+  }
+
   @Get('export')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Permissions(Permission.PRODUCTS_READ)
   @Header('Content-Type', 'text/csv')
   async exportProducts(@Res() res: Response) {
-    const products = await this.productsService.getAllProducts({ limit: 10000 });
+    const products = await this.productsService.getAllProducts({
+      limit: 10000,
+      includeInventory: true,
+    });
     const rows = ['sku,productName,variantSize,variantColor,price,currencyCode,stock,warehouseLocation,buyPrice'];
     const data = Array.isArray(products) ? products : products.data;
     for (const p of data) {
@@ -106,21 +131,14 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Permissions(Permission.PRODUCTS_WRITE)
   async importProducts(
-    @Body() body: { rows: Array<Record<string, string>>; dryRun?: boolean },
+    @Body(new ZodValidationPipe(ImportProductsDto)) body: ImportProductsDto,
+    @Req() req: AuthenticatedRequest,
   ) {
-    const errors: string[] = [];
-    const preview: Array<Record<string, string>> = [];
-    for (const row of body.rows ?? []) {
-      if (!row.sku || !row.productName) {
-        errors.push(`Missing sku or productName: ${JSON.stringify(row)}`);
-        continue;
-      }
-      preview.push(row);
-    }
-    if (body.dryRun || errors.length) {
-      return { dryRun: true, preview, errors };
-    }
-    return { imported: preview.length, preview };
+    return this.productsService.importProducts(
+      body.rows,
+      body.dryRun,
+      req.user?.userId,
+    );
   }
 
   @Get(':id')

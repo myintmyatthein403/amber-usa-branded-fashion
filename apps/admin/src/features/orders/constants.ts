@@ -21,6 +21,7 @@ export const STATUS_CONFIG: Record<OrderStatus, { label: string; icon: any; colo
 export const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; icon: any; color: string; bg: string; border: string }> = {
   PENDING: { label: 'Unpaid', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-600/10', border: 'border-amber-600/20' },
   PAID: { label: 'Paid', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-600/10', border: 'border-emerald-600/20' },
+  PARTIALLY_PAID: { label: 'Deposit Paid', icon: AlertCircle, color: 'text-blue-600', bg: 'bg-blue-600/10', border: 'border-blue-600/20' },
   FAILED: { label: 'Failed', icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-600/10', border: 'border-rose-600/20' },
   REFUNDED: { label: 'Refunded', icon: ArrowRight, color: 'text-slate-600', bg: 'bg-slate-600/10', border: 'border-slate-600/20' },
   REJECTED: { label: 'Rejected', icon: XCircle, color: 'text-rose-600', bg: 'bg-rose-600/10', border: 'border-rose-600/20' },

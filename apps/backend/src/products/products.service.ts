@@ -1,12 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Product, Prisma } from '@prisma/client';
 import { ProductsRepository } from './products.repository';
 import { AttributesService } from '../attributes/attributes.service';
+import { LogisticsService } from '../logistics/logistics.service';
 import { sanitizeData } from '../common/utils/data-sanitizer';
 import {
   CreateProductDto,
   UpdateProductDto,
   StockValidationItemDto,
+  ImportProductRowDto,
 } from './dto/product.dto';
 
 export interface ProductListParams {
@@ -28,13 +30,28 @@ export interface ProductListParams {
   limit?: number;
   search?: string;
   publicOnly?: boolean;
+  includeInventory?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
+
+// Allow-list: prevents arbitrary/unsafe field names reaching Prisma's
+// orderBy from public, unauthenticated query params.
+const SORTABLE_FIELDS = new Set([
+  'createdAt',
+  'price',
+  'name',
+  'isFeatured',
+  'isNewArrival',
+  'isBestSeller',
+]);
 
 @Injectable()
 export class ProductsService {
   constructor(
     private productsRepository: ProductsRepository,
     private attributesService: AttributesService,
+    private logisticsService: LogisticsService,
   ) {}
 
   private stripCostFields<T extends Record<string, unknown>>(product: T): T {
@@ -108,11 +125,19 @@ export class ProductsService {
       }
     }
 
-    const variantFilters: Prisma.VariantWhereInput[] = [];
-
     if (params.inStock) {
-      variantFilters.push({ stock: { gt: 0 } });
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          OR: [
+            { variants: { some: { stock: { gt: 0 } } } },
+            { variants: { none: {} }, stock: { gt: 0 } },
+          ],
+        },
+      ];
     }
+
+    const variantFilters: Prisma.VariantWhereInput[] = [];
 
     if (params.warehouseLocation) {
       variantFilters.push({
@@ -158,8 +183,19 @@ export class ProductsService {
     const where = this.buildWhere(params);
     const { page, limit, search } = params;
 
-    if (!page && !limit && !search && !params.publicOnly) {
-      return this.productsRepository.findAllSimple(where);
+    const sortBy =
+      params.sortBy && SORTABLE_FIELDS.has(params.sortBy) ? params.sortBy : 'createdAt';
+    const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc';
+    const options = {
+      includeInventory: params.includeInventory,
+      orderBy: { [sortBy]: sortOrder } as Prisma.ProductOrderByWithRelationInput,
+    };
+
+    if (!page && !limit && !search) {
+      const data = await this.productsRepository.findAllSimple(where, options);
+      return params.publicOnly
+        ? data.map((p) => this.stripCostFields(p as unknown as Record<string, unknown>))
+        : data;
     }
 
     const currentPage = Number(page) || 1;
@@ -170,6 +206,7 @@ export class ProductsService {
       where,
       skip,
       currentLimit,
+      options,
     );
 
     return {
@@ -215,6 +252,36 @@ export class ProductsService {
         sanitizedData.variants as UpdateProductDto['variants'],
       )) as UpdateProductDto['variants'];
     }
+
+    if (sanitizedData.stock !== undefined) {
+      const incomingVariants = sanitizedData.variants as
+        | UpdateProductDto['variants']
+        | undefined;
+      const hasIncomingVariants =
+        Array.isArray(incomingVariants) && incomingVariants.length > 0;
+
+      if (!hasIncomingVariants) {
+        const existingVariantCount = await this.productsRepository.countVariants(id);
+        if (existingVariantCount === 0) {
+          const inventoryCount = await this.productsRepository.countInventoryRows(id);
+          if (inventoryCount > 1) {
+            throw new BadRequestException(
+              'Cannot update stock directly for products with multiple warehouse inventories. Use Logistics Management instead.',
+            );
+          }
+          if (
+            inventoryCount === 0 &&
+            !sanitizedData.warehouseId &&
+            !(sanitizedData.warehouseAllocations as unknown[] | undefined)?.length
+          ) {
+            throw new BadRequestException(
+              'No inventory record found for this product. Please add stock via Logistics Management.',
+            );
+          }
+        }
+      }
+    }
+
     return this.productsRepository.update(id, sanitizedData);
   }
 
@@ -224,6 +291,94 @@ export class ProductsService {
 
   async publishScheduled(): Promise<number> {
     return this.productsRepository.publishScheduled();
+  }
+
+  // Facet counts for the shop filter sidebar. Each dimension is counted
+  // against a where-clause that excludes that same dimension's own filter,
+  // so "Brand" counts reflect category/price/search/etc. already applied,
+  // not the brand selection itself (standard faceted-search semantics).
+  async getProductFacets(params: ProductListParams = {}) {
+    const brandWhere = this.buildWhere({ ...params, brandId: undefined });
+    const categoryWhere = this.buildWhere({ ...params, categoryId: undefined });
+
+    const [brands, categories] = await Promise.all([
+      this.productsRepository.countByBrand(brandWhere),
+      this.productsRepository.countByCategory(categoryWhere),
+    ]);
+
+    return { brands, categories };
+  }
+
+  // Bulk import: updates existing variants matched by SKU (price, currency,
+  // buy price, per-warehouse stock). Does not create new products/variants —
+  // a flat CSV row can't safely supply category/slug/images, so rows whose
+  // SKU doesn't already exist are reported as errors rather than guessed at.
+  async importProducts(rows: ImportProductRowDto[], dryRun = false, userId?: string) {
+    const errors: string[] = [];
+    const validRows: Array<{ row: ImportProductRowDto; variantId: string }> = [];
+
+    for (const row of rows) {
+      const variant = await this.productsRepository.findVariantBySku(row.sku);
+      if (!variant) {
+        errors.push(
+          `SKU not found: ${row.sku}. Import only updates existing variants; create the product first.`,
+        );
+        continue;
+      }
+      validRows.push({ row, variantId: variant.id });
+    }
+
+    if (dryRun || errors.length) {
+      return {
+        dryRun: true,
+        preview: validRows.map((v) => v.row),
+        errors,
+      };
+    }
+
+    let warehousesByLocation: Record<string, string> | null = null;
+    let imported = 0;
+
+    for (const { row, variantId } of validRows) {
+      const fieldUpdate: Prisma.VariantUpdateInput = {};
+      if (row.price) fieldUpdate.price = Number(row.price);
+      if (row.currencyCode) fieldUpdate.currencyCode = row.currencyCode;
+      if (row.buyPrice) fieldUpdate.buyPrice = Number(row.buyPrice);
+      if (Object.keys(fieldUpdate).length > 0) {
+        await this.productsRepository.updateVariantFields(variantId, fieldUpdate);
+      }
+
+      if (row.stock && row.warehouseLocation) {
+        if (!warehousesByLocation) {
+          const warehouses = (await this.logisticsService.getAllWarehouses()) as Array<{
+            id: string;
+            location: string;
+          }>;
+          warehousesByLocation = Object.fromEntries(
+            warehouses.map((w) => [w.location, w.id]),
+          );
+        }
+        const warehouseId = warehousesByLocation[row.warehouseLocation];
+        if (!warehouseId) {
+          errors.push(
+            `No warehouse found for location "${row.warehouseLocation}" (SKU ${row.sku})`,
+          );
+          continue;
+        }
+        await this.logisticsService.updateStock(
+          { variantId },
+          warehouseId,
+          Number(row.stock),
+          'RECEIVING',
+          'Bulk CSV import',
+          userId,
+        );
+      }
+
+      imported++;
+    }
+
+    return { imported, errors };
   }
 
   async validateStock(items: StockValidationItemDto[]) {
@@ -278,7 +433,7 @@ export class ProductsService {
           continue;
         }
 
-        const isDigital = product.name.includes('Gift Card');
+        const isDigital = (product as { isDigital?: boolean }).isDigital ?? false;
 
         results.push({
           ...item,

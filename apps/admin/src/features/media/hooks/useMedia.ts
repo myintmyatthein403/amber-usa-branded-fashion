@@ -12,6 +12,7 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchMedia = useCallback(async () => {
@@ -34,6 +35,7 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
     if (!e.target.files || e.target.files.length === 0) return;
     
     setUploading(true);
+    setUploadError(null);
     const formData = new FormData();
     formData.append('file', e.target.files[0]);
 
@@ -50,8 +52,14 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
       }
     } catch (error) {
       console.error('Upload failed:', error);
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Upload failed. You can continue without an image or pick one from the library.',
+      );
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -74,6 +82,7 @@ export const useMedia = ({ onSelect, selectionMode }: UseMediaProps = {}) => {
     filteredMedia,
     loading,
     uploading,
+    uploadError,
     searchTerm,
     setSearchTerm,
     fetchMedia,
