@@ -139,6 +139,26 @@ export const API_ROUTES = {
     CARGO_BY_ID: (id: string) => `/logistics/cargo/${id}`,
     CARGO_STATUS: (id: string) => `/logistics/cargo/${id}/status`,
     },
+  RETURNS: {
+    BASE: '/returns',
+    BY_ID: (id: string) => `/returns/${id}`,
+    STATUS: (id: string) => `/returns/${id}/status`,
+    RECEIVE: (id: string) => `/returns/${id}/receive`,
+  },
+  QUESTIONS: {
+    BASE: '/questions',
+    TOGGLE_APPROVAL: (id: string) => `/questions/${id}/toggle-approval`,
+    ANSWERS: (id: string) => `/questions/${id}/answers`,
+    BY_ID: (id: string) => `/questions/${id}`,
+  },
+  PRICE_TIERS: {
+    BASE: '/price-tiers',
+    BY_ID: (id: string) => `/price-tiers/${id}`,
+  },
+  FEEDBACK: {
+    BASE: '/feedback',
+    STATUS: (id: string) => `/feedback/${id}/status`,
+  },
   MEDIA: {
     BASE: '/media',
     UPLOAD: '/media/upload',

@@ -41,6 +41,16 @@ export class ExchangeRateRefreshService {
     const mmk = await this.prisma.currency.findUnique({ where: { code: 'MMK' } });
 
     if (usd && mmk) {
+      const existing = await this.prisma.exchangeRate.findUnique({
+        where: { fromCurrencyId_toCurrencyId: { fromCurrencyId: usd.id, toCurrencyId: mmk.id } },
+      });
+      // An admin-entered manual rate takes priority over the external API —
+      // a scheduled refresh (see currencies.scheduler.ts) must never
+      // silently clobber it.
+      if (existing?.isManualOverride) {
+        return { rate: Number(existing.rate), source: 'manual_override' };
+      }
+
       await this.prisma.exchangeRate.upsert({
         where: {
           fromCurrencyId_toCurrencyId: {

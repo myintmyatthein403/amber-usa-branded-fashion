@@ -1,30 +1,35 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { LogisticsService } from './logistics.service';
 
-const RECONCILE_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
-
 @Injectable()
-export class LogisticsScheduler implements OnModuleInit, OnModuleDestroy {
+export class LogisticsScheduler {
   private readonly logger = new Logger(LogisticsScheduler.name);
-  private interval: ReturnType<typeof setInterval> | null = null;
 
   constructor(private logisticsService: LogisticsService) {}
 
-  onModuleInit() {
-    this.interval = setInterval(async () => {
-      try {
-        const { variantDriftCount, productDriftCount } =
-          await this.logisticsService.reconcileStock();
-        if (variantDriftCount === 0 && productDriftCount === 0) {
-          this.logger.log('Stock reconciliation: no drift found');
-        }
-      } catch (err) {
-        this.logger.error('Scheduled stock reconciliation failed', err);
+  @Cron(CronExpression.EVERY_6_HOURS)
+  async reconcileStock() {
+    try {
+      const { variantDriftCount, productDriftCount } =
+        await this.logisticsService.reconcileStock();
+      if (variantDriftCount === 0 && productDriftCount === 0) {
+        this.logger.log('Stock reconciliation: no drift found');
       }
-    }, RECONCILE_INTERVAL_MS);
+    } catch (err) {
+      this.logger.error('Scheduled stock reconciliation failed', err);
+    }
   }
 
-  onModuleDestroy() {
-    if (this.interval) clearInterval(this.interval);
+  @Cron(CronExpression.EVERY_12_HOURS)
+  async checkReorderAlerts() {
+    try {
+      const { count } = await this.logisticsService.checkReorderAlerts();
+      if (count === 0) {
+        this.logger.log('Reorder sweep: nothing at or below threshold');
+      }
+    } catch (err) {
+      this.logger.error('Scheduled reorder alert sweep failed', err);
+    }
   }
 }

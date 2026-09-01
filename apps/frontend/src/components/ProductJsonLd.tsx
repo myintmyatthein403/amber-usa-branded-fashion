@@ -8,6 +8,9 @@ interface ProductJsonLdProps {
   brand?: string;
   inStock?: boolean;
   url?: string;
+  avgRating?: number | string | null;
+  reviewCount?: number;
+  breadcrumbs?: { name: string; url: string }[];
 }
 
 export default function ProductJsonLd({
@@ -20,7 +23,13 @@ export default function ProductJsonLd({
   brand,
   inStock = true,
   url,
+  avgRating,
+  reviewCount,
+  breadcrumbs,
 }: ProductJsonLdProps) {
+  const ratingValue = avgRating != null ? Number(avgRating) : 0;
+  const hasReviews = (reviewCount ?? 0) > 0 && ratingValue > 0;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -29,6 +38,13 @@ export default function ProductJsonLd({
     image: image ? [image] : undefined,
     sku,
     brand: brand ? { "@type": "Brand", name: brand } : undefined,
+    aggregateRating: hasReviews
+      ? {
+          "@type": "AggregateRating",
+          ratingValue: ratingValue.toFixed(1),
+          reviewCount,
+        }
+      : undefined,
     offers: {
       "@type": "Offer",
       price: String(price),
@@ -40,10 +56,31 @@ export default function ProductJsonLd({
     },
   };
 
+  const breadcrumbJsonLd = breadcrumbs?.length
+    ? {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: breadcrumbs.map((crumb, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: crumb.name,
+          item: crumb.url,
+        })),
+      }
+    : null;
+
   return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        />
+      )}
+    </>
   );
 }

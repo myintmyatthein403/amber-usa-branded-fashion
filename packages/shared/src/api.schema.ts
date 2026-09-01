@@ -58,12 +58,16 @@ export const ApiProductSchema = z.object({
     logo: z.string().nullable(),
   }).nullable(),
   variants: z.array(ApiVariantSchema).default([]),
+  avgRating: z.union([z.number(), z.string()]).default(0),
+  reviewCount: z.number().default(0),
+  warrantyMonths: z.number().nullable().optional(),
   reviews: z.array(z.object({
     id: z.string(),
     rating: z.number(),
     comment: z.string().nullable(),
     userName: z.string(),
     createdAt: z.string(),
+    isVerifiedPurchase: z.boolean().default(false),
   })).default([]),
 });
 
@@ -77,6 +81,8 @@ export const ApiReviewSchema = z.object({
   userProfileUrl: z.string().nullable(),
   createdAt: z.string(),
   platform: z.enum(['WEBSITE', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK']).default('WEBSITE'),
+  isVerifiedPurchase: z.boolean().default(false),
+  orderItemId: z.string().nullable().optional(),
 });
 
 export type ApiReview = z.infer<typeof ApiReviewSchema>;

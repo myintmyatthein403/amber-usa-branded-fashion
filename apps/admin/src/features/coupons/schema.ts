@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const CouponDiscountTypeSchema = z.enum(['PERCENTAGE', 'FIXED_AMOUNT']);
+export const CouponDiscountTypeSchema = z.enum(['PERCENTAGE', 'FIXED_AMOUNT', 'BUY_X_GET_Y', 'FREE_SHIPPING']);
+export const CouponScopeTypeSchema = z.enum(['ORDER', 'PRODUCT', 'CATEGORY']);
 
 export const CouponSchema = z.object({
   id: z.string().uuid().optional(),
@@ -14,6 +15,11 @@ export const CouponSchema = z.object({
   usageLimit: z.number().nullable().optional(),
   usageCount: z.number().default(0),
   isActive: z.boolean().default(true),
+  scopeType: CouponScopeTypeSchema.default('ORDER'),
+  scopeProductId: z.string().nullable().optional(),
+  scopeCategoryId: z.string().nullable().optional(),
+  buyQuantity: z.number().nullable().optional(),
+  getQuantity: z.number().nullable().optional(),
 });
 
 export type Coupon = z.infer<typeof CouponSchema> & { id: string };

@@ -9,6 +9,7 @@ import { ProductCardSkeleton } from "@/components/ProductCardSkeleton";
 import { useStore } from "@/store/useStore";
 import { cn } from "@/lib/utils";
 import Price from "./Price";
+import { cloudinaryDeliveryUrl } from "@/lib/image";
 import { Product } from "@amber/shared";
 import { getProductStock, isProductPurchasable } from "@/lib/product";
 
@@ -139,7 +140,10 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
               <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-neutral-100 shadow-sm">
                 {(hoveredProduct === product.id ? product.secondaryImage : product.image) && (
                   <Image
-                    src={(hoveredProduct === product.id ? product.secondaryImage : product.image) as string}
+                    src={cloudinaryDeliveryUrl(
+                      (hoveredProduct === product.id ? product.secondaryImage : product.image) as string,
+                      { width: 800 },
+                    )}
                     alt={product.name}
                     fill
                     className="object-cover transition-transform duration-1000 group-hover:scale-110"
@@ -194,7 +198,7 @@ export default function ProductGrid({ title, filter }: { title: string, filter?:
               </div>
 
               <div className="mt-6 flex flex-col items-center text-center space-y-1">
-                <a href={`/shop/${product.id}`} className="block group-hover:translate-y-[-2px] transition-transform">
+                <a href={`/shop/${product.slug || product.id}`} className="block group-hover:translate-y-[-2px] transition-transform">
                   <h3 className="text-lg font-serif text-foreground group-hover:text-amber-gold transition-colors">
                     {product.name}
                   </h3>

@@ -21,11 +21,14 @@ import { cn } from "@/lib/utils";
 import { useState, useMemo, useEffect } from "react";
 import SizeGuideModal from "@/components/modals/SizeGuideModal";
 import ProductReviews from "@/components/ProductReviews";
+import ProductQA from "@/components/ProductQA";
+import RecentlyViewed from "@/components/RecentlyViewed";
 import { useStore } from "@/store/useStore";
 import DOMPurify from "dompurify";
 import Price from "@/components/Price";
 import { getApiUrl } from "@/lib/api";
 import { productApiPath, getProductStock, resolveAttributeValues } from "@/lib/product";
+import { cloudinaryDeliveryUrl } from "@/lib/image";
 import { useTranslations } from "@/i18n/useTranslations";
 import { toast } from "@/store/useToastStore";
 import type { ApiProduct, ApiReview, Product } from "@amber/shared";
@@ -62,6 +65,7 @@ interface DetailVariant {
 
 interface RelatedProduct {
   id: string;
+  slug?: string;
   name: string;
   price: number;
   isUsdPrice: boolean;
@@ -79,6 +83,7 @@ export default function ProductDetailPage() {
   );
   const [filterableAttributes, setFilterableAttributes] = useState<FilterableAttribute[]>([]);
   const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
+  const [frequentlyBoughtTogether, setFrequentlyBoughtTogether] = useState<RelatedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState("description");
@@ -89,6 +94,7 @@ export default function ProductDetailPage() {
 
   const addToCart = useStore((state) => state.addToCart);
   const addToCompare = useStore((state) => state.addToCompare);
+  const addRecentlyViewed = useStore((state) => state.addRecentlyViewed);
   const currency = useStore((state) => state.currency);
   const exchangeRate = useStore((state) => state.exchangeRate);
   const market = useStore((state) => state.market);
@@ -198,6 +204,7 @@ export default function ProductDetailPage() {
           variants?: DetailVariant[];
         };
         setProduct(productData);
+        addRecentlyViewed(productData.id);
         if (typeof window !== "undefined") {
           const defaultDesc =
             "Indulge in the elegance of authentic global fashion. Each piece is sourced directly from USA outlets to guarantee quality and authenticity.";
@@ -205,16 +212,20 @@ export default function ProductDetailPage() {
             DOMPurify.sanitize(productData.description || defaultDesc),
           );
         }
-        if (productData.brandId) {
-          const relatedRes = await fetch(
-            `${getApiUrl()}/products?market=${market}&brandId=${productData.brandId}&limit=4`,
-          );
-          const relatedResult = await relatedRes.json();
-          const list = (relatedResult?.data ?? relatedResult ?? []) as RelatedProduct[];
-          setRelatedProducts(
-            list.filter((p) => p.id !== productData.id).slice(0, 4),
-          );
-        }
+        // Admin-curated overrides win when set; otherwise scored by
+        // category + attribute-value overlap (see products.repository.ts's
+        // findScoredRelatedProducts) — no longer just "same brand."
+        const relatedRes = await fetch(`${getApiUrl()}/products/${productData.id}/related`);
+        const relatedResult = await relatedRes.json();
+        const list = (relatedResult?.data ?? relatedResult ?? []) as RelatedProduct[];
+        setRelatedProducts(list.filter((p) => p.id !== productData.id).slice(0, 4));
+
+        const fbtRes = await fetch(
+          `${getApiUrl()}/products/${productData.id}/frequently-bought-together`,
+        );
+        const fbtResult = await fbtRes.json();
+        const fbtList = (fbtResult?.data ?? fbtResult ?? []) as RelatedProduct[];
+        setFrequentlyBoughtTogether(fbtList.filter((p) => p.id !== productData.id).slice(0, 4));
       } catch (error) {
         console.error("Failed to fetch product:", error);
       } finally {
@@ -222,6 +233,7 @@ export default function ProductDetailPage() {
       }
     };
     if (ref) fetchProduct();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref]);
 
   useEffect(() => {
@@ -344,7 +356,7 @@ export default function ProductDetailPage() {
             >
               {activeImage ? (
                 <Image
-                  src={activeImage}
+                  src={cloudinaryDeliveryUrl(activeImage, { width: 1200 })}
                   alt={product.name}
                   fill
                   className="object-cover transition-all duration-700"
@@ -383,7 +395,7 @@ export default function ProductDetailPage() {
                         : "border-transparent opacity-60 hover:opacity-100",
                     )}
                   >
-                    <Image src={img} alt={`${product.name} ${idx}`} fill className="object-cover" />
+                    <Image src={cloudinaryDeliveryUrl(img, { width: 200 })} alt={`${product.name} ${idx}`} fill className="object-cover" />
                   </button>
                 ))}
               </div>
@@ -663,20 +675,42 @@ export default function ProductDetailPage() {
                     <p className="text-[10px] text-[#1A1A1A]/40">100% Authentic Brands</p>
                   </div>
                 </div>
+                {product.warrantyMonths != null && product.warrantyMonths > 0 && (
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-[#F5F0E1] flex items-center justify-center rounded-full">
+                      <ShieldCheck className="w-5 h-5 text-[#D4AF37]" />
+                    </div>
+                    <div>
+                      <h5 className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]">
+                        Warranty
+                      </h5>
+                      <p className="text-[10px] text-[#1A1A1A]/40">
+                        {product.warrantyMonths} month{product.warrantyMonths !== 1 ? "s" : ""} coverage
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
         </div>
       </section>
 
-      <ProductReviews reviews={reviews as ApiReview[]} />
+      <ProductReviews
+        reviews={reviews as ApiReview[]}
+        productId={product.id}
+        avgRating={product.avgRating}
+        reviewCount={product.reviewCount}
+      />
 
-      {relatedProducts.length > 0 && (
+      <ProductQA productId={product.id} />
+
+      {frequentlyBoughtTogether.length > 0 && (
         <section className="max-w-7xl mx-auto px-6 md:px-12 pb-24">
-          <h2 className="text-3xl font-serif text-center mb-12">{t("product.related")}</h2>
+          <h2 className="text-3xl font-serif text-center mb-12">Frequently Bought Together</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {relatedProducts.map((rp) => (
-              <Link key={rp.id} href={`/shop/${rp.id}`} className="group space-y-4">
+            {frequentlyBoughtTogether.map((rp) => (
+              <Link key={rp.id} href={`/shop/${rp.slug || rp.id}`} className="group space-y-4">
                 <div className="relative aspect-[3/4] bg-[#F5F0E1] overflow-hidden">
                   <Image
                     src={rp.images?.[0] || "/placeholder.png"}
@@ -698,6 +732,36 @@ export default function ProductDetailPage() {
           </div>
         </section>
       )}
+
+      {relatedProducts.length > 0 && (
+        <section className="max-w-7xl mx-auto px-6 md:px-12 pb-24">
+          <h2 className="text-3xl font-serif text-center mb-12">{t("product.related")}</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {relatedProducts.map((rp) => (
+              <Link key={rp.id} href={`/shop/${rp.slug || rp.id}`} className="group space-y-4">
+                <div className="relative aspect-[3/4] bg-[#F5F0E1] overflow-hidden">
+                  <Image
+                    src={rp.images?.[0] || "/placeholder.png"}
+                    alt={rp.name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-700"
+                  />
+                </div>
+                <h3 className="text-sm font-serif text-center group-hover:text-[#D4AF37] transition-colors">
+                  {rp.name}
+                </h3>
+                <Price
+                  amount={rp.price}
+                  isUsdPrice={rp.isUsdPrice}
+                  className="text-sm text-[#D4AF37] font-bold block text-center"
+                />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <RecentlyViewed excludeProductId={product.id} />
     </main>
   );
 }

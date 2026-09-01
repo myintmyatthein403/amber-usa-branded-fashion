@@ -16,6 +16,11 @@ export const useInventory = () => {
   const [selectedItem, setSelectedItem] = useState<GroupedInventory | null>(null);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
   const [adjustmentQty, setAdjustmentQty] = useState(0);
+  const [adjustmentMode, setAdjustmentMode] = useState<'SET' | 'DELTA'>('SET');
+  const [adjustmentReason, setAdjustmentReason] = useState<
+    'ADJUSTMENT' | 'RECEIVING' | 'DAMAGE' | 'SALE' | 'RESTOCK'
+  >('ADJUSTMENT');
+  const [adjustmentNote, setAdjustmentNote] = useState('');
 
   // Bulk Transfer State
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -76,12 +81,16 @@ export const useInventory = () => {
     setSelectedWarehouseId(warehouseId || '');
     const currentQty = warehouseId ? (group.stocks[warehouseId] || 0) : 0;
     setAdjustmentQty(currentQty);
+    setAdjustmentMode('SET');
+    setAdjustmentReason('ADJUSTMENT');
+    setAdjustmentNote('');
     setAdjustModalOpen(true);
   }, []);
 
   const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem || !selectedWarehouseId) return;
+    if (adjustmentMode === 'DELTA' && adjustmentQty === 0) return;
 
     setSubmitting(true);
     try {
@@ -91,7 +100,10 @@ export const useInventory = () => {
           variantId: selectedItem.kind === 'variant' ? selectedItem.id : undefined,
           productId: selectedItem.kind === 'product' ? selectedItem.id : undefined,
           warehouseId: selectedWarehouseId,
-          quantity: adjustmentQty
+          mode: adjustmentMode,
+          quantity: adjustmentQty,
+          reason: adjustmentReason,
+          note: adjustmentNote || undefined,
         }
       });
       setAdjustModalOpen(false);
@@ -122,8 +134,19 @@ export const useInventory = () => {
   const updateAdjustmentQtyByWarehouse = useCallback((warehouseId: string) => {
     setSelectedWarehouseId(warehouseId);
     const group = groupedInventory.find(g => g.id === selectedItem?.id && g.kind === selectedItem?.kind);
-    if (group) setAdjustmentQty(group.stocks[warehouseId] || 0);
-  }, [groupedInventory, selectedItem]);
+    if (group) setAdjustmentQty(adjustmentMode === 'DELTA' ? 0 : (group.stocks[warehouseId] || 0));
+  }, [groupedInventory, selectedItem, adjustmentMode]);
+
+  const changeAdjustmentMode = useCallback((mode: 'SET' | 'DELTA') => {
+    setAdjustmentMode(mode);
+    if (mode === 'DELTA') {
+      setAdjustmentQty(0);
+      setAdjustmentReason('ADJUSTMENT');
+    } else {
+      const group = groupedInventory.find(g => g.id === selectedItem?.id && g.kind === selectedItem?.kind);
+      setAdjustmentQty(group && selectedWarehouseId ? (group.stocks[selectedWarehouseId] || 0) : 0);
+    }
+  }, [groupedInventory, selectedItem, selectedWarehouseId]);
 
   return {
     loading,
@@ -141,6 +164,12 @@ export const useInventory = () => {
     selectedWarehouseId,
     adjustmentQty,
     setAdjustmentQty,
+    adjustmentMode,
+    changeAdjustmentMode,
+    adjustmentReason,
+    setAdjustmentReason,
+    adjustmentNote,
+    setAdjustmentNote,
     groupedInventory,
     warehouses,
     openAdjustModal,

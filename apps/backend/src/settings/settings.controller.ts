@@ -4,6 +4,8 @@ import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { UpdateSettingsSchema, type UpdateSettingsInput } from '@amber/shared';
 
 @Controller('settings')
 export class SettingsController {
@@ -18,16 +20,7 @@ export class SettingsController {
   @Roles('ADMIN', 'SUPERADMIN')
   @Patch()
   updateSettings(
-    @Body()
-    data: {
-      privacyPolicy?: string;
-      termsConditions?: string;
-      stripePublishableKey?: string;
-      stripeSecretKey?: string;
-      stripeWebhookSecret?: string;
-      codDepositAmount?: number | null;
-      codDepositOrderThreshold?: number | null;
-    },
+    @Body(new ZodValidationPipe(UpdateSettingsSchema)) data: UpdateSettingsInput,
   ) {
     return this.settingsService.updateSettings(data);
   }

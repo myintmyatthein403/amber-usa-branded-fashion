@@ -24,6 +24,10 @@ import { RolesPage } from './pages/RolesPage';
 import { LoginPage } from './pages/LoginPage';
 import { Dashboard } from './pages/Dashboard';
 import { OrdersPage } from './pages/OrdersPage';
+import { ReturnsPage } from './pages/ReturnsPage';
+import { QuestionsPage } from './pages/QuestionsPage';
+import { WholesalePricingPage } from './pages/WholesalePricingPage';
+import { FeedbackPage } from './pages/FeedbackPage';
 import { WarehousesPage } from './pages/WarehousesPage';
 import { CargoPage } from './pages/CargoPage';
 import { InventoryPage } from './pages/InventoryPage';
@@ -51,10 +55,14 @@ const TAB_PERMISSIONS: Record<string, string[]> = {
   brands: ['brands:manage'],
   variants: ['products:write'],
   orders: ['orders:manage'],
+  returns: ['orders:manage'],
   warehouses: ['logistics:manage'],
   inventory: ['logistics:manage'],
   cargo: ['logistics:manage'],
   reviews: ['reviews:manage'],
+  questions: ['reviews:manage'],
+  'wholesale-pricing': ['sales:manage'],
+  feedback: ['orders:manage'],
   sales: ['sales:manage'],
   coupons: ['coupons:manage'],
   giftcards: ['giftcards:manage'],
@@ -158,7 +166,7 @@ function App() {
   // Sync activeTab with URL on mount
   useEffect(() => {
     const path = window.location.pathname.replace(/^\//, '');
-    const validTabs: any[] = ['dashboard', 'products', 'categories', 'brands', 'variants', 'hero', 'mission', 'gift-card-section', 'sale-section', 'footer-section', 'testimonials', 'community-posts', 'collections', 'coupons', 'gift-cards', 'sales', 'reviews', 'orders', 'customers', 'staff', 'roles', 'settings', 'delivery-methods', 'ads', 'warehouses', 'cargo', 'inventory', 'media', 'currencies', 'attributes'];
+    const validTabs: any[] = ['dashboard', 'products', 'categories', 'brands', 'variants', 'hero', 'mission', 'gift-card-section', 'sale-section', 'footer-section', 'testimonials', 'community-posts', 'collections', 'coupons', 'gift-cards', 'sales', 'reviews', 'questions', 'orders', 'returns', 'customers', 'staff', 'roles', 'settings', 'delivery-methods', 'ads', 'warehouses', 'cargo', 'inventory', 'media', 'currencies', 'attributes', 'wholesale-pricing', 'feedback'];
     
     if (validTabs.includes(path)) {
       setActiveTab(path as any);
@@ -216,6 +224,10 @@ function App() {
       case 'delivery-methods': return <DeliveryMethodsPage />;
       case 'ads': return <AdsPage />;
       case 'orders': return <OrdersPage />;
+      case 'returns': return <ReturnsPage />;
+      case 'questions': return <QuestionsPage />;
+      case 'wholesale-pricing': return <WholesalePricingPage />;
+      case 'feedback': return <FeedbackPage />;
       case 'warehouses': return <WarehousesPage />;
       case 'inventory': return <InventoryPage />;
       case 'cargo': return <CargoPage />;

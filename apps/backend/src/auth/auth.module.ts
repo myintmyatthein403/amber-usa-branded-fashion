@@ -33,6 +33,6 @@ import { EmailService } from './email.service';
     PasswordResetRepository,
     EmailService,
   ],
-  exports: [AuthService, RolesGuard],
+  exports: [AuthService, RolesGuard, EmailService],
 })
 export class AuthModule {}

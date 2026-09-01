@@ -27,7 +27,7 @@ export type CategoryFormData = z.infer<typeof CategoryFormDataSchema>;
 export const ProductFormDataSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   slug: z.string().min(1, 'Slug is required'),
-  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).default('DRAFT'),
+  status: z.enum(['DRAFT', 'IN_REVIEW', 'PUBLISHED', 'ARCHIVED']).default('DRAFT'),
   brandId: z.string().optional(),
   categoryId: z.string().optional(),
   shortDescription: z.string().optional(),
@@ -98,13 +98,18 @@ export type DeliveryMethodFormData = z.infer<typeof DeliveryMethodFormDataSchema
 export const CouponFormDataSchema = z.object({
   code: z.string().min(1, 'Code is required'),
   description: z.string().optional(),
-  discountType: z.enum(['PERCENTAGE', 'FIXED_AMOUNT']).default('PERCENTAGE'),
+  discountType: z.enum(['PERCENTAGE', 'FIXED_AMOUNT', 'BUY_X_GET_Y', 'FREE_SHIPPING']).default('PERCENTAGE'),
   discountValue: z.number().min(0),
   minOrderAmount: z.number().optional(),
   maxDiscount: z.number().optional(),
   expiryDate: z.string().optional(),
   usageLimit: z.number().optional(),
   isActive: z.boolean().default(true),
+  scopeType: z.enum(['ORDER', 'PRODUCT', 'CATEGORY']).default('ORDER'),
+  scopeProductId: z.string().optional(),
+  scopeCategoryId: z.string().optional(),
+  buyQuantity: z.number().optional(),
+  getQuantity: z.number().optional(),
 });
 
 export type CouponFormData = z.infer<typeof CouponFormDataSchema>;

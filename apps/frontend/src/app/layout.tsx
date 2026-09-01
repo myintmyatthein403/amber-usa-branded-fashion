@@ -7,7 +7,9 @@ import Footer from "@/components/Footer";
 import AnnouncementModal from "@/components/modals/AnnouncementModal";
 import Preloader from "@/components/Preloader";
 import ToastContainer from "@/components/ToastContainer";
+import FeedbackWidget from "@/components/FeedbackWidget";
 import { Providers } from "@/context/Providers";
+import { getSiteUrl } from "@/lib/seo";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -20,8 +22,18 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: "Amber Brand Fashion | Modern Myanmar Heritage",
   description: "A high-end minimalist e-commerce experience for Amber Brand Fashion, blending modern silhouettes with traditional Myanmar craftsmanship.",
+  openGraph: {
+    type: "website",
+    siteName: "Amber Brand Fashion",
+    title: "Amber Brand Fashion | Modern Myanmar Heritage",
+    description: "A high-end minimalist e-commerce experience for Amber Brand Fashion, blending modern silhouettes with traditional Myanmar craftsmanship.",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({
@@ -42,6 +54,7 @@ export default function RootLayout({
           <CompareDrawer />
           <AnnouncementModal />
           <ToastContainer />
+          <FeedbackWidget />
         </Providers>
       </body>
     </html>

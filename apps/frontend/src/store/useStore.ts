@@ -103,7 +103,14 @@ interface AppState {
   getSubtotal: () => number;
   getDeliveryFee: () => number;
   getTotal: () => number;
+
+  // Recently viewed: capped, most-recent-first, deduped list of product
+  // IDs — pure client-side tracking, no backend model needed for this.
+  recentlyViewed: string[];
+  addRecentlyViewed: (productId: string) => void;
 }
+
+const RECENTLY_VIEWED_LIMIT = 12;
 
 export const useStore = create<AppState>()(
   persist(
@@ -345,6 +352,16 @@ export const useStore = create<AppState>()(
         return currency === "MMK" ? baseMmk : baseMmk / exchangeRate;
       },
       getTotal: () => get().getSubtotal() + get().getDeliveryFee(),
+
+      recentlyViewed: [],
+      addRecentlyViewed: (productId) => {
+        set((state) => ({
+          recentlyViewed: [
+            productId,
+            ...state.recentlyViewed.filter((id) => id !== productId),
+          ].slice(0, RECENTLY_VIEWED_LIMIT),
+        }));
+      },
     }),
     {
       name: "amber-premium-storage",
@@ -357,6 +374,7 @@ export const useStore = create<AppState>()(
         market: state.market,
         locale: state.locale,
         liteMode: state.liteMode,
+        recentlyViewed: state.recentlyViewed,
       }),
     },
   ),

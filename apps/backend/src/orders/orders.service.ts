@@ -11,6 +11,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrderStatusChangedEvent } from '../common/events/domain.events';
 import { ExchangeRateHelper } from '../currencies/exchange-rate.helper';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { CouponsService } from '../coupons/coupons.service';
+import { PriceTiersService } from '../price-tiers/price-tiers.service';
 import { normalizePrice, toUsd, calculateDepositTotal } from '@amber/shared';
 
 const STRIPE_METHOD_NAMES = ['stripe', 'credit card'];
@@ -28,6 +30,8 @@ export class OrdersService {
     private eventEmitter: EventEmitter2,
     private exchangeRateHelper: ExchangeRateHelper,
     private cloudinaryService: CloudinaryService,
+    private couponsService: CouponsService,
+    private priceTiersService: PriceTiersService,
   ) {}
 
   async createOrder(data: {
@@ -56,6 +60,7 @@ export class OrdersService {
     state?: string;
     township?: string;
     zipCode?: string;
+    couponCode?: string;
     items: Array<{
       productId: string;
       variantId?: string;
@@ -69,20 +74,36 @@ export class OrdersService {
     }>;
   }) {
     let warehouseId = data.warehouseId;
-    const itemsWithPreOrderInfo = [];
+    const itemsWithPreOrderInfo: any[] = [];
     let calculatedTotal = 0;
     const orderCurrency = data.currency || 'USD';
 
     if (!warehouseId) {
-      const firstItem = data.items[0];
-      if (firstItem) {
-        const inventory = await this.ordersRepository.findWarehouseWithStock(
-          firstItem.variantId
-            ? { variantId: firstItem.variantId }
-            : { productId: firstItem.productId },
-          firstItem.quantity,
-        );
-        warehouseId = inventory?.warehouseId;
+      // Prefer a warehouse that can fulfill every item in the cart, not
+      // just the first one — falls back to the old first-item-only match
+      // when no single warehouse carries everything (still routes the
+      // whole order to one warehouse either way; true per-item split
+      // fulfillment would need a bigger fulfillment-model change).
+      warehouseId =
+        (await this.ordersRepository.findWarehouseSatisfyingAllItems(
+          data.items.map((item) => ({
+            variantId: item.variantId,
+            productId: item.productId,
+            quantity: item.quantity,
+          })),
+        )) ?? undefined;
+
+      if (!warehouseId) {
+        const firstItem = data.items[0];
+        if (firstItem) {
+          const inventory = await this.ordersRepository.findWarehouseWithStock(
+            firstItem.variantId
+              ? { variantId: firstItem.variantId }
+              : { productId: firstItem.productId },
+            firstItem.quantity,
+          );
+          warehouseId = inventory?.warehouseId;
+        }
       }
     }
 
@@ -100,18 +121,47 @@ export class OrdersService {
       orderCurrency,
     );
 
-    for (const item of data.items) {
+    // Fetch every variant/product/price-override this cart needs up front,
+    // in a fixed number of queries regardless of cart size, instead of the
+    // ~3 sequential queries per line item this loop used to run (a 20-item
+    // cart previously cost 60+ round-trips on the checkout critical path).
+    const variantIds = data.items
+      .filter((item) => item.variantId)
+      .map((item) => item.variantId!);
+    const variantlessProductIds = data.items
+      .filter((item) => !item.variantId)
+      .map((item) => item.productId);
+
+    const [variants, products] = await Promise.all([
+      this.ordersRepository.findVariantsForOrder(variantIds),
+      this.ordersRepository.findProductsForOrder(variantlessProductIds),
+    ]);
+    const variantById = new Map(variants.map((v) => [v.id, v]));
+    const productById = new Map(products.map((p) => [p.id, p]));
+
+    const priceOverrides = await this.ordersRepository.findPriceOverridesForOrder(
+      variantIds,
+      variantlessProductIds,
+      orderCurrency,
+    );
+    const priceOverrideByVariantId = new Map(
+      priceOverrides.filter((p) => p.variantId).map((p) => [p.variantId!, p]),
+    );
+    const priceOverrideByProductId = new Map(
+      priceOverrides.filter((p) => !p.variantId && p.productId).map((p) => [p.productId!, p]),
+    );
+
+    const resolved = data.items.map((item) => {
       let isPreOrder = false;
       let isDigital = false;
       let expectedShippingDate = null;
       let dbPrice = 0;
       let depositAmount: number | null = null;
+      let categoryId: string | null = null;
       let currencyCode = item.currencyCode || (item.isUsd ? 'USD' : 'MMK');
 
       if (item.variantId) {
-        const variant = await this.ordersRepository.findVariantForOrder(
-          item.variantId,
-        );
+        const variant = variantById.get(item.variantId);
         if (!variant)
           throw new NotFoundException(`Variant not found: ${item.variantId}`);
 
@@ -127,10 +177,9 @@ export class OrdersService {
           variant.product as { depositAmount?: unknown }
         ).depositAmount;
         depositAmount = productDeposit != null ? Number(productDeposit) : null;
+        categoryId = (variant.product as { categoryId?: string | null }).categoryId ?? null;
       } else {
-        const product = await this.ordersRepository.findProductForOrder(
-          item.productId,
-        );
+        const product = productById.get(item.productId);
         if (!product)
           throw new NotFoundException(`Product not found: ${item.productId}`);
 
@@ -143,6 +192,47 @@ export class OrdersService {
         const productDeposit = (product as { depositAmount?: unknown })
           .depositAmount;
         depositAmount = productDeposit != null ? Number(productDeposit) : null;
+        categoryId = (product as { categoryId?: string | null }).categoryId ?? null;
+      }
+
+      // True multi-currency pricing: an explicit, independently-curated
+      // ProductPrice for this exact order currency takes priority over the
+      // default FX-conversion-from-the-base-price path — e.g. a MMK price
+      // that isn't just USD*rate because the business prices that market
+      // differently. Falls back silently when no override exists (the
+      // common case), leaving the existing FX conversion untouched.
+      const priceOverride = item.variantId
+        ? priceOverrideByVariantId.get(item.variantId)
+        : priceOverrideByProductId.get(item.productId);
+      if (priceOverride) {
+        dbPrice = Number(priceOverride.price);
+        currencyCode = orderCurrency;
+      }
+
+      return { item, dbPrice, currencyCode, isPreOrder, isDigital, depositAmount, categoryId, expectedShippingDate };
+    });
+
+    // Quantity-break wholesale pricing: the best-matching tier (if any) for
+    // each line item's resolved currency/quantity overrides the base price.
+    // Batched the same way — one query for the whole cart's tiers instead of
+    // one per line item. Falls back silently to dbPrice when no tier
+    // applies, which is the common case (most products have no PriceTier).
+    const tierPrices = await this.priceTiersService.getApplicablePricesForOrder(
+      resolved.map((r) => ({
+        variantId: r.item.variantId,
+        productId: r.item.variantId ? undefined : r.item.productId,
+        quantity: r.item.quantity,
+        currencyCode: r.currencyCode,
+      })),
+    );
+
+    resolved.forEach((r, index) => {
+      const { item, isPreOrder, isDigital, depositAmount, categoryId, expectedShippingDate } = r;
+      let { dbPrice, currencyCode } = r;
+
+      const tierPrice = tierPrices[index];
+      if (tierPrice != null) {
+        dbPrice = tierPrice;
       }
 
       const unitPriceUsd = toUsd(dbPrice, currencyCode, lockedExchangeRate);
@@ -164,10 +254,31 @@ export class OrdersService {
         isDigital,
         depositAmount,
         expectedShippingDate,
+        categoryId,
+        lineTotal: lineInOrderCurrency,
       });
-    }
+    });
 
     calculatedTotal += data.deliveryFee || 0;
+
+    let couponResult: Awaited<ReturnType<CouponsService['validateAndCompute']>> | null = null;
+    if (data.couponCode) {
+      couponResult = await this.couponsService.validateAndCompute(
+        data.couponCode,
+        itemsWithPreOrderInfo.map((i) => ({
+          productId: i.productId,
+          categoryId: i.categoryId,
+          quantity: i.quantity,
+          lineTotal: i.lineTotal,
+        })),
+        calculatedTotal,
+      );
+      calculatedTotal -= couponResult.discountAmount;
+      if (couponResult.freeShipping) {
+        calculatedTotal -= data.deliveryFee || 0;
+      }
+      calculatedTotal = Math.max(0, calculatedTotal);
+    }
 
     const paymentMethodRow = await this.prisma.paymentMethod.findFirst({
       where: { name: data.paymentMethod },
@@ -210,7 +321,7 @@ export class OrdersService {
       calculatedTotal,
     );
 
-    return this.ordersRepository.create(
+    const order = await this.ordersRepository.create(
       data,
       warehouseId,
       itemsWithPreOrderInfo,
@@ -218,7 +329,42 @@ export class OrdersService {
       lockedExchangeRate,
       depositAmount,
       balanceDue,
+      couponResult
+        ? { coupon: couponResult.coupon, discountAmount: couponResult.discountAmount }
+        : undefined,
     );
+
+    // Best-effort serial-number assignment for variants that track them —
+    // deliberately outside the order-creation transaction and non-blocking:
+    // this is traceability/warranty metadata, not stock correctness (that's
+    // already guarded atomically in ordersRepository.create), so a failure
+    // here must never roll back or fail an otherwise-valid order.
+    await this.assignSerialNumbers(order.id).catch((err) => {
+      console.error(`Failed to assign serial numbers for order ${order.id}:`, err);
+    });
+
+    return order;
+  }
+
+  private async assignSerialNumbers(orderId: string): Promise<void> {
+    const orderItems = await this.prisma.orderItem.findMany({
+      where: { orderId, variantId: { not: null } },
+      include: { variant: true },
+    });
+    for (const item of orderItems) {
+      if (!item.variant?.tracksSerialNumbers || !item.variantId) continue;
+
+      const available = await this.prisma.serialNumber.findMany({
+        where: { variantId: item.variantId, status: 'AVAILABLE' },
+        take: item.quantity,
+      });
+      for (const serial of available) {
+        await this.prisma.serialNumber.updateMany({
+          where: { id: serial.id, status: 'AVAILABLE' },
+          data: { status: 'SOLD', orderItemId: item.id },
+        });
+      }
+    }
   }
 
   async uploadPaymentProof(
@@ -433,6 +579,32 @@ export class OrdersService {
     return this.ordersRepository.findById(id);
   }
 
+  async markRefunded(id: string) {
+    const order = await this.ordersRepository.findById(id);
+    if (!order) throw new NotFoundException('Order not found');
+
+    const oldStatus = order.status;
+    // Same double-restock guards deleteOrder already uses, since refund can
+    // race with an admin cancellation of the same order.
+    if (
+      !order.restocked &&
+      order.status !== 'CANCELLED' &&
+      order.paymentStatus !== 'FAILED'
+    ) {
+      await this.ordersRepository.restock(id);
+    }
+
+    if (order.status !== 'REFUNDED') {
+      await this.ordersRepository.updateStatus(id, 'REFUNDED');
+      this.eventEmitter.emit(
+        'order.status_changed',
+        new OrderStatusChangedEvent(id, oldStatus, 'REFUNDED'),
+      );
+    }
+
+    return this.ordersRepository.findById(id);
+  }
+
   async bulkUpdateStatus(ids: string[], status: OrderStatus) {
     return this.ordersRepository.bulkUpdateStatus(ids, status);
   }
@@ -534,17 +706,30 @@ export class OrdersService {
     const oneHourAgo = new Date();
     oneHourAgo.setHours(oneHourAgo.getHours() - 1);
 
+    // Two distinct abandonment paths land here, both left PENDING/PENDING
+    // forever with stock already decremented if nothing acts on them:
+    // (a) manual payment methods where the customer never uploaded proof,
+    // and (b) Stripe checkouts abandoned before any payment_intent webhook
+    // fires — no FAILED transition ever happens, so updatePaymentStatus's
+    // restock path never runs for them. Stripe orders never populate
+    // paymentProofUrl either way, so they're gated explicitly by payment
+    // method rather than relying on that field being incidentally null.
     const staleOrders = await this.prisma.order.findMany({
       where: {
         status: 'PENDING',
         paymentStatus: 'PENDING',
-        paymentProofUrl: null,
         createdAt: { lt: oneHourAgo },
       },
-      select: { id: true },
+      select: { id: true, paymentMethod: true, paymentProofUrl: true },
     });
 
-    for (const order of staleOrders) {
+    const staleToCancel = staleOrders.filter((order) =>
+      isManualPaymentMethod(order.paymentMethod)
+        ? order.paymentProofUrl == null
+        : true,
+    );
+
+    for (const order of staleToCancel) {
       try {
         await this.updateOrderStatus(order.id, 'CANCELLED');
       } catch (error) {
@@ -552,6 +737,6 @@ export class OrdersService {
       }
     }
 
-    return staleOrders.length;
+    return staleToCancel.length;
   }
 }

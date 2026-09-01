@@ -12,6 +12,7 @@ import {
 } from './dto/product.dto';
 
 export interface ProductListParams {
+  ids?: string[];
   isFeatured?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
@@ -78,6 +79,7 @@ export class ProductsService {
 
   private buildWhere(params: ProductListParams): Prisma.ProductWhereInput {
     const where: Prisma.ProductWhereInput = {
+      ...(params.ids?.length ? { id: { in: params.ids } } : {}),
       isFeatured: params.isFeatured,
       isNewArrival: params.isNewArrival,
       isBestSeller: params.isBestSeller,
@@ -241,10 +243,21 @@ export class ProductsService {
     return this.stripCostFields(product as unknown as Record<string, unknown>) as unknown as Product;
   }
 
+  async getRelatedProducts(productId: string, limit = 4) {
+    const curated = await this.productsRepository.findCuratedRecommendations(productId, 'RELATED', limit);
+    if (curated.length > 0) return curated;
+    return this.productsRepository.findScoredRelatedProducts(productId, limit);
+  }
+
+  async getFrequentlyBoughtTogether(productId: string, limit = 4) {
+    return this.productsRepository.findCuratedRecommendations(productId, 'FREQUENTLY_BOUGHT_TOGETHER', limit);
+  }
+
   async updateProduct(
     id: string,
     data: UpdateProductDto,
     draft = false,
+    changedBy?: string,
   ): Promise<Product> {
     const sanitizedData = sanitizeData(data);
     if (!draft && sanitizedData.variants) {
@@ -282,7 +295,7 @@ export class ProductsService {
       }
     }
 
-    return this.productsRepository.update(id, sanitizedData);
+    return this.productsRepository.update(id, sanitizedData, changedBy);
   }
 
   async deleteProduct(id: string): Promise<Product> {
@@ -291,6 +304,18 @@ export class ProductsService {
 
   async publishScheduled(): Promise<number> {
     return this.productsRepository.publishScheduled();
+  }
+
+  // Product.expiryDate previously did nothing after being set (a genuinely
+  // dead field) — this is what actually wires it up: any PUBLISHED product
+  // past its expiryDate gets moved to ARCHIVED, with a ProductStatusHistory
+  // row explaining why.
+  async autoArchiveExpired(): Promise<number> {
+    return this.productsRepository.autoArchiveExpired();
+  }
+
+  async getStatusHistory(productId: string) {
+    return this.productsRepository.findStatusHistory(productId);
   }
 
   // Facet counts for the shop filter sidebar. Each dimension is counted

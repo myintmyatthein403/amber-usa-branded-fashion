@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { MemoryCacheModule } from './common/cache/memory-cache.module';
 import { join } from 'path';
@@ -43,10 +44,16 @@ import { CurrenciesModule } from './currencies/currencies.module';
 import { AttributesModule } from './attributes/attributes.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 import { AddressesModule } from './addresses/addresses.module';
+import { ReturnsModule } from './returns/returns.module';
+import { QuestionsModule } from './questions/questions.module';
+import { PriceTiersModule } from './price-tiers/price-tiers.module';
+import { RecommendationsModule } from './recommendations/recommendations.module';
+import { FeedbackModule } from './feedback/feedback.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     MemoryCacheModule,
     // Generous default (120 req/min per IP) — protects public/unauthenticated
     // endpoints (products, attributes, search) from scraping/DoS without
@@ -98,6 +105,11 @@ import { AddressesModule } from './addresses/addresses.module';
     AttributesModule,
     WishlistModule,
     AddressesModule,
+    ReturnsModule,
+    QuestionsModule,
+    PriceTiersModule,
+    RecommendationsModule,
+    FeedbackModule,
   ],
   controllers: [AppController, HealthController],
   providers: [

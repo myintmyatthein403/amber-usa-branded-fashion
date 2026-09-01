@@ -12,7 +12,11 @@ import { CommunityPostsService } from './community-posts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { CommunityPostSchema } from '@amber/shared';
+import type { z } from 'zod';
+
+type CreateCommunityPostInput = z.infer<typeof CommunityPostSchema>;
 
 @Controller('community-posts')
 export class CommunityPostsController {
@@ -21,7 +25,7 @@ export class CommunityPostsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  create(@Body() data: any) {
+  create(@Body(new ZodValidationPipe(CommunityPostSchema)) data: CreateCommunityPostInput) {
     return this.communityPostsService.create(data);
   }
 
@@ -40,7 +44,10 @@ export class CommunityPostsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  update(@Param('id') id: string, @Body() data: any) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(CommunityPostSchema.partial())) data: Partial<CreateCommunityPostInput>,
+  ) {
     return this.communityPostsService.update(id, data);
   }
 

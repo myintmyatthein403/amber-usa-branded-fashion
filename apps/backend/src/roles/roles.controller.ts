@@ -12,6 +12,11 @@ import { RolesService } from './roles.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { RoleSchema } from '@amber/shared';
+import type { z } from 'zod';
+
+type RoleInput = z.infer<typeof RoleSchema>;
 
 @Controller('roles')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,12 +35,15 @@ export class RolesController {
   }
 
   @Post()
-  create(@Body() createDto: any) {
+  create(@Body(new ZodValidationPipe(RoleSchema)) createDto: RoleInput) {
     return this.rolesService.create(createDto);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateDto: any) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(RoleSchema.partial())) updateDto: Partial<RoleInput>,
+  ) {
     return this.rolesService.update(id, updateDto);
   }
 

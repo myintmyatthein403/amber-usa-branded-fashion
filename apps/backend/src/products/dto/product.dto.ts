@@ -64,6 +64,9 @@ export const ProductQueryDto = z.object({
   onSale: z.string().optional(),
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
+  // Comma-separated product IDs — used by recently-viewed/recommendation
+  // rails to batch-fetch a known set of products in one request.
+  ids: z.string().optional(),
   currencyCode: z.string().optional(),
   market: z.enum(['US', 'MM']).optional(),
   warehouseLocation: z.string().optional(),

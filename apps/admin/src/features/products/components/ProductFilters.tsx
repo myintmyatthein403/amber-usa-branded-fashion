@@ -3,7 +3,7 @@ import { X, Filter } from 'lucide-react';
 import { Category, Brand } from '../schema';
 
 export type FilterState = {
-  status: '' | 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  status: '' | 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED';
   categoryId: string;
   brandId: string;
   onSale: boolean | null;
@@ -65,6 +65,7 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
         >
           <option value="">All Status</option>
           <option value="DRAFT">Draft</option>
+          <option value="IN_REVIEW">In Review</option>
           <option value="PUBLISHED">Published</option>
           <option value="ARCHIVED">Archived</option>
         </select>

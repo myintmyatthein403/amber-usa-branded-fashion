@@ -7,6 +7,7 @@ import { useCartActions } from "@/hooks/useCartActions";
 import Link from "next/link";
 import Price from "./Price";
 import type { CartItem } from "@/store/useStore";
+import { cloudinaryDeliveryUrl } from "@/lib/image";
 
 export default function CartDrawer() {
   const {
@@ -44,7 +45,7 @@ export default function CartDrawer() {
       >
         <div className="relative w-24 aspect-[3/4] bg-[#F5F0E1] rounded-sm overflow-hidden shrink-0">
           {item.image ? (
-            <Image src={item.image} alt={item.name} fill className="object-cover" />
+            <Image src={cloudinaryDeliveryUrl(item.image, { width: 200 })} alt={item.name} fill className="object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Package className="w-8 h-8 text-[#1A1A1A]/20" />

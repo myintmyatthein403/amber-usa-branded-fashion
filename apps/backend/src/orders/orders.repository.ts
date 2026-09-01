@@ -5,15 +5,17 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Order, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { Order, OrderStatus, PaymentStatus, Coupon, Prisma } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrderStatusChangedEvent } from '../common/events/domain.events';
+import { CouponsRepository } from '../coupons/coupons.repository';
 
 @Injectable()
 export class OrdersRepository {
   constructor(
     private prisma: PrismaService,
     private eventEmitter: EventEmitter2,
+    private couponsRepository: CouponsRepository,
   ) {}
 
   async create(
@@ -24,6 +26,7 @@ export class OrdersRepository {
     lockedExchangeRate?: number,
     depositAmount?: number | null,
     balanceDue?: number,
+    couponInfo?: { coupon: Coupon; discountAmount: number },
   ): Promise<Order> {
     return this.prisma.$transaction(async (tx) => {
       for (const item of itemsWithPreOrderInfo) {
@@ -135,6 +138,8 @@ export class OrdersRepository {
               hasPreOrderItems: itemsWithPreOrderInfo.some((i) => i.isPreOrder),
               depositAmount: depositAmount ?? null,
               balanceDue: depositAmount != null ? balanceDue ?? 0 : null,
+              couponCode: couponInfo?.coupon.code ?? null,
+              discountAmount: couponInfo?.discountAmount ?? null,
               items: {
                 create: itemsWithPreOrderInfo.map((item) => ({
                   productId: item.productId,
@@ -155,6 +160,21 @@ export class OrdersRepository {
             },
             include: { items: true },
           });
+
+          // Redeem inside the same transaction the order is created in —
+          // a failed redemption (e.g. usage limit hit by a concurrent
+          // checkout between validation and this point) rolls the whole
+          // order back rather than creating an order with an unredeemed
+          // coupon applied.
+          if (couponInfo) {
+            await this.couponsRepository.redeem(
+              tx,
+              couponInfo.coupon,
+              order.id,
+              orderData.userId || undefined,
+            );
+          }
+
           return order;
         } catch (error) {
           if (error.code === 'P2002' && retries > 1) {
@@ -232,6 +252,18 @@ export class OrdersRepository {
   async bulkUpdateStatus(ids: string[], status: OrderStatus) {
     return this.prisma.$transaction(async (tx) => {
       for (const id of ids) {
+        // Mirror the single-order updateOrderStatus path: cancelling must
+        // restock. The bulk path previously skipped this entirely, silently
+        // leaving stock decremented for every order in the batch.
+        if (status === 'CANCELLED') {
+          const existing = await tx.order.findUnique({
+            where: { id },
+            select: { status: true },
+          });
+          if (existing && existing.status !== 'CANCELLED') {
+            await this.doRestock(tx, id);
+          }
+        }
         await tx.order.update({ where: { id }, data: { status } });
       }
     });
@@ -266,7 +298,21 @@ export class OrdersRepository {
       where: { id: orderId },
       include: { items: true },
     });
-    if (!order || order.restocked) return;
+    if (!order) return;
+
+    // Atomically claim the restock (false -> true) before touching any
+    // inventory. Two concurrent callers (e.g. an admin cancel racing a
+    // payment-failure webhook) both landing here previously double-credited
+    // stock, since the old code only checked `restocked` on read and wrote
+    // `restocked: true` unconditionally at the end. Postgres row-locks the
+    // order during this UPDATE, so only one concurrent transaction can win
+    // the `restocked: false` match — the loser sees count === 0 and returns
+    // without incrementing anything.
+    const claimed = await tx.order.updateMany({
+      where: { id: orderId, restocked: false },
+      data: { restocked: true },
+    });
+    if (claimed.count === 0) return;
 
     for (const item of order.items) {
       if (item.variantId && !item.isPreOrder) {
@@ -313,10 +359,6 @@ export class OrdersRepository {
         });
       }
     }
-    await tx.order.update({
-      where: { id: orderId },
-      data: { restocked: true },
-    });
   }
 
   async findByOrderNumber(orderNumber: string): Promise<Order | null> {
@@ -341,9 +383,69 @@ export class OrdersRepository {
     target: { variantId?: string; productId?: string },
     quantity: number,
   ) {
+    // Deterministic tiebreak: prefer the warehouse holding the most stock
+    // for this item, rather than whatever Postgres happened to return first
+    // with no ORDER BY. Reduces the odds this specific warehouse runs out
+    // again soon and makes warehouse selection reproducible/testable.
     return this.prisma.inventory.findFirst({
       where: { ...target, quantity: { gte: quantity } },
+      orderBy: { quantity: 'desc' },
     });
+  }
+
+  // Finds a single warehouse that can fulfill every line item in the cart,
+  // not just the first one. The old caller only ever checked item[0]'s
+  // availability, then routed the WHOLE order to that warehouse regardless
+  // of whether it actually had the other items in stock — createOrder would
+  // then fail deep inside the transaction on the first item that warehouse
+  // didn't carry. This doesn't add true per-item split-shipment (every item
+  // still ships from one warehouse), but it picks a warehouse that's
+  // actually capable of fulfilling the whole order when one exists.
+  async findWarehouseSatisfyingAllItems(
+    items: { variantId?: string; productId?: string; quantity: number }[],
+  ): Promise<string | null> {
+    if (items.length === 0) return null;
+
+    const perItemCandidates = await Promise.all(
+      items.map((item) =>
+        this.prisma.inventory.findMany({
+          where: {
+            ...(item.variantId
+              ? { variantId: item.variantId }
+              : { productId: item.productId }),
+            quantity: { gte: item.quantity },
+          },
+          select: { warehouseId: true, quantity: true },
+        }),
+      ),
+    );
+
+    const [first, ...rest] = perItemCandidates;
+    const candidateIds = new Set(first.map((c) => c.warehouseId));
+    for (const candidates of rest) {
+      const idsForItem = new Set(candidates.map((c) => c.warehouseId));
+      for (const id of Array.from(candidateIds)) {
+        if (!idsForItem.has(id)) candidateIds.delete(id);
+      }
+    }
+    if (candidateIds.size === 0) return null;
+
+    // Deterministic tiebreak among warehouses that can fulfill everything:
+    // prefer the one with the most total headroom across all items.
+    const totalsByWarehouse = new Map<string, number>();
+    for (const candidates of perItemCandidates) {
+      for (const c of candidates) {
+        if (!candidateIds.has(c.warehouseId)) continue;
+        totalsByWarehouse.set(
+          c.warehouseId,
+          (totalsByWarehouse.get(c.warehouseId) ?? 0) + c.quantity,
+        );
+      }
+    }
+    const [bestWarehouseId] = Array.from(totalsByWarehouse.entries()).sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+    )[0];
+    return bestWarehouseId;
   }
 
   async findDefaultWarehouse(location: string) {
@@ -354,15 +456,38 @@ export class OrdersRepository {
     return this.prisma.warehouse.findFirst();
   }
 
-  async findVariantForOrder(id: string) {
-    return this.prisma.variant.findUnique({
-      where: { id },
+  // Batched variants/products/price-overrides lookups: createOrder fetches
+  // everything up front for the whole cart instead of running 3 sequential
+  // queries per line item, which meant a 20-item cart cost 60+ round-trips
+  // on the checkout critical path.
+  async findVariantsForOrder(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.variant.findMany({
+      where: { id: { in: ids } },
       include: { product: true },
     });
   }
 
-  async findProductForOrder(id: string) {
-    return this.prisma.product.findUnique({ where: { id } });
+  async findProductsForOrder(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.product.findMany({ where: { id: { in: ids } } });
+  }
+
+  async findPriceOverridesForOrder(
+    variantIds: string[],
+    productIds: string[],
+    currencyCode: string,
+  ) {
+    if (variantIds.length === 0 && productIds.length === 0) return [];
+    return this.prisma.productPrice.findMany({
+      where: {
+        currencyCode,
+        OR: [
+          ...(variantIds.length ? [{ variantId: { in: variantIds } }] : []),
+          ...(productIds.length ? [{ productId: { in: productIds } }] : []),
+        ],
+      },
+    });
   }
 
   async findByIdWithItems(id: string) {

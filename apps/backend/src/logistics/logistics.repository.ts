@@ -174,6 +174,47 @@ export class LogisticsRepository {
     });
   }
 
+  // Applies a +/- delta to a warehouse's Inventory row. Negative deltas
+  // (e.g. DAMAGE write-offs) use the same guarded updateMany pattern as
+  // every other decrement in this codebase — WHERE quantity >= |delta| —
+  // so a write-off can't drive stock negative. Positive deltas (e.g.
+  // RESTOCK from a return) upsert with increment.
+  async adjustInventoryDelta(
+    target: InventoryTarget,
+    warehouseId: string,
+    delta: number,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      if (delta < 0) {
+        const decremented = await tx.inventory.updateMany({
+          where: {
+            ...inventoryFilterWhere(target),
+            warehouseId,
+            quantity: { gte: -delta },
+          },
+          data: { quantity: { decrement: -delta } },
+        });
+        if (decremented.count === 0) {
+          throw new BadRequestException(
+            `Insufficient stock for item ${target.variantId ?? target.productId} in this warehouse`,
+          );
+        }
+      } else {
+        await tx.inventory.upsert({
+          where: inventoryUniqueWhere(target, warehouseId) as Prisma.InventoryWhereUniqueInput,
+          update: { quantity: { increment: delta } },
+          create: { ...target, warehouseId, quantity: delta },
+        });
+      }
+
+      await recomputeAndSyncStock(tx, target);
+
+      return tx.inventory.findUnique({
+        where: inventoryUniqueWhere(target, warehouseId) as Prisma.InventoryWhereUniqueInput,
+      });
+    });
+  }
+
   // --- Cargo ---
   async createCargoShipment(data: {
     shipmentNumber: string;

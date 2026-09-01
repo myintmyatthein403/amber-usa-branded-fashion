@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/node';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -36,9 +37,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errorResponse.errors = payload.errors;
     }
 
-    // Log the error for internal tracking (could use a Logger service here)
+    // Only genuinely unexpected (5xx) failures go to Sentry — 4xx HttpExceptions
+    // are normal, expected business-logic responses (validation errors, not
+    // founds, etc.), not bugs, and would just be noise in error tracking.
     if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
       console.error('Unhandled Exception:', exception);
+      Sentry.captureException(exception);
     }
 
     response.status(status).json(errorResponse);

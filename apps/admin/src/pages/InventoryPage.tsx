@@ -25,6 +25,12 @@ export const InventoryPage: React.FC = () => {
     selectedWarehouseId,
     adjustmentQty,
     setAdjustmentQty,
+    adjustmentMode,
+    changeAdjustmentMode,
+    adjustmentReason,
+    setAdjustmentReason,
+    adjustmentNote,
+    setAdjustmentNote,
     groupedInventory,
     warehouses,
     openAdjustModal,
@@ -96,10 +102,16 @@ export const InventoryPage: React.FC = () => {
           selectedItem={selectedItem}
           selectedWarehouseId={selectedWarehouseId}
           adjustmentQty={adjustmentQty}
+          adjustmentMode={adjustmentMode}
+          adjustmentReason={adjustmentReason}
+          adjustmentNote={adjustmentNote}
           warehouses={warehouses}
           submitting={submitting}
           onWarehouseChange={updateAdjustmentQtyByWarehouse}
           onQtyChange={setAdjustmentQty}
+          onModeChange={changeAdjustmentMode}
+          onReasonChange={setAdjustmentReason}
+          onNoteChange={setAdjustmentNote}
           onSubmit={handleAdjustStock}
           onCancel={() => setAdjustModalOpen(false)}
         />

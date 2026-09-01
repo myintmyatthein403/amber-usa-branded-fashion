@@ -1,6 +1,8 @@
 import React from 'react';
 import { Percent, Banknote, Calendar, Hash, FileText, Loader2 } from 'lucide-react';
 import type { CouponFormData } from '@amber/shared';
+import { useFetch } from '../../../hooks/useCrud';
+import { API_ROUTES } from '../../../config/constants';
 
 interface CouponFormProps {
   formData: CouponFormData;
@@ -19,6 +21,9 @@ export const CouponForm: React.FC<CouponFormProps> = ({
   editingCoupon,
   onCancel
 }) => {
+  const { data: products } = useFetch<{ id: string; name: string }>(API_ROUTES.PRODUCTS.BASE);
+  const { data: categories } = useFetch<{ id: string; name: string }>(API_ROUTES.CATEGORIES.BASE);
+
   return (
     <form onSubmit={onSubmit} className="space-y-8 py-4">
       <div className="space-y-6">
@@ -38,13 +43,89 @@ export const CouponForm: React.FC<CouponFormProps> = ({
             <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">Discount Type</label>
             <select
               value={formData.discountType}
-              onChange={(e) => setFormData({ ...formData, discountType: e.target.value as 'PERCENTAGE' | 'FIXED_AMOUNT' })}
+              onChange={(e) => setFormData({ ...formData, discountType: e.target.value as CouponFormData['discountType'] })}
               className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors duration-300 rounded-none cursor-pointer"
             >
               <option value="PERCENTAGE">Percentage (%)</option>
               <option value="FIXED_AMOUNT">Fixed Amount ($)</option>
+              <option value="BUY_X_GET_Y">Buy X Get Y</option>
+              <option value="FREE_SHIPPING">Free Shipping</option>
             </select>
           </div>
+        </div>
+
+        {formData.discountType === 'BUY_X_GET_Y' && (
+          <div className="grid grid-cols-2 gap-6 p-4 border border-dashed border-primary/20 bg-secondary/30">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">Buy Quantity</label>
+              <input
+                type="number"
+                min={1}
+                value={formData.buyQuantity ?? ''}
+                onChange={(e) => setFormData({ ...formData, buyQuantity: e.target.value ? Number(e.target.value) : undefined })}
+                className="w-full h-10 border border-border bg-transparent px-4 text-sm focus:border-primary focus:outline-none transition-colors"
+                placeholder="e.g. 2"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">Get Quantity (at Value% off)</label>
+              <input
+                type="number"
+                min={1}
+                value={formData.getQuantity ?? ''}
+                onChange={(e) => setFormData({ ...formData, getQuantity: e.target.value ? Number(e.target.value) : undefined })}
+                className="w-full h-10 border border-border bg-transparent px-4 text-sm focus:border-primary focus:outline-none transition-colors"
+                placeholder="e.g. 1"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">Applies To</label>
+            <select
+              value={formData.scopeType}
+              onChange={(e) => setFormData({ ...formData, scopeType: e.target.value as CouponFormData['scopeType'], scopeProductId: undefined, scopeCategoryId: undefined })}
+              className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors duration-300 rounded-none cursor-pointer"
+            >
+              <option value="ORDER">Whole Order</option>
+              <option value="PRODUCT">Specific Product</option>
+              <option value="CATEGORY">Specific Category</option>
+            </select>
+          </div>
+          {formData.scopeType === 'PRODUCT' && (
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">Product</label>
+              <select
+                required
+                value={formData.scopeProductId ?? ''}
+                onChange={(e) => setFormData({ ...formData, scopeProductId: e.target.value })}
+                className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm focus:border-primary focus:outline-none transition-colors duration-300 rounded-none cursor-pointer"
+              >
+                <option value="">Select a product</option>
+                {(products || []).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {formData.scopeType === 'CATEGORY' && (
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-bold text-muted-foreground">Category</label>
+              <select
+                required
+                value={formData.scopeCategoryId ?? ''}
+                onChange={(e) => setFormData({ ...formData, scopeCategoryId: e.target.value })}
+                className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm focus:border-primary focus:outline-none transition-colors duration-300 rounded-none cursor-pointer"
+              >
+                <option value="">Select a category</option>
+                {(categories || []).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-3 gap-6">

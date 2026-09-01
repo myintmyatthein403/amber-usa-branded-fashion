@@ -52,6 +52,15 @@ export const RejectManualPaymentDto = z.object({
 
 export type RejectManualPaymentDto = z.infer<typeof RejectManualPaymentDto>;
 
+export const RefundOrderDto = z.object({
+  amount: z.number().positive().optional(),
+  reason: z
+    .enum(['requested_by_customer', 'fraudulent', 'duplicate', 'expired_uncaptured_charge'])
+    .optional(),
+});
+
+export type RefundOrderDto = z.infer<typeof RefundOrderDto>;
+
 export const OrderQueryDto = z.object({
   page: z.number().optional(),
   limit: z.number().optional(),

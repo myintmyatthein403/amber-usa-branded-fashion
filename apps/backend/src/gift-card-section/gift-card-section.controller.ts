@@ -12,7 +12,8 @@ import { GiftCardSectionService } from './gift-card-section.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { GiftCardSectionSchema, type CreateGiftCardSectionInput } from '@amber/shared';
 
 @Controller('gift-card-section')
 export class GiftCardSectionController {
@@ -23,7 +24,7 @@ export class GiftCardSectionController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  create(@Body() data: any) {
+  create(@Body(new ZodValidationPipe(GiftCardSectionSchema)) data: CreateGiftCardSectionInput) {
     return this.giftCardSectionService.create(data);
   }
 
@@ -42,7 +43,10 @@ export class GiftCardSectionController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  update(@Param('id') id: string, @Body() data: any) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(GiftCardSectionSchema.partial())) data: Partial<CreateGiftCardSectionInput>,
+  ) {
     return this.giftCardSectionService.update(id, data);
   }
 

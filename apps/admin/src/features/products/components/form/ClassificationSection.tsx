@@ -8,7 +8,7 @@ interface ClassificationSectionProps {
   brandId?: string;
   categoryId?: string;
   collectionIds: string[];
-  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  status?: 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED';
   brands: Brand[];
   categories: Category[];
   collections: Collection[];
@@ -86,6 +86,7 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({
             className="w-full h-12 border-b border-input bg-transparent px-0 py-2 text-sm font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors duration-300 rounded-none"
           >
             <option value="DRAFT">DRAFT</option>
+            <option value="IN_REVIEW">IN REVIEW</option>
             <option value="PUBLISHED">PUBLISHED</option>
             <option value="ARCHIVED">ARCHIVED</option>
           </select>

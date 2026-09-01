@@ -9,6 +9,8 @@ import {
 import type { RawBodyRequest } from '@nestjs/common';
 import { StripeService } from './stripe.service';
 import type { Request } from 'express';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { CreatePaymentIntentSchema, type CreatePaymentIntentInput } from '@amber/shared';
 
 @Controller('stripe')
 export class StripeController {
@@ -16,13 +18,9 @@ export class StripeController {
 
   @Post('create-payment-intent')
   async createPaymentIntent(
-    @Body() data: { amount: number; currency: string; orderId?: string },
+    @Body(new ZodValidationPipe(CreatePaymentIntentSchema)) data: CreatePaymentIntentInput,
   ) {
-    return this.stripeService.createPaymentIntent(
-      data.amount,
-      data.currency,
-      data.orderId,
-    );
+    return this.stripeService.createPaymentIntent(data.orderId);
   }
 
   @Post('webhook')

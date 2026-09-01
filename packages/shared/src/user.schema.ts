@@ -96,3 +96,17 @@ export const ResetPasswordSchema = z.object({
 });
 
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+
+export const AddressSchema = z.object({
+  label: z.string().optional(),
+  country: z.string().min(1, 'Country is required'),
+  street: z.string().min(1, 'Street is required'),
+  city: z.string().min(1, 'City is required'),
+  state: z.string().optional(),
+  township: z.string().optional(),
+  zipCode: z.string().optional(),
+  phone: z.string().optional(),
+  isDefault: z.boolean().optional(),
+});
+
+export type AddressInput = z.infer<typeof AddressSchema>;

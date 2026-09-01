@@ -8,9 +8,11 @@ import { UsersModule } from '../users/users.module';
 import { PointsListener } from '../common/listeners/points.listener';
 import { CurrenciesModule } from '../currencies/currencies.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { CouponsModule } from '../coupons/coupons.module';
+import { PriceTiersModule } from '../price-tiers/price-tiers.module';
 
 @Module({
-  imports: [StripeModule, UsersModule, CurrenciesModule, CloudinaryModule],
+  imports: [StripeModule, UsersModule, CurrenciesModule, CloudinaryModule, CouponsModule, PriceTiersModule],
   controllers: [OrdersController],
   providers: [OrdersService, OrdersRepository, OrdersListener, PointsListener],
   exports: [OrdersService, OrdersRepository],

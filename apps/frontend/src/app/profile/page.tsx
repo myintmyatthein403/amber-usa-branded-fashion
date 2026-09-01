@@ -61,6 +61,12 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
+  const [returnComments, setReturnComments] = useState("");
+  const [returnSelectedItemIds, setReturnSelectedItemIds] = useState<Set<string>>(new Set());
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [returnError, setReturnError] = useState<string | null>(null);
+  const [returnSuccess, setReturnSuccess] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -161,6 +167,63 @@ export default function ProfilePage() {
     usernameStatus === "checking" ||
     usernameStatus === "taken" ||
     usernameStatus === "invalid";
+
+  const openRefundModal = () => {
+    setReturnReason("");
+    setReturnComments("");
+    setReturnError(null);
+    setReturnSuccess(false);
+    setReturnSelectedItemIds(
+      new Set((selectedOrder?.items ?? []).map((item: ProfileOrder["items"][number]) => item.id)),
+    );
+    setIsRefundModalOpen(true);
+  };
+
+  const toggleReturnItem = (itemId: string) => {
+    setReturnSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const handleSubmitReturnRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrder || !returnReason.trim() || returnSelectedItemIds.size === 0) return;
+
+    setReturnSubmitting(true);
+    setReturnError(null);
+    try {
+      const response = await fetch(`${getApiUrl()}/returns`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: selectedOrder.id,
+          reason: returnReason.trim(),
+          comments: returnComments.trim() || undefined,
+          items: selectedOrder.items
+            .filter((item: ProfileOrder["items"][number]) => returnSelectedItemIds.has(item.id))
+            .map((item: ProfileOrder["items"][number]) => ({
+              orderItemId: item.id,
+              quantity: item.quantity,
+            })),
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error((json as { message?: string })?.message ?? "Failed to submit return request");
+      }
+      setReturnSuccess(true);
+    } catch (error) {
+      setReturnError(error instanceof Error ? error.message : "Failed to submit return request");
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -470,8 +533,8 @@ export default function ProfilePage() {
                       </div>
                       <div className="flex gap-4">
                         {selectedOrder.status === "COMPLETED" && (
-                          <button 
-                            onClick={() => setIsRefundModalOpen(true)}
+                          <button
+                            onClick={openRefundModal}
                             className="flex items-center space-x-2 px-6 py-3 border border-red-100 text-red-500 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-all"
                           >
                             <RotateCcw className="w-3 h-3" />
@@ -542,6 +605,111 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Request Refund / Return Modal */}
+      <AnimatePresence>
+        {isRefundModalOpen && selectedOrder && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsRefundModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-white p-10 shadow-2xl space-y-8 max-h-[85vh] overflow-y-auto"
+            >
+              <button onClick={() => setIsRefundModalOpen(false)} className="absolute top-6 right-6 text-[#1A1A1A]/40 hover:text-[#1A1A1A]"><X className="w-6 h-6" /></button>
+
+              {returnSuccess ? (
+                <div className="space-y-4 text-center py-8">
+                  <CheckCircle2 className="w-10 h-10 text-[#D4AF37] mx-auto" />
+                  <h3 className="text-2xl font-serif">Return Requested</h3>
+                  <p className="text-sm text-[#1A1A1A]/60">
+                    We&apos;ve received your request for order {selectedOrder.orderNumber}. Our team will review it and follow up by email.
+                  </p>
+                  <button
+                    onClick={() => setIsRefundModalOpen(false)}
+                    className="mt-4 px-8 py-3 bg-[#1A1A1A] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <h3 className="text-3xl font-serif">Request a Return</h3>
+                    <p className="text-[10px] text-[#1A1A1A]/40 uppercase tracking-widest font-bold">Order {selectedOrder.orderNumber}</p>
+                  </div>
+
+                  <form onSubmit={handleSubmitReturnRequest} className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]">Items to Return</label>
+                      {(selectedOrder.items ?? []).map((item: ProfileOrder["items"][number]) => (
+                        <label key={item.id} className="flex items-center gap-3 p-3 border border-[#1A1A1A]/5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={returnSelectedItemIds.has(item.id)}
+                            onChange={() => toggleReturnItem(item.id)}
+                            className="accent-[#D4AF37]"
+                          />
+                          <span className="text-sm flex-1">{item.name}</span>
+                          <span className="text-[10px] text-[#1A1A1A]/40 uppercase font-bold">Qty {item.quantity}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]">Reason</label>
+                      <input
+                        type="text"
+                        required
+                        value={returnReason}
+                        onChange={(e) => setReturnReason(e.target.value)}
+                        placeholder="e.g. wrong size, changed my mind, item damaged on arrival"
+                        className="w-full p-4 bg-[#F5F0E1]/30 border border-[#1A1A1A]/5 outline-none focus:border-[#D4AF37] text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]">Additional Comments (optional)</label>
+                      <textarea
+                        rows={3}
+                        value={returnComments}
+                        onChange={(e) => setReturnComments(e.target.value)}
+                        className="w-full p-4 bg-[#F5F0E1]/30 border border-[#1A1A1A]/5 outline-none focus:border-[#D4AF37] text-sm resize-none"
+                      />
+                    </div>
+
+                    {returnError && <p className="text-xs text-red-500 font-medium italic">{returnError}</p>}
+
+                    <div className="pt-4 flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setIsRefundModalOpen(false)}
+                        className="flex-1 py-4 border border-[#1A1A1A]/10 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-50 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={returnSubmitting || !returnReason.trim() || returnSelectedItemIds.size === 0}
+                        className="flex-[2] py-4 bg-[#1A1A1A] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all shadow-xl shadow-black/10 disabled:opacity-50"
+                      >
+                        {returnSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Submit Request"}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Edit Profile Modal */}
       <AnimatePresence>

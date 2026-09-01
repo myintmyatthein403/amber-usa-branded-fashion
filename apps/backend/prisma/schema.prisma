@@ -27,9 +27,40 @@ model User {
   
   orders          Order[]
   refundRequests  RefundRequest[]
+  returnRequests  ReturnRequest[]
   addresses       SavedAddress[]
   wishlist        WishlistItem[]
   passwordResetTokens PasswordResetToken[]
+  stockMovements  StockMovement[]
+  reviews         Review[]
+  questions       Question[]
+  couponRedemptions CouponRedemption[]
+  feedback        Feedback[]
+}
+
+enum FeedbackStatus {
+  NEW
+  REVIEWED
+  RESOLVED
+}
+
+// Beta-readiness: the app previously had no mechanism at all for a user to
+// report a bug or leave feedback — this is the whole point of running a
+// beta, so it's the minimum viable version (a form + an admin inbox), not
+// a polished/third-party feedback tool.
+model Feedback {
+  id        String         @id @default(uuid())
+  userId    String?
+  user      User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String?
+  message   String         @db.Text
+  page      String?
+  userAgent String?
+  status    FeedbackStatus @default(NEW)
+  createdAt DateTime       @default(now())
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model PasswordResetToken {
@@ -117,16 +148,21 @@ model Order {
   balanceDue      Decimal?    @db.Decimal(10, 2)
   balanceSettledAt DateTime?
   balanceSettledBy String?
-  
+
+  couponCode      String?
+  discountAmount  Decimal?    @db.Decimal(10, 2)
+
   userId          String?
   user            User?       @relation(fields: [userId], references: [id])
   
   warehouseId     String?
-  warehouse       Warehouse?  @relation("WarehouseOrders", fields: [warehouseId], references: [id])
-  
+  warehouse       Warehouse?  @relation("WarehouseOrders", fields: [warehouseId], references: [id], onDelete: SetNull)
+
   items           OrderItem[]
   refundRequest   RefundRequest?
-  
+  returnRequests  ReturnRequest[]
+  couponRedemption CouponRedemption?
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -160,6 +196,15 @@ model OrderItem {
   expectedShippingDate DateTime?
   isDigital  Boolean @default(false)
 
+  returnItems ReturnItem[]
+  reviews     Review[]
+  serialNumbers SerialNumber[]
+
+  // NOTE: variantId is nullable, and Postgres treats NULLs as distinct in a
+  // unique index — this does not fully prevent duplicate line items for a
+  // simple (no-variant) product within the same order, only for variant
+  // items. Left as a best-effort constraint rather than a full guarantee.
+  @@unique([orderId, productId, variantId])
   @@index([orderId])
   @@index([productId])
   @@index([variantId])
@@ -187,8 +232,78 @@ enum RefundStatus {
   REJECTED
 }
 
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  RECEIVED
+  COMPLETED
+}
+
+enum ReturnItemCondition {
+  RESELLABLE
+  DAMAGED
+}
+
+model ReturnRequest {
+  id        String       @id @default(uuid())
+  orderId   String
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id])
+
+  reason    String
+  comments  String?      @db.Text
+  status    ReturnStatus @default(REQUESTED)
+
+  items     ReturnItem[]
+
+  processedAt DateTime?
+  processedBy String?
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+}
+
+model ReturnItem {
+  id              String               @id @default(uuid())
+  returnRequestId String
+  returnRequest   ReturnRequest        @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  orderItemId     String
+  orderItem       OrderItem            @relation(fields: [orderItemId], references: [id])
+
+  quantity        Int
+  // Set by the admin receiving flow when the physical item comes back —
+  // RESELLABLE credits Inventory, DAMAGED logs a DAMAGE StockMovement
+  // instead. Null until received.
+  condition       ReturnItemCondition?
+  receivedAt      DateTime?
+
+  createdAt       DateTime             @default(now())
+
+  @@index([returnRequestId])
+  @@index([orderItemId])
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  provider    String   @default("stripe")
+  eventId     String   @unique
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@index([provider])
+}
+
 enum ProductStatus {
   DRAFT
+  IN_REVIEW
   PUBLISHED
   ARCHIVED
 }
@@ -224,6 +339,9 @@ model Product {
   isBestSeller     Boolean       @default(false)
   stock            Int           @default(0)
   lowStockThreshold Int          @default(5)
+  // Quantity at which an automated reorder alert should fire; distinct from
+  // lowStockThreshold (display-only "low stock" badge). Null = not tracked.
+  reorderPoint     Int?
   isDigital        Boolean       @default(false)
 
   // Pre-order Fields
@@ -238,7 +356,18 @@ model Product {
   // SEO Fields
   metaTitle        String?
   metaDescription  String?
-  
+
+  // Denormalized review aggregate, recomputed transactionally whenever a
+  // review is approved/rejected/deleted (see reviews.repository.ts) —
+  // mirrors the recomputeAndSyncStock pattern already used for inventory.
+  avgRating        Decimal       @default(0) @db.Decimal(3, 2)
+  reviewCount      Int           @default(0)
+
+  // Post-purchase policy overrides; null = fall back to the site-wide
+  // default policy.
+  warrantyMonths   Int?
+  returnWindowDaysOverride Int?
+
   tags             String[]      @default([])
   images           String[]
   
@@ -258,12 +387,21 @@ model Product {
   sale             Sale?         @relation(fields: [saleId], references: [id])
 
   reviews          Review[]
+  questions        Question[]
   orderItems       OrderItem[]
   wishlistItems    WishlistItem[]
 
   inventory        Inventory[]
   cargoItems       CargoItem[]
   stockMovements   StockMovement[]
+
+  priceTiers       PriceTier[]
+  prices           ProductPrice[]
+  statusHistory    ProductStatusHistory[]
+  scopedCoupons    Coupon[]
+  mediaUsages      MediaUsage[]
+  recommendationsFrom ProductRecommendation[] @relation("RecommendationSource")
+  recommendationsTo   ProductRecommendation[] @relation("RecommendationTarget")
 
   @@index([categoryId])
   @@index([brandId])
@@ -277,10 +415,23 @@ model Review {
   id             String   @id @default(uuid())
   rating         Int      @default(5)
   comment        String?  @db.Text
+  // Free-text fallback for admin-curated/social-sourced reviews that predate
+  // (or intentionally bypass) real user accounts — kept alongside userId
+  // rather than replaced, so that existing curation workflow keeps working.
   userName       String
   userProfileUrl String?  // Link to social profile
   platform       Platform @default(WEBSITE)
   isApproved     Boolean  @default(false)
+
+  // Real customer submissions set these. A review is "verified" purely by
+  // whether orderItemId resolves to a COMPLETED order belonging to userId
+  // at write time — computed once and stored rather than re-derived on
+  // every read (see ReviewsService.createCustomerReview).
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  orderItemId    String?
+  orderItem      OrderItem? @relation(fields: [orderItemId], references: [id])
+  isVerifiedPurchase Boolean @default(false)
 
   productId      String
   product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -288,7 +439,14 @@ model Review {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  // The hot path: every product-page view runs `{ productId, isApproved:
+  // true }` ordered by createdAt (findApprovedByProduct) — this composite
+  // index covers it directly instead of relying on the plain productId
+  // index plus a post-filter/sort.
+  @@index([productId, isApproved, createdAt])
   @@index([productId])
+  @@index([userId])
+  @@index([orderItemId])
 }
 
 enum Platform {
@@ -337,13 +495,57 @@ model Coupon {
   usageLimit      Int?
   usageCount      Int         @default(0)
   isActive        Boolean     @default(true)
+
+  // Scope: ORDER (default, cart-total) | PRODUCT | CATEGORY. Only the
+  // matching field for the scope should be set — enforced at the app layer
+  // (see CouponsService.validateCoupon), mirroring the variant/product XOR
+  // convention already used on Inventory/StockMovement.
+  scopeType       CouponScopeType @default(ORDER)
+  scopeProductId  String?
+  scopeProduct    Product?    @relation(fields: [scopeProductId], references: [id])
+  scopeCategoryId String?
+  scopeCategory   Category?   @relation(fields: [scopeCategoryId], references: [id])
+
+  // BUY_X_GET_Y only: buy `buyQuantity` of the scoped product, get
+  // `getQuantity` at the discount described by discountType/discountValue
+  // (100% = free).
+  buyQuantity     Int?
+  getQuantity     Int?
+
+  redemptions     CouponRedemption[]
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  @@index([scopeProductId])
+  @@index([scopeCategoryId])
+}
+
+enum CouponScopeType {
+  ORDER
+  PRODUCT
+  CATEGORY
 }
 
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
+  BUY_X_GET_Y
+  FREE_SHIPPING
+}
+
+model CouponRedemption {
+  id        String   @id @default(uuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([couponId])
+  @@index([userId])
 }
 
 model GiftCard {
@@ -513,13 +715,19 @@ model Category {
 
   metaTitle       String?
   metaDescription String?
-  
+
+  // Post-purchase policy override; null = fall back to the site-wide
+  // default policy (same convention as Product.returnWindowDaysOverride,
+  // which takes priority over this when both are set).
+  returnWindowDaysOverride Int?
+
   parentId        String?
   parent          Category?   @relation("CategoryToSubcategory", fields: [parentId], references: [id], onDelete: Cascade)
   subcategories   Category[]  @relation("CategoryToSubcategory")
-  
+
   products        Product[]
-  
+  scopedCoupons   Coupon[]
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -534,7 +742,10 @@ model Variant {
   color             String
   stock             Int      @default(0)
   lowStockThreshold Int      @default(5)
-  
+  // Quantity at which an automated reorder alert should fire; distinct from
+  // lowStockThreshold (display-only "low stock" badge). Null = not tracked.
+  reorderPoint      Int?
+
   buyPrice          Decimal? @db.Decimal(10, 2) // Purchase price in USA
   price             Decimal? @db.Decimal(10, 2)
   compareAtPrice    Decimal? @db.Decimal(10, 2)
@@ -544,16 +755,23 @@ model Variant {
   isPreOrder        Boolean  @default(false)
   preOrderShippingDate DateTime?
   attributeSelections Json?  // { "attrId1": "valueId1", "attrId2": "valueId2" }
+  // When true, individual units of this variant are tracked via SerialNumber
+  // (warranty/IMEI-style tracking) rather than just an aggregate quantity.
+  tracksSerialNumbers Boolean @default(false)
 
   images            String[]
-  
+
   productId         String
   product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
+
   inventory         Inventory[]
   cargoItems        CargoItem[]
   stockMovements    StockMovement[]
-  
+  priceTiers        PriceTier[]
+  prices            ProductPrice[]
+  serialNumbers     SerialNumber[]
+  mediaUsages       MediaUsage[]
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   orderItems        OrderItem[]
@@ -660,7 +878,9 @@ model Warehouse {
   originShipments      CargoShipment[] @relation("OriginWarehouse")
   destinationShipments CargoShipment[] @relation("DestinationWarehouse")
   orders               Order[]         @relation("WarehouseOrders")
-  
+  stockMovementsFrom   StockMovement[] @relation("StockMovementFromWarehouse")
+  stockMovementsTo     StockMovement[] @relation("StockMovementToWarehouse")
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -674,6 +894,9 @@ model Inventory {
   warehouseId String
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   quantity    Int       @default(0)
+  // Bin/shelf/aisle within the warehouse, free text (e.g. "A-12-3"). Null =
+  // not tracked yet.
+  location    String?
 
   @@unique([variantId, warehouseId])
   @@unique([productId, warehouseId])
@@ -737,6 +960,29 @@ model Media {
   height    Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  usages    MediaUsage[]
+}
+
+// Tracks which Product/Variant currently reference a Media asset's URL, so
+// deleting a Media row can check for live references first. Product.images/
+// Variant.images remain plain string arrays (too many other call sites
+// already assume that shape to change it) — this is an additive tracking
+// table populated whenever MediaSelector's onSelect is used, not a
+// replacement for those columns.
+model MediaUsage {
+  id        String   @id @default(uuid())
+  mediaId   String
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   Variant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([mediaId])
+  @@index([productId])
+  @@index([variantId])
 }
 
 enum StockMovementReason {
@@ -755,11 +1001,14 @@ model StockMovement {
   productId       String?
   product         Product?            @relation(fields: [productId], references: [id], onDelete: Cascade)
   fromWarehouseId String?
+  fromWarehouse   Warehouse?          @relation("StockMovementFromWarehouse", fields: [fromWarehouseId], references: [id], onDelete: SetNull)
   toWarehouseId   String?
+  toWarehouse     Warehouse?          @relation("StockMovementToWarehouse", fields: [toWarehouseId], references: [id], onDelete: SetNull)
   quantity        Int
   reason          StockMovementReason
   note            String?
   userId          String?
+  user            User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt       DateTime            @default(now())
 
   @@index([variantId])
@@ -861,4 +1110,146 @@ model AttributeValue {
   attribute   Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
 
   @@unique([attributeId, slug])
+}
+
+// --- Product Q&A ---
+// Mirrors Review's moderation shape deliberately: isApproved gates public
+// display, userName is a fallback for unauthenticated/legacy entries.
+model Question {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  userName   String?
+  body       String   @db.Text
+  isApproved Boolean  @default(false)
+
+  answers    Answer[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Same hot-path reasoning as Review.@@index([productId, isApproved, createdAt]).
+  @@index([productId, isApproved, createdAt])
+  @@index([productId])
+  @@index([userId])
+}
+
+model Answer {
+  id         String   @id @default(uuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  body       String   @db.Text
+  // Set when an admin/staff member answers, so the frontend can render an
+  // "Official Store Answer" badge distinct from a peer answer.
+  answeredBy String?
+  isOfficial Boolean  @default(false)
+
+  createdAt  DateTime @default(now())
+
+  @@index([questionId])
+}
+
+// --- Wholesale / tiered pricing ---
+// Exactly one of productId/variantId must be set (app-layer XOR, same
+// convention as Inventory/StockMovement/CargoItem). minQuantity is the
+// break point: the highest tier whose minQuantity <= the ordered quantity
+// applies.
+model PriceTier {
+  id          String   @id @default(uuid())
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId   String?
+  variant     Variant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  minQuantity Int
+  price       Decimal  @db.Decimal(10, 2)
+  currencyCode String  @default("USD")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@index([variantId])
+}
+
+// --- True multi-currency product pricing ---
+// An explicit, independently-curated price for a given currency, overriding
+// the default FX-conversion-from-USD path in ExchangeRateHelper when a row
+// exists for the order's currency.
+model ProductPrice {
+  id           String   @id @default(uuid())
+  productId    String?
+  product      Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId    String?
+  variant      Variant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  currencyCode String
+  price        Decimal  @db.Decimal(10, 2)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([productId, currencyCode])
+  @@unique([variantId, currencyCode])
+}
+
+// --- Product status audit trail ---
+model ProductStatusHistory {
+  id         String        @id @default(uuid())
+  productId  String
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fromStatus ProductStatus?
+  toStatus   ProductStatus
+  changedBy  String?
+  note       String?
+  createdAt  DateTime      @default(now())
+
+  @@index([productId])
+}
+
+// --- Serial number / warranty unit tracking ---
+enum SerialStatus {
+  AVAILABLE
+  SOLD
+  RETURNED
+}
+
+model SerialNumber {
+  id           String       @id @default(uuid())
+  variantId    String
+  variant      Variant      @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  serialNumber String       @unique
+  status       SerialStatus @default(AVAILABLE)
+  orderItemId  String?
+  orderItem    OrderItem?   @relation(fields: [orderItemId], references: [id])
+
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([variantId])
+  @@index([orderItemId])
+}
+
+// --- Recommendations ---
+// Admin-curatable overrides layered on top of the algorithmic
+// category+attribute scoring in ProductsService.getRelatedProducts — a row
+// here always wins over the computed score for that (productId, type) pair.
+enum RecommendationType {
+  RELATED
+  FREQUENTLY_BOUGHT_TOGETHER
+}
+
+model ProductRecommendation {
+  id                  String             @id @default(uuid())
+  productId           String
+  product             Product            @relation("RecommendationSource", fields: [productId], references: [id], onDelete: Cascade)
+  recommendedProductId String
+  recommendedProduct  Product            @relation("RecommendationTarget", fields: [recommendedProductId], references: [id], onDelete: Cascade)
+  type                RecommendationType
+  position            Int                @default(0)
+
+  createdAt           DateTime           @default(now())
+
+  @@unique([productId, recommendedProductId, type])
+  @@index([productId])
 }

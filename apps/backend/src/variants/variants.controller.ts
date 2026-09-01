@@ -21,6 +21,8 @@ import { CreateVariantDto, UpdateVariantDto } from './dto/variant.dto';
 export class VariantsController {
   constructor(private readonly variantsService: VariantsService) {}
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
   @Get()
   findAll(@Query('productId') productId?: string) {
     return this.variantsService.getAllVariants(productId);

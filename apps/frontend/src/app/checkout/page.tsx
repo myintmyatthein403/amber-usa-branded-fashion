@@ -48,6 +48,15 @@ export default function CheckoutPage() {
   const [manualPaymentSubmitted, setManualPaymentSubmitted] = useState(false);
   const [codDepositAmount, setCodDepositAmount] = useState<number | null>(null);
   const [codDepositOrderThreshold, setCodDepositOrderThreshold] = useState<number | null>(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discountType: string;
+    discountAmount: number;
+    freeShipping: boolean;
+  } | null>(null);
+  const [couponApplying, setCouponApplying] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   const cartItems: CartItem[] = useStore((state) => state.cartItems);
   const subtotal = useStore((state) => state.getSubtotal());
@@ -183,11 +192,12 @@ export default function CheckoutPage() {
     return parseFloat(selectedMethod.price);
   };
 
-  const shippingCost = getShippingCostValue();
+  const rawShippingCost = getShippingCostValue();
+  const shippingCost = appliedCoupon?.freeShipping ? 0 : rawShippingCost;
   const isShippingUsd = selectedMethod?.isUsdPrice ?? false;
   const getShippingDisplay = (cost: number) => formatPrice(cost, isShippingUsd);
 
-  const total = computeCheckoutTotal(
+  const preDiscountTotal = computeCheckoutTotal(
     cartItems,
     shippingCost,
     currency,
@@ -195,8 +205,52 @@ export default function CheckoutPage() {
     isShippingUsd,
     shippingCost,
   );
+  const total = Math.max(0, preDiscountTotal - (appliedCoupon?.discountAmount ?? 0));
 
   const calculateTotal = () => total;
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim() || cartItems.length === 0) return;
+    setCouponApplying(true);
+    setCouponError(null);
+    try {
+      const res = await fetch(`${getApiUrl()}/coupons/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: couponCode.trim(),
+          items: cartItems.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+            lineTotal: item.price * item.quantity,
+          })),
+          orderTotal: subtotal,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error((json as { message?: string })?.message || "Invalid coupon code");
+      }
+      const data = json?.data || json;
+      setAppliedCoupon({
+        code: data.code,
+        discountType: data.discountType,
+        discountAmount: data.discountAmount,
+        freeShipping: data.freeShipping,
+      });
+    } catch (error) {
+      setAppliedCoupon(null);
+      setCouponError(error instanceof Error ? error.message : "Invalid coupon code");
+    } finally {
+      setCouponApplying(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError(null);
+  };
 
   const pastPaidOrderCount = (authUser?.orders || []).filter(
     (o) => o.paymentStatus === "PAID" || o.paymentStatus === "PARTIALLY_PAID",
@@ -229,7 +283,7 @@ export default function CheckoutPage() {
         headers["Authorization"] = `Bearer ${authToken}`;
       }
 
-      const payload = buildOrderPayload(formData, cartItems, currency, shippingCost);
+      const payload = buildOrderPayload(formData, cartItems, currency, shippingCost, appliedCoupon?.code);
 
       const orderResponse = await fetch(`${getApiUrl()}/orders`, {
         method: "POST",
@@ -371,7 +425,7 @@ export default function CheckoutPage() {
           Authorization: `Bearer ${authToken}`,
         };
 
-        const payload = buildOrderPayload(formData, cartItems, currency, shippingCost);
+        const payload = buildOrderPayload(formData, cartItems, currency, shippingCost, appliedCoupon?.code);
 
         const orderResponse = await fetch(`${getApiUrl()}/orders`, {
           method: "POST",
@@ -661,6 +715,13 @@ export default function CheckoutPage() {
             total={total}
             depositAmount={depositAmount}
             balanceDue={balanceDue}
+            couponCode={couponCode}
+            onCouponCodeChange={setCouponCode}
+            onApplyCoupon={handleApplyCoupon}
+            onRemoveCoupon={handleRemoveCoupon}
+            couponApplying={couponApplying}
+            couponError={couponError}
+            appliedCoupon={appliedCoupon}
           />
         </div>
       </div>

@@ -11,10 +11,11 @@ import {
 } from '@nestjs/common';
 import { ApiQuery } from '@nestjs/swagger';
 import { SalesService } from './sales.service';
-import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { SaleSchema, type CreateSaleInput } from '@amber/shared';
 
 @Controller('sales')
 export class SalesController {
@@ -23,7 +24,7 @@ export class SalesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  create(@Body() createSaleDto: Prisma.SaleCreateInput) {
+  create(@Body(new ZodValidationPipe(SaleSchema)) createSaleDto: CreateSaleInput) {
     return this.salesService.createSale(
       createSaleDto as unknown as Parameters<
         typeof this.salesService.createSale
@@ -62,7 +63,7 @@ export class SalesController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() updateSaleDto: Prisma.SaleUpdateInput,
+    @Body(new ZodValidationPipe(SaleSchema.partial())) updateSaleDto: Partial<CreateSaleInput>,
   ) {
     return this.salesService.updateSale(
       id,

@@ -59,9 +59,32 @@ export class SalesService {
 
     if (productIds !== undefined) {
       await this.syncProducts(id, productIds);
+    } else {
+      // discountType/discountValue/dates/isActive may have just changed —
+      // re-evaluate pricing for products already in this sale so an edit
+      // takes effect immediately instead of waiting for the next sweep.
+      await this.reconcileSaleProductPricing(sale);
     }
 
     return sale;
+  }
+
+  // Applies or reverts pricing for every product currently associated with
+  // this sale based on whether the sale's window is active right now —
+  // shared by updateSale (immediate effect) and the scheduler (periodic
+  // sweep for window boundaries crossed between admin edits).
+  async reconcileSaleProductPricing(sale: Sale): Promise<void> {
+    const fresh = await this.salesRepository.findById(sale.id);
+    if (!fresh) return;
+    const products = (fresh as Sale & { products?: { id: string }[] }).products ?? [];
+    const windowActive = this.salesRepository.isSaleWindowActive(fresh);
+    for (const product of products) {
+      if (windowActive) {
+        await this.salesRepository.applySalePricing(product.id, fresh);
+      } else {
+        await this.salesRepository.revertSalePricing(product.id);
+      }
+    }
   }
 
   async deleteSale(id: string): Promise<Sale> {
@@ -77,16 +100,19 @@ export class SalesService {
     await this.salesRepository.resetProductsInSale(saleId);
 
     if (productIds.length > 0) {
+      const sale = await this.salesRepository.findById(saleId);
       await this.salesRepository.updateProductsSaleAssociation(
         productIds,
         saleId,
         true,
+        sale ?? undefined,
       );
     }
   }
 
   async addProductToSale(saleId: string, productId: string) {
-    return this.salesRepository.updateProductSale(productId, saleId, true);
+    const sale = await this.salesRepository.findById(saleId);
+    return this.salesRepository.updateProductSale(productId, saleId, true, sale ?? undefined);
   }
 
   async removeProductFromSale(productId: string) {

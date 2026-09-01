@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Product, Prisma, Variant } from '@prisma/client';
+import { Product, Prisma, Variant, ProductStatus } from '@prisma/client';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
 import { recomputeAndSyncStock } from '../logistics/inventory-target.util';
+import { reconcileMediaUsage } from './media-usage.util';
 type VariantInput = CreateProductDto['variants'][number] & {
   warehouseId?: string;
   warehouseAllocations?: Array<{ warehouseId: string; quantity: number }>;
@@ -275,12 +276,18 @@ export class ProductsRepository {
         } as Prisma.ProductCreateInput,
       });
 
+      await reconcileMediaUsage(tx, { productId: product.id }, createData.images as string[] | undefined);
+      await tx.productStatusHistory.create({
+        data: { productId: product.id, fromStatus: null, toStatus: product.status },
+      });
+
       if (variants?.length) {
         for (const v of variants) {
           const variant = await tx.variant.create({
             data: this.buildVariantData(v, product.id, productCurrency),
           });
           await this.syncVariantInventory(tx, variant.id, v);
+          await reconcileMediaUsage(tx, { variantId: variant.id }, v.images as string[] | undefined);
         }
       } else {
         await this.syncProductInventory(tx, product.id, {
@@ -301,6 +308,76 @@ export class ProductsRepository {
         },
       });
     }) as Promise<Product>;
+  }
+
+  // Admin-curated overrides (ProductRecommendation) always win over the
+  // algorithmic scoring below — a row here means a merchandiser explicitly
+  // chose this pairing.
+  async findCuratedRecommendations(
+    productId: string,
+    type: 'RELATED' | 'FREQUENTLY_BOUGHT_TOGETHER',
+    limit: number,
+  ) {
+    const rows = await this.prisma.productRecommendation.findMany({
+      where: { productId, type },
+      orderBy: { position: 'asc' },
+      take: limit,
+      include: { recommendedProduct: { include: { category: true, brand: true } } },
+    });
+    return rows
+      .map((r) => r.recommendedProduct)
+      .filter((p) => p.status === 'PUBLISHED');
+  }
+
+  // Same-category/brand candidates scored by attribute-value overlap (e.g.
+  // shared color/size selections) — a real signal beyond "same brand",
+  // without needing order-history volume the way real co-purchase mining
+  // would (see findCuratedRecommendations for the manual-override path
+  // that covers "frequently bought together" until that's viable).
+  async findScoredRelatedProducts(productId: string, limit: number) {
+    const source = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: { variants: true },
+    });
+    if (!source) return [];
+
+    const candidates = await this.prisma.product.findMany({
+      where: {
+        id: { not: productId },
+        status: 'PUBLISHED',
+        OR: [
+          ...(source.categoryId ? [{ categoryId: source.categoryId }] : []),
+          ...(source.brandId ? [{ brandId: source.brandId }] : []),
+        ],
+      },
+      include: { variants: true, category: true, brand: true },
+      take: 50,
+    });
+    if (candidates.length === 0) return [];
+
+    const attrValues = (variants: { attributeSelections: unknown }[]): Set<string> => {
+      const set = new Set<string>();
+      for (const v of variants) {
+        const selections = v.attributeSelections as Record<string, string> | null;
+        if (selections) for (const val of Object.values(selections)) set.add(val);
+      }
+      return set;
+    };
+
+    const sourceAttrValues = attrValues(source.variants);
+
+    const scored = candidates.map((c) => {
+      let score = 0;
+      if (source.categoryId && c.categoryId === source.categoryId) score += 3;
+      if (source.brandId && c.brandId === source.brandId) score += 2;
+      for (const val of attrValues(c.variants)) {
+        if (sourceAttrValues.has(val)) score += 1;
+      }
+      return { product: c, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit).map((s) => s.product);
   }
 
   // List/grid views never render per-warehouse inventory breakdown (only the
@@ -388,7 +465,7 @@ export class ProductsRepository {
     });
   }
 
-  async update(id: string, data: UpdateProductDto): Promise<Product> {
+  async update(id: string, data: UpdateProductDto, changedBy?: string): Promise<Product> {
     const {
       variants,
       collectionIds,
@@ -417,6 +494,11 @@ export class ProductsRepository {
       sanitized;
 
     return this.prisma.$transaction(async (tx) => {
+      const before =
+        updateData.status !== undefined
+          ? await tx.product.findUnique({ where: { id }, select: { status: true } })
+          : null;
+
       await tx.product.update({
         where: { id },
         data: {
@@ -426,6 +508,21 @@ export class ProductsRepository {
             : undefined,
         } as Prisma.ProductUpdateInput,
       });
+
+      if (before && before.status !== updateData.status) {
+        await tx.productStatusHistory.create({
+          data: {
+            productId: id,
+            fromStatus: before.status,
+            toStatus: updateData.status as ProductStatus,
+            changedBy,
+          },
+        });
+      }
+
+      if (updateData.images !== undefined) {
+        await reconcileMediaUsage(tx, { productId: id }, updateData.images as string[]);
+      }
 
       if (variants) {
         const existingVariants = await tx.variant.findMany({
@@ -458,11 +555,15 @@ export class ProductsRepository {
               data: variantData,
             });
             await this.syncVariantInventory(tx, v.id, v);
+            if (v.images !== undefined) {
+              await reconcileMediaUsage(tx, { variantId: v.id }, v.images as string[]);
+            }
           } else {
             const newVariant = await tx.variant.create({
               data: this.buildVariantData(v, id, productCurrency),
             });
             await this.syncVariantInventory(tx, newVariant.id, v);
+            await reconcileMediaUsage(tx, { variantId: newVariant.id }, v.images as string[] | undefined);
           }
         }
 
@@ -537,14 +638,58 @@ export class ProductsRepository {
   }
 
   async publishScheduled(): Promise<number> {
+    const due = await this.prisma.product.findMany({
+      where: { status: 'DRAFT', publishAt: { lte: new Date() } },
+      select: { id: true },
+    });
+    if (due.length === 0) return 0;
+
+    const ids = due.map((p) => p.id);
     const result = await this.prisma.product.updateMany({
-      where: {
-        status: 'DRAFT',
-        publishAt: { lte: new Date() },
-      },
+      where: { id: { in: ids } },
       data: { status: 'PUBLISHED' },
     });
+    await this.prisma.productStatusHistory.createMany({
+      data: ids.map((id) => ({
+        productId: id,
+        fromStatus: 'DRAFT' as const,
+        toStatus: 'PUBLISHED' as const,
+        note: 'Auto-published (scheduled publishAt reached)',
+      })),
+    });
     return result.count;
+  }
+
+  // Product.expiryDate previously did nothing after being set — this wires
+  // it into an actual state transition, mirroring publishScheduled's shape.
+  async autoArchiveExpired(): Promise<number> {
+    const expired = await this.prisma.product.findMany({
+      where: { status: 'PUBLISHED', expiryDate: { lt: new Date() } },
+      select: { id: true },
+    });
+    if (expired.length === 0) return 0;
+
+    const ids = expired.map((p) => p.id);
+    const result = await this.prisma.product.updateMany({
+      where: { id: { in: ids } },
+      data: { status: 'ARCHIVED' },
+    });
+    await this.prisma.productStatusHistory.createMany({
+      data: ids.map((id) => ({
+        productId: id,
+        fromStatus: 'PUBLISHED' as const,
+        toStatus: 'ARCHIVED' as const,
+        note: 'Auto-archived (expiryDate passed)',
+      })),
+    });
+    return result.count;
+  }
+
+  async findStatusHistory(productId: string) {
+    return this.prisma.productStatusHistory.findMany({
+      where: { productId },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async countByBrand(

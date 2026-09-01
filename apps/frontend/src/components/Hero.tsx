@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { cloudinaryDeliveryUrl } from "@/lib/image";
 
 interface HeroData {
   badge: string;
@@ -117,8 +118,8 @@ export default function Hero() {
               transition={{ duration: 1.2, ease: "easeOut" }}
               className="relative w-[280px] md:w-[350px] h-[400px] md:h-[500px] shadow-2xl overflow-hidden rounded-sm"
             >
-              <Image 
-                src={data.data.imageMain} 
+              <Image
+                src={cloudinaryDeliveryUrl(data.data.imageMain, { width: 700 })}
                 alt="Hero Primary"
                 fill
                 className="object-cover"
@@ -134,8 +135,8 @@ export default function Hero() {
               transition={{ duration: 1.2, delay: 0.3 }}
               className="absolute -bottom-5 md:-bottom-10 -left-5 md:-left-10 w-[150px] md:w-[200px] h-[200px] md:h-[250px] shadow-xl overflow-hidden rounded-sm border-4 md:border-8 border-white z-20"
             >
-              <Image 
-                src={data.data.imageSecondary} 
+              <Image
+                src={cloudinaryDeliveryUrl(data.data.imageSecondary, { width: 400 })}
                 alt="Hero Secondary"
                 fill
                 className="object-cover"

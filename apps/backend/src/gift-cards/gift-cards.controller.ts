@@ -9,19 +9,23 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { GiftCardsService } from './gift-cards.service';
-import { Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { GiftCardSchema } from '@amber/shared';
+import type { z } from 'zod';
+
+type CreateGiftCardInput = z.infer<typeof GiftCardSchema>;
 
 @Controller('gift-cards')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN', 'SUPERADMIN')
 export class GiftCardsController {
   constructor(private readonly giftCardsService: GiftCardsService) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'SUPERADMIN')
   @Post()
-  create(@Body() data: Prisma.GiftCardCreateInput) {
+  create(@Body(new ZodValidationPipe(GiftCardSchema)) data: CreateGiftCardInput) {
     return this.giftCardsService.create(data);
   }
 
@@ -35,15 +39,14 @@ export class GiftCardsController {
     return this.giftCardsService.findOne(id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'SUPERADMIN')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() data: Prisma.GiftCardUpdateInput) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(GiftCardSchema.partial())) data: Partial<CreateGiftCardInput>,
+  ) {
     return this.giftCardsService.update(id, data);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'SUPERADMIN')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.giftCardsService.remove(id);

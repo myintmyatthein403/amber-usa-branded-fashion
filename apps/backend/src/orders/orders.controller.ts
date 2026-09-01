@@ -38,6 +38,7 @@ import {
   BulkPaymentStatusDto,
   TrackingUpdateDto,
   RejectManualPaymentDto,
+  RefundOrderDto,
 } from './dto/order.dto';
 import {
   ApiTags,
@@ -102,6 +103,7 @@ export class OrdersController {
       deliveryFee: data.deliveryFee,
       deliveryMethodId: data.deliveryMethodId,
       shippingAddress: data.shippingAddress,
+      couponCode: data.couponCode || undefined,
       customerName: data.customerName || customerName,
       customerEmail: data.customerEmail,
       customerPhone: data.customerPhone,
@@ -172,7 +174,7 @@ export class OrdersController {
   rejectManualPayment(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Body() body: RejectManualPaymentDto,
+    @Body(new ZodValidationPipe(RejectManualPaymentDto)) body: RejectManualPaymentDto,
   ) {
     return this.ordersService.rejectManualPayment(
       id,
@@ -272,7 +274,10 @@ export class OrdersController {
   @Roles('ADMIN', 'SUPERADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update order status' })
-  updateOrderStatus(@Param('id') id: string, @Body() body: OrderStatusDto) {
+  updateOrderStatus(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(OrderStatusDto)) body: OrderStatusDto,
+  ) {
     return this.ordersService.updateOrderStatus(id, body.status);
   }
 
@@ -281,7 +286,10 @@ export class OrdersController {
   @Roles('ADMIN', 'SUPERADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update payment status' })
-  updatePaymentStatus(@Param('id') id: string, @Body() body: PaymentStatusDto) {
+  updatePaymentStatus(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(PaymentStatusDto)) body: PaymentStatusDto,
+  ) {
     return this.ordersService.updatePaymentStatus(id, body.status);
   }
 
@@ -290,7 +298,7 @@ export class OrdersController {
   @Roles('ADMIN', 'SUPERADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Bulk update order status' })
-  bulkUpdateStatus(@Body() body: BulkOrderStatusDto) {
+  bulkUpdateStatus(@Body(new ZodValidationPipe(BulkOrderStatusDto)) body: BulkOrderStatusDto) {
     return this.ordersService.bulkUpdateStatus(body.ids, body.status);
   }
 
@@ -299,7 +307,9 @@ export class OrdersController {
   @Roles('ADMIN', 'SUPERADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Bulk update payment status' })
-  bulkUpdatePaymentStatus(@Body() body: BulkPaymentStatusDto) {
+  bulkUpdatePaymentStatus(
+    @Body(new ZodValidationPipe(BulkPaymentStatusDto)) body: BulkPaymentStatusDto,
+  ) {
     return this.ordersService.bulkUpdatePaymentStatus(body.ids, body.status);
   }
 
@@ -311,7 +321,7 @@ export class OrdersController {
   @ApiParam({ name: 'id', description: 'Order ID' })
   updateOrderTracking(
     @Param('id') id: string,
-    @Body() body: TrackingUpdateDto,
+    @Body(new ZodValidationPipe(TrackingUpdateDto)) body: TrackingUpdateDto,
   ) {
     return this.ordersService.updateOrderTracking(id, body);
   }
@@ -324,15 +334,7 @@ export class OrdersController {
   @ApiParam({ name: 'id', description: 'Order ID' })
   async processRefund(
     @Param('id') id: string,
-    @Body()
-    body: {
-      amount?: number;
-      reason?:
-        | 'requested_by_customer'
-        | 'fraudulent'
-        | 'duplicate'
-        | 'expired_uncaptured_charge';
-    },
+    @Body(new ZodValidationPipe(RefundOrderDto)) body: RefundOrderDto,
   ) {
     return this.stripeService.createRefund(id, body.amount, body.reason);
   }

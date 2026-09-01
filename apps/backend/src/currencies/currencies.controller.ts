@@ -4,6 +4,15 @@ import { ExchangeRateRefreshService } from './exchange-rate-refresh.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import {
+  CurrencySchema,
+  type CurrencyInput,
+  SetBaseCurrencySchema,
+  ExchangeRateSchema,
+  type ExchangeRateInput,
+  UpdateExchangeRateSchema,
+} from '@amber/shared';
 
 @Controller('currencies')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -22,29 +31,16 @@ export class CurrenciesController {
 
   @Post()
   @Roles('SUPERADMIN', 'ADMIN')
-  async create(@Body() data: {
-    code: string;
-    name: string;
-    symbol: string;
-    isBase?: boolean;
-    isActive?: boolean;
-    decimalPlaces?: number;
-    position?: string;
-  }) {
+  async create(@Body(new ZodValidationPipe(CurrencySchema)) data: CurrencyInput) {
     return this.currenciesService.createCurrency(data);
   }
 
   @Patch(':id')
   @Roles('SUPERADMIN', 'ADMIN')
-  async update(@Param('id') id: string, @Body() data: Partial<{
-    code: string;
-    name: string;
-    symbol: string;
-    isBase: boolean;
-    isActive: boolean;
-    decimalPlaces: number;
-    position: string;
-  }>) {
+  async update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(CurrencySchema.partial())) data: Partial<CurrencyInput>,
+  ) {
     return this.currenciesService.updateCurrency(id, data);
   }
 
@@ -56,7 +52,7 @@ export class CurrenciesController {
 
   @Post('set-base')
   @Roles('SUPERADMIN', 'ADMIN')
-  async setBase(@Body() data: { currencyId: string }) {
+  async setBase(@Body(new ZodValidationPipe(SetBaseCurrencySchema)) data: { currencyId: string }) {
     return this.currenciesService.setBaseCurrency(data.currencyId);
   }
 }
@@ -87,18 +83,16 @@ export class ExchangeRatesController {
 
   @Post()
   @Roles('SUPERADMIN', 'ADMIN')
-  async create(@Body() data: {
-    fromCurrencyId: string;
-    toCurrencyId: string;
-    rate: number;
-    effectiveDate?: string;
-  }) {
+  async create(@Body(new ZodValidationPipe(ExchangeRateSchema)) data: ExchangeRateInput) {
     return this.currenciesService.createExchangeRate(data);
   }
 
   @Patch(':id')
   @Roles('SUPERADMIN', 'ADMIN')
-  async update(@Param('id') id: string, @Body() data: { rate: number }) {
+  async update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateExchangeRateSchema)) data: { rate: number },
+  ) {
     return this.currenciesService.updateExchangeRate(id, data.rate);
   }
 

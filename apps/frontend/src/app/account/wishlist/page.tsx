@@ -14,6 +14,7 @@ interface WishlistEntry {
   variantId?: string;
   product?: {
     id: string;
+    slug?: string;
     name: string;
     images?: string[];
     price?: number;
@@ -99,7 +100,7 @@ export default function WishlistPage() {
                 <p className="font-serif text-sm">{item.product?.name || "Product"}</p>
                 <div className="flex gap-3">
                   <Link
-                    href={`/shop/${item.productId}`}
+                    href={`/shop/${item.product?.slug || item.productId}`}
                     className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37]"
                   >
                     View

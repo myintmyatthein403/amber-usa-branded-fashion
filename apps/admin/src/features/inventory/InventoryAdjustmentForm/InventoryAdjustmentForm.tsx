@@ -2,14 +2,31 @@ import React from 'react';
 import { Package, Minus, Plus, Loader2 } from 'lucide-react';
 import { GroupedInventory, Warehouse } from '../schema';
 
+type AdjustmentMode = 'SET' | 'DELTA';
+type AdjustmentReason = 'ADJUSTMENT' | 'RECEIVING' | 'DAMAGE' | 'SALE' | 'RESTOCK';
+
+const REASON_LABELS: Record<AdjustmentReason, string> = {
+  ADJUSTMENT: 'Adjustment (recount)',
+  RECEIVING: 'Receiving (new stock in)',
+  DAMAGE: 'Damaged / Written off',
+  SALE: 'Sale (manual, off-platform)',
+  RESTOCK: 'Restock (e.g. return received)',
+};
+
 interface InventoryAdjustmentFormProps {
   selectedItem: GroupedInventory | null;
   selectedWarehouseId: string;
   adjustmentQty: number;
+  adjustmentMode: AdjustmentMode;
+  adjustmentReason: AdjustmentReason;
+  adjustmentNote: string;
   warehouses: Warehouse[];
   submitting: boolean;
   onWarehouseChange: (id: string) => void;
   onQtyChange: (qty: number) => void;
+  onModeChange: (mode: AdjustmentMode) => void;
+  onReasonChange: (reason: AdjustmentReason) => void;
+  onNoteChange: (note: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
 }
@@ -18,10 +35,16 @@ export const InventoryAdjustmentForm: React.FC<InventoryAdjustmentFormProps> = (
   selectedItem,
   selectedWarehouseId,
   adjustmentQty,
+  adjustmentMode,
+  adjustmentReason,
+  adjustmentNote,
   warehouses,
   submitting,
   onWarehouseChange,
   onQtyChange,
+  onModeChange,
+  onReasonChange,
+  onNoteChange,
   onSubmit,
   onCancel
 }) => {
@@ -64,25 +87,63 @@ export const InventoryAdjustmentForm: React.FC<InventoryAdjustmentFormProps> = (
              </select>
           </div>
 
+          <div className="space-y-2">
+             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Adjustment Type</label>
+             <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onModeChange('SET')}
+                  className={`h-10 text-[10px] font-bold uppercase tracking-widest border transition-colors ${adjustmentMode === 'SET' ? 'bg-foreground text-primary-foreground border-foreground' : 'bg-transparent text-muted-foreground border-border hover:border-foreground'}`}
+                >
+                  Set Absolute Count
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onModeChange('DELTA')}
+                  className={`h-10 text-[10px] font-bold uppercase tracking-widest border transition-colors ${adjustmentMode === 'DELTA' ? 'bg-foreground text-primary-foreground border-foreground' : 'bg-transparent text-muted-foreground border-border hover:border-foreground'}`}
+                >
+                  Record +/- Change
+                </button>
+             </div>
+          </div>
+
+          {adjustmentMode === 'DELTA' && (
+            <div className="space-y-2">
+               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Reason</label>
+               <select
+                 required
+                 value={adjustmentReason}
+                 onChange={(e) => onReasonChange(e.target.value as AdjustmentReason)}
+                 className="w-full h-12 border-b border-border bg-transparent px-0 py-2 text-sm font-bold uppercase tracking-widest focus:border-primary focus:outline-none transition-colors"
+               >
+                 {Object.entries(REASON_LABELS).map(([value, label]) => (
+                   <option key={value} value={value}>{label}</option>
+                 ))}
+               </select>
+            </div>
+          )}
+
           <div className="space-y-4">
-             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Adjusted Quantity</label>
+             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {adjustmentMode === 'DELTA' ? 'Change Amount (use minus for write-offs)' : 'Adjusted Quantity'}
+             </label>
              <div className="flex items-center gap-6">
-                <button 
-                  type="button" 
-                  onClick={() => onQtyChange(Math.max(0, adjustmentQty - 1))}
+                <button
+                  type="button"
+                  onClick={() => onQtyChange(adjustmentMode === 'DELTA' ? adjustmentQty - 1 : Math.max(0, adjustmentQty - 1))}
                   className="w-12 h-12 bg-secondary text-foreground flex items-center justify-center hover:bg-destructive hover:text-white transition-all"
                 >
                   <Minus size={16} />
                 </button>
-                <input 
+                <input
                   type="number"
-                  min="0"
+                  min={adjustmentMode === 'DELTA' ? undefined : 0}
                   value={adjustmentQty}
                   onChange={(e) => onQtyChange(parseInt(e.target.value) || 0)}
                   className="flex-1 h-12 bg-muted/20 border-b border-border text-center text-2xl font-serif font-bold focus:border-primary focus:outline-none"
                 />
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => onQtyChange(adjustmentQty + 1)}
                   className="w-12 h-12 bg-secondary text-foreground flex items-center justify-center hover:bg-primary hover:text-white transition-all"
                 >
@@ -90,8 +151,21 @@ export const InventoryAdjustmentForm: React.FC<InventoryAdjustmentFormProps> = (
                 </button>
              </div>
              <p className="text-[9px] text-muted-foreground italic text-center uppercase tracking-wider">
-                This action will directly override the current ledger value for this warehouse.
+                {adjustmentMode === 'DELTA'
+                  ? 'Applies this change to the current count and logs it with the reason above — the ledger entry records the change itself, not just a new total.'
+                  : 'This action will directly override the current ledger value for this warehouse.'}
              </p>
+          </div>
+
+          <div className="space-y-2">
+             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Note (optional)</label>
+             <input
+               type="text"
+               value={adjustmentNote}
+               onChange={(e) => onNoteChange(e.target.value)}
+               placeholder="e.g. crushed box on arrival, cycle count correction..."
+               className="w-full h-10 border-b border-border bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+             />
           </div>
        </div>
 

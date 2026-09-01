@@ -53,6 +53,7 @@ export function buildOrderPayload(
   cartItems: CartItem[],
   currency: string,
   deliveryFee: number,
+  couponCode?: string,
 ) {
   const shippingAddress = buildShippingAddress(form);
   const customerName = `${form.firstName} ${form.lastName}`.trim();
@@ -74,6 +75,7 @@ export function buildOrderPayload(
     currency,
     market: form.market,
     shippingCountry: form.shippingCountry,
+    couponCode: couponCode || undefined,
     items: cartItems.map((item) => ({
       productId: item.id,
       variantId: item.variantId,

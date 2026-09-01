@@ -6,9 +6,11 @@ import {
   Body,
   Param,
   Query,
+  Req,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiQuery } from '@nestjs/swagger';
 import { LogisticsService } from './logistics.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -38,6 +40,15 @@ import {
   ApiParam,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+    role: string;
+    permissions: string[];
+  };
+}
 
 @ApiTags('Logistics')
 @Controller('logistics')
@@ -109,8 +120,9 @@ export class LogisticsController {
   }
 
   @Patch('inventory/update')
-  @ApiOperation({ summary: 'Update stock level' })
+  @ApiOperation({ summary: 'Update stock level (absolute set or +/- delta with a reason)' })
   updateStock(
+    @Req() req: AuthenticatedRequest,
     @Body(new ZodValidationPipe(UpdateStockSchema)) data: UpdateStockInput,
   ) {
     return this.logisticsService.updateStock(
@@ -119,23 +131,33 @@ export class LogisticsController {
       data.quantity,
       data.reason,
       data.note,
+      req.user?.userId,
+      data.mode,
     );
   }
 
   @Post('inventory/transfer')
   @ApiOperation({ summary: 'Transfer stock between warehouses' })
   transferStock(
+    @Req() req: AuthenticatedRequest,
     @Body(new ZodValidationPipe(TransferStockSchema)) data: TransferStockInput,
   ) {
-    return this.logisticsService.transferStock(data);
+    return this.logisticsService.transferStock({
+      ...data,
+      userId: req.user?.userId,
+    });
   }
 
   @Post('inventory/bulk-transfer')
   @ApiOperation({ summary: 'Bulk transfer stock between warehouses' })
   bulkTransfer(
+    @Req() req: AuthenticatedRequest,
     @Body(new ZodValidationPipe(BulkTransferStockSchema)) data: BulkTransferStockInput,
   ) {
-    return this.logisticsService.bulkTransferStock(data);
+    return this.logisticsService.bulkTransferStock({
+      ...data,
+      userId: req.user?.userId,
+    });
   }
 
   @Get('inventory/low-stock')

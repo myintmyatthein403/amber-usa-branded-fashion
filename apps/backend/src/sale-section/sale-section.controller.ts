@@ -13,7 +13,8 @@ import { SaleSectionService } from './sale-section.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { SaleSectionSchema, type CreateSaleSectionInput } from '@amber/shared';
 
 @Controller('sale-section')
 export class SaleSectionController {
@@ -22,7 +23,7 @@ export class SaleSectionController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  create(@Body() data: any) {
+  create(@Body(new ZodValidationPipe(SaleSectionSchema)) data: CreateSaleSectionInput) {
     return this.saleSectionService.create(data);
   }
 
@@ -49,7 +50,10 @@ export class SaleSectionController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  update(@Param('id') id: string, @Body() data: any) {
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(SaleSectionSchema.partial())) data: Partial<CreateSaleSectionInput>,
+  ) {
     return this.saleSectionService.update(id, data);
   }
 

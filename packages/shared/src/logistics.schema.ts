@@ -26,15 +26,39 @@ export const InventorySchema = z.object({
 
 export type Inventory = z.infer<typeof InventorySchema>;
 
+// SET replaces the warehouse's absolute quantity (the original behavior —
+// e.g. a physical recount). DELTA applies a +/- change and records that
+// change (not the resulting total) on the StockMovement ledger, which is
+// what makes DAMAGE/SALE/RESTOCK entries actually self-explanatory instead
+// of requiring the operator to mentally diff two absolute numbers.
+export const StockAdjustmentModeSchema = z.enum(['SET', 'DELTA']);
+export type StockAdjustmentMode = z.infer<typeof StockAdjustmentModeSchema>;
+
+export const StockMovementReasonSchema = z.enum([
+  'ADJUSTMENT',
+  'RECEIVING',
+  'DAMAGE',
+  'SALE',
+  'RESTOCK',
+]);
+export type StockMovementReasonInput = z.infer<typeof StockMovementReasonSchema>;
+
 export const UpdateStockSchema = z.object({
   variantId: z.string().uuid().optional(),
   productId: z.string().uuid().optional(),
   warehouseId: z.string().uuid(),
-  quantity: z.number().min(0, 'Quantity cannot be negative'),
-  reason: z.enum(['ADJUSTMENT', 'RECEIVING']).optional(),
+  mode: StockAdjustmentModeSchema.default('SET'),
+  quantity: z.number(),
+  reason: StockMovementReasonSchema.optional(),
   note: z.string().optional(),
 }).refine((d) => !!d.variantId !== !!d.productId, {
   message: 'Exactly one of variantId or productId is required',
+}).refine((d) => d.mode === 'DELTA' || d.quantity >= 0, {
+  message: 'Quantity cannot be negative in SET mode',
+  path: ['quantity'],
+}).refine((d) => d.mode !== 'DELTA' || d.quantity !== 0, {
+  message: 'Delta quantity cannot be zero',
+  path: ['quantity'],
 });
 
 export type UpdateStockInput = z.infer<typeof UpdateStockSchema>;

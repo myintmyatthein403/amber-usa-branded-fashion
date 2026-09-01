@@ -11,6 +11,7 @@ import Price from "../Price";
 import { Product } from "@amber/shared";
 import { getApiUrl } from "@/lib/api";
 import { getProductStock, isProductPurchasable, resolveAttributeValues } from "@/lib/product";
+import { cloudinaryDeliveryUrl } from "@/lib/image";
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -195,7 +196,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                 <div className="relative flex-1 min-h-[400px]">
                   {(activeImage || product.images?.[0]) ? (
                     <Image
-                      src={activeImage || product.images?.[0] || ""}
+                      src={cloudinaryDeliveryUrl(activeImage || product.images?.[0] || "", { width: 800 })}
                       alt={product.name}
                       fill
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -227,7 +228,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
                           activeImage === img ? "border-[#C9A962] opacity-100" : "border-transparent opacity-40 hover:opacity-100"
                         )}
                       >
-                        <Image src={img} alt={`${product.name} ${idx}`} fill className="object-cover" />
+                        <Image src={cloudinaryDeliveryUrl(img, { width: 150 })} alt={`${product.name} ${idx}`} fill className="object-cover" />
                       </button>
                     ))}
                   </div>
@@ -381,7 +382,7 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
 
                   <div className="text-center pt-2">
                     <a
-                      href={`/shop/${product.id}`}
+                      href={`/shop/${product.slug || product.id}`}
                       className="text-[11px] uppercase tracking-[0.35em] font-bold text-[#888888] hover:text-[#C9A962] underline underline-offset-8 decoration-1 transition-all"
                     >
                       View Full Details

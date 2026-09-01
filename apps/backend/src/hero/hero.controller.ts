@@ -7,14 +7,13 @@ import {
   Param,
   Delete,
   UseGuards,
-  UsePipes,
 } from '@nestjs/common';
 import { HeroService } from './hero.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { HeroSectionSchema } from '@amber/shared';
+import { HeroSectionSchema, type CreateHeroSectionInput } from '@amber/shared';
 
 @Controller('hero')
 export class HeroController {
@@ -23,8 +22,10 @@ export class HeroController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  async create(@Body() data: any) {
-    return this.heroService.create(data);
+  async create(@Body(new ZodValidationPipe(HeroSectionSchema)) data: CreateHeroSectionInput) {
+    return this.heroService.create(
+      data as unknown as Parameters<typeof this.heroService.create>[0],
+    );
   }
 
   @Get()
@@ -42,8 +43,14 @@ export class HeroController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  async update(@Param('id') id: string, @Body() data: any) {
-    return this.heroService.update(id, data);
+  async update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(HeroSectionSchema.partial())) data: Partial<CreateHeroSectionInput>,
+  ) {
+    return this.heroService.update(
+      id,
+      data as unknown as Parameters<typeof this.heroService.update>[1],
+    );
   }
 
   @Delete(':id')

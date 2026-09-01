@@ -20,6 +20,7 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { z } from 'zod';
 import { ProductSchema, Permission } from '@amber/shared';
 import {
   CreateProductDto,
@@ -61,6 +62,7 @@ export class ProductsController {
     }
 
     return this.productsService.getAllProducts({
+      ids: query.ids ? query.ids.split(',').map((id) => id.trim()).filter(Boolean) : undefined,
       isFeatured: query.isFeatured !== undefined ? query.isFeatured === 'true' : undefined,
       isNewArrival: query.isNewArrival !== undefined ? query.isNewArrival === 'true' : undefined,
       isBestSeller: query.isBestSeller !== undefined ? query.isBestSeller === 'true' : undefined,
@@ -87,6 +89,23 @@ export class ProductsController {
   @Get('slug/:slug')
   findBySlug(@Param('slug') slug: string) {
     return this.productsService.getProductBySlug(slug);
+  }
+
+  @Get(':id/related')
+  getRelated(@Param('id') id: string) {
+    return this.productsService.getRelatedProducts(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Permissions(Permission.PRODUCTS_WRITE)
+  @Get(':id/status-history')
+  getStatusHistory(@Param('id') id: string) {
+    return this.productsService.getStatusHistory(id);
+  }
+
+  @Get(':id/frequently-bought-together')
+  getFrequentlyBoughtTogether(@Param('id') id: string) {
+    return this.productsService.getFrequentlyBoughtTogether(id);
   }
 
   @Get('facets')
@@ -149,7 +168,9 @@ export class ProductsController {
   }
 
   @Post('validate-stock')
-  validateStock(@Body() items: StockValidationItemDto[]) {
+  validateStock(
+    @Body(new ZodValidationPipe(z.array(StockValidationItemDto))) items: StockValidationItemDto[],
+  ) {
     return this.productsService.validateStock(items);
   }
 
@@ -157,12 +178,18 @@ export class ProductsController {
   @Permissions(Permission.PRODUCTS_WRITE)
   @Patch(':id')
   update(
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateProductDto))
     updateProductDto: UpdateProductDto,
     @Query('draft') draft?: string,
   ) {
-    return this.productsService.updateProduct(id, updateProductDto, draft === 'true');
+    return this.productsService.updateProduct(
+      id,
+      updateProductDto,
+      draft === 'true',
+      req.user?.userId,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

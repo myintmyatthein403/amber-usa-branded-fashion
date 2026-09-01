@@ -120,7 +120,7 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
                     {results.map((product) => (
                       <Link 
                         key={product.id} 
-                        href={`/shop/${product.id}`}
+                        href={`/shop/${product.slug || product.id}`}
                         onClick={onClose}
                         className="group"
                       >

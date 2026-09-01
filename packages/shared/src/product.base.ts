@@ -53,7 +53,7 @@ export const VariantBaseSchema = z.object({
   warehouseAllocations: z.array(WarehouseAllocationSchema).optional(),
 });
 
-export const ProductStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
+export const ProductStatusSchema = z.enum(['DRAFT', 'IN_REVIEW', 'PUBLISHED', 'ARCHIVED']);
 export const ProductVisibilitySchema = z.enum(['USA', 'MYANMAR', 'BOTH', 'PRE_ORDER_ONLY']);
 
 export const ProductBaseSchema = z.object({
@@ -89,6 +89,8 @@ export const ProductBaseSchema = z.object({
   preOrderNote: z.string().optional().nullable(),
   depositAmount: z.union([z.number(), z.string()]).optional().nullable(),
   expiryDate: z.string().optional().nullable(),
+  warrantyMonths: z.number().int().optional().nullable(),
+  returnWindowDaysOverride: z.number().int().optional().nullable(),
   metaTitle: z.string().optional().nullable(),
   metaDescription: z.string().optional().nullable(),
   tags: z.array(z.string()).default([]),
@@ -133,7 +135,7 @@ export const ProductFiltersBaseSchema = z.object({
   inStock: z.boolean().optional(),
   priceMin: z.number().optional(),
   priceMax: z.number().optional(),
-  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
+  status: z.enum(['DRAFT', 'IN_REVIEW', 'PUBLISHED', 'ARCHIVED']).optional(),
   page: z.number().optional(),
   limit: z.number().optional(),
   search: z.string().optional(),

@@ -15,7 +15,7 @@ export const useProducts = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filters, setFilters] = useState({
-    status: '' as '' | 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
+    status: '' as '' | 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED',
     categoryId: '',
     brandId: '',
     onSale: null as boolean | null,
@@ -105,7 +105,7 @@ export const useProducts = () => {
   const initialProductForm = {
     name: '',
     slug: '',
-    status: 'DRAFT' as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
+    status: 'DRAFT' as 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED',
     brandId: '',
     shortDescription: '',
     description: '',
@@ -430,7 +430,7 @@ export const useProducts = () => {
     setProductForm({
       name: product.name,
       slug: product.slug,
-      status: product.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
+      status: product.status as 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED',
       brandId: product.brandId || '',
       shortDescription: product.shortDescription || '',
       description: product.description || '',

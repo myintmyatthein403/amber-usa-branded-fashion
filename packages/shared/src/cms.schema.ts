@@ -32,6 +32,41 @@ export type Review = z.infer<typeof ReviewSchema> & {
   createdAt: string;
 };
 
+// Real customer submission — distinct from the admin-curation ReviewSchema
+// above. orderItemId is what lets the backend verify this is an actual
+// purchase before marking isVerifiedPurchase.
+export const CreateCustomerReviewSchema = z.object({
+  productId: z.string().uuid(),
+  orderItemId: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().min(1).max(2000).optional(),
+});
+
+export type CreateCustomerReviewInput = z.infer<typeof CreateCustomerReviewSchema>;
+
+// --- Product Q&A ---
+export const CreateQuestionSchema = z.object({
+  productId: z.string().uuid(),
+  body: z.string().min(3).max(1000),
+});
+
+export type CreateQuestionInput = z.infer<typeof CreateQuestionSchema>;
+
+export const CreateAnswerSchema = z.object({
+  body: z.string().min(1).max(2000),
+});
+
+export type CreateAnswerInput = z.infer<typeof CreateAnswerSchema>;
+
+// --- Beta feedback / bug reports ---
+export const CreateFeedbackSchema = z.object({
+  message: z.string().min(3, 'Please include a bit more detail').max(4000),
+  email: z.string().email().optional(),
+  page: z.string().max(500).optional(),
+});
+
+export type CreateFeedbackInput = z.infer<typeof CreateFeedbackSchema>;
+
 export const HeroSectionSchema = z.object({
   id: z.string().uuid().optional(),
   badge: z.string().optional(),
@@ -356,6 +391,62 @@ export const SettingsSchema = z.object({
 });
 
 export type Settings = z.infer<typeof SettingsSchema> & { id: string };
+
+export const UpdateSettingsSchema = z.object({
+  privacyPolicy: z.string().optional(),
+  termsConditions: z.string().optional(),
+  stripePublishableKey: z.string().optional(),
+  stripeSecretKey: z.string().optional(),
+  stripeWebhookSecret: z.string().optional(),
+  codDepositAmount: z.number().nullable().optional(),
+  codDepositOrderThreshold: z.number().nullable().optional(),
+});
+
+export const CurrencySchema = z.object({
+  code: z.string().min(1, 'Code is required'),
+  name: z.string().min(1, 'Name is required'),
+  symbol: z.string().min(1, 'Symbol is required'),
+  isBase: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  decimalPlaces: z.number().int().min(0).optional(),
+  position: z.string().optional(),
+});
+
+export type CurrencyInput = z.infer<typeof CurrencySchema>;
+
+export const SetBaseCurrencySchema = z.object({
+  currencyId: z.string().min(1, 'currencyId is required'),
+});
+
+export const ExchangeRateSchema = z.object({
+  fromCurrencyId: z.string().min(1, 'fromCurrencyId is required'),
+  toCurrencyId: z.string().min(1, 'toCurrencyId is required'),
+  rate: z.number().positive('Rate must be positive'),
+  effectiveDate: z.string().optional(),
+});
+
+export type ExchangeRateInput = z.infer<typeof ExchangeRateSchema>;
+
+export const UpdateExchangeRateSchema = z.object({
+  rate: z.number().positive('Rate must be positive'),
+});
+
+export const PaymentMethodSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Name is required'),
+  type: z.string().min(1, 'Type is required'),
+  markets: z.array(z.string()).default([]),
+  accountName: z.string().nullable().optional(),
+  accountNumber: z.string().nullable().optional(),
+  qrCode: z.string().nullable().optional(),
+  instructions: z.string().nullable().optional(),
+  isActive: z.boolean().default(true),
+  isCod: z.boolean().default(false),
+});
+
+export type PaymentMethodInput = z.infer<typeof PaymentMethodSchema>;
+
+export type UpdateSettingsInput = z.infer<typeof UpdateSettingsSchema>;
 
 export const MediaItemSchema = z.object({
   id: z.string().uuid(),

@@ -18,6 +18,13 @@ export class OrderCancelledEvent {
   constructor(public readonly orderId: string) {}
 }
 
+export class OrderRefundedEvent {
+  constructor(
+    public readonly orderId: string,
+    public readonly isFullRefund: boolean,
+  ) {}
+}
+
 export class ShipmentStatusChangedEvent {
   constructor(
     public readonly shipmentId: string,

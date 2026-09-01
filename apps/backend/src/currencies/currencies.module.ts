@@ -5,6 +5,7 @@ import { CurrenciesRepository } from './currencies.repository';
 import { ExchangeRatesRepository } from './exchange-rates.repository';
 import { ExchangeRateHelper } from './exchange-rate.helper';
 import { ExchangeRateRefreshService } from './exchange-rate-refresh.service';
+import { CurrenciesScheduler } from './currencies.scheduler';
 @Module({
   controllers: [CurrenciesController, ExchangeRatesController],
   providers: [
@@ -13,6 +14,7 @@ import { ExchangeRateRefreshService } from './exchange-rate-refresh.service';
     ExchangeRatesRepository,
     ExchangeRateHelper,
     ExchangeRateRefreshService,
+    CurrenciesScheduler,
   ],
   exports: [CurrenciesService, ExchangeRateHelper, ExchangeRateRefreshService],
 })

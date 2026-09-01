@@ -22,7 +22,10 @@ import {
   Megaphone,
   Lock,
   Image as ImageIcon,
-  DollarSign
+  DollarSign,
+  RotateCcw,
+  MessageCircleQuestion,
+  MessageSquarePlus
 } from 'lucide-react';
 import { useAdminUIStore } from '../../store/useAdminUIStore';
 import { clsx, type ClassValue } from 'clsx';
@@ -34,7 +37,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type Tab = 'dashboard' | 'products' | 'categories' | 'brands' | 'variants' | 'hero' | 'mission' | 'gift-card-section' | 'sale-section' | 'footer-section' | 'testimonials' | 'community-posts' | 'collections' | 'coupons' | 'gift-cards' | 'sales' | 'reviews' | 'orders' | 'customers' | 'staff' | 'roles' | 'settings' | 'delivery-methods' | 'ads' | 'warehouses' | 'cargo' | 'inventory' | 'media' | 'currencies' | 'attributes';
+type Tab = 'dashboard' | 'products' | 'categories' | 'brands' | 'variants' | 'hero' | 'mission' | 'gift-card-section' | 'sale-section' | 'footer-section' | 'testimonials' | 'community-posts' | 'collections' | 'coupons' | 'gift-cards' | 'sales' | 'reviews' | 'questions' | 'orders' | 'returns' | 'customers' | 'staff' | 'roles' | 'settings' | 'delivery-methods' | 'ads' | 'warehouses' | 'cargo' | 'inventory' | 'media' | 'currencies' | 'attributes' | 'wholesale-pricing' | 'feedback';
 
 
 interface SidebarItem {
@@ -77,7 +80,10 @@ const sidebarConfig: SidebarItem[] = [
     icon: BarChart3,
     subItems: [
       { id: 'orders', label: 'Orders', icon: ShoppingBag, permissions: ['orders:manage'] },
+      { id: 'returns', label: 'Returns & RMAs', icon: RotateCcw, permissions: ['orders:manage'] },
       { id: 'reviews', label: 'Reviews', icon: MessageSquare, permissions: ['reviews:manage'] },
+      { id: 'questions', label: 'Product Q&A', icon: MessageCircleQuestion, permissions: ['reviews:manage'] },
+      { id: 'feedback', label: 'Beta Feedback', icon: MessageSquarePlus, permissions: ['orders:manage'] },
       { id: 'delivery-methods', label: 'Delivery Setup', icon: Truck, permissions: ['settings:manage'] },
       { id: 'currencies', label: 'Currency Management', icon: DollarSign, permissions: ['settings:manage'] },
       { id: 'customers', label: 'Customers', icon: Users, permissions: ['staff:manage'] },
@@ -89,6 +95,7 @@ const sidebarConfig: SidebarItem[] = [
     icon: Ticket,
     subItems: [
       { id: 'sales', label: 'Sales Campaigns', icon: Tag, permissions: ['sales:manage'] },
+      { id: 'wholesale-pricing', label: 'Wholesale Pricing', icon: Layers, permissions: ['sales:manage'] },
       { id: 'coupons', label: 'Discount Codes', icon: Ticket, permissions: ['coupons:manage'] },
       { id: 'gift-cards', label: 'Gift Cards', icon: Gift, permissions: ['giftcards:manage'] },
       { id: 'ads', label: 'Ads Management', icon: Megaphone, permissions: ['ads:manage'] },

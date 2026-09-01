@@ -4,6 +4,7 @@ import {
   Get,
   Delete,
   Param,
+  Query,
   UseInterceptors,
   UploadedFile,
   UseGuards,
@@ -48,7 +49,7 @@ export class MediaController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPERADMIN')
-  async remove(@Param('id') id: string) {
-    return this.mediaService.remove(id);
+  async remove(@Param('id') id: string, @Query('force') force?: string) {
+    return this.mediaService.remove(id, force === 'true');
   }
 }

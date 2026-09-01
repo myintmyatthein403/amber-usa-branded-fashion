@@ -8,7 +8,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import Stripe from 'stripe';
-import { OrderPaidEvent, OrderPaymentFailedEvent } from '../common/events/domain.events';
+import {
+  OrderPaidEvent,
+  OrderPaymentFailedEvent,
+  OrderRefundedEvent,
+} from '../common/events/domain.events';
 
 @Injectable()
 export class StripeService {
@@ -44,54 +48,38 @@ export class StripeService {
     return this.stripe;
   }
 
-  async createPaymentIntent(
-    amount: number,
-    currency: string,
-    orderId?: string,
-  ) {
+  // orderId is mandatory: the amount and currency are always re-derived from
+  // the DB order here, never trusted from the caller — a raw amount/currency
+  // fallback previously let an unauthenticated caller mint a PaymentIntent
+  // for an arbitrary amount against the store's live Stripe account.
+  async createPaymentIntent(orderId: string) {
     const stripe = await this.getStripeInstance();
 
-    let verifiedAmount = amount;
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
 
-    // Recalculate amount from DB if orderId is provided (Finding 2)
-    if (orderId) {
-      const order = await this.prisma.order.findUnique({
-        where: { id: orderId },
-        include: { items: true },
-      });
-
-      if (!order) {
-        throw new NotFoundException(`Order ${orderId} not found`);
-      }
-
-      // Re-sum items
-      const itemsTotal = order.items.reduce(
-        (sum, item) => sum + Number(item.price) * item.quantity,
-        0,
-      );
-
-      // We need to account for delivery fee if it's not in items
-      // totalAmount in DB is already calculated correctly by OrdersService.createOrder
-      verifiedAmount = Number(order.totalAmount);
-
-      this.logger.log(
-        `Creating payment intent for order ${orderId}. Verified amount: ${verifiedAmount}`,
-      );
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
     }
+
+    const verifiedAmount = Number(order.totalAmount);
+
+    this.logger.log(
+      `Creating payment intent for order ${orderId}. Verified amount: ${verifiedAmount}`,
+    );
 
     const intent = await stripe.paymentIntents.create({
       amount: Math.round(verifiedAmount * 100), // convert to cents
-      currency: currency.toLowerCase(),
-      metadata: { orderId: orderId || '' },
+      currency: order.currency.toLowerCase(),
+      metadata: { orderId },
       automatic_payment_methods: { enabled: true },
     });
 
-    if (orderId) {
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: { stripePaymentIntentId: intent.id },
-      });
-    }
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { stripePaymentIntentId: intent.id },
+    });
 
     return {
       clientSecret: intent.client_secret,
@@ -165,7 +153,26 @@ export class StripeService {
       throw new BadRequestException(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the event
+    // Idempotency: Stripe redelivers webhooks (its own retries, or the same
+    // event replayed after a timeout on our end), and this had no dedup
+    // beyond a few handlers' own incidental guards. Skip an event that
+    // already completed successfully — the record is only written *after*
+    // processing succeeds (below), so a delivery that fails partway through
+    // is deliberately left unrecorded and will be reprocessed on retry
+    // rather than silently skipped as "already handled".
+    const existing = await this.prisma.webhookEvent.findUnique({
+      where: { eventId: event.id },
+    });
+    if (existing) {
+      this.logger.log(`Webhook event ${event.id} already processed — skipping`);
+      return { received: true };
+    }
+
+    // Handle the event. handlePaymentSucceeded/handlePaymentFailed await
+    // emitAsync and let listener failures propagate, instead of the emitter
+    // firing-and-forgetting into a try/catch that swallows the error behind
+    // an already-sent 200 — a thrown error here reaches the controller
+    // unwrapped, so NestJS returns a 5xx and Stripe's own retry kicks in.
     switch (event.type) {
       case 'payment_intent.succeeded':
         const paymentIntent = event.data.object;
@@ -177,6 +184,16 @@ export class StripeService {
         await this.handlePaymentFailed(failedIntent);
         break;
       // Add more event types as needed
+    }
+
+    try {
+      await this.prisma.webhookEvent.create({
+        data: { provider: 'stripe', eventId: event.id, eventType: event.type },
+      });
+    } catch (err) {
+      // A concurrent duplicate delivery raced us and recorded it first —
+      // both did the same successful work, so this is harmless.
+      if (err.code !== 'P2002') throw err;
     }
 
     return { received: true };
@@ -237,6 +254,17 @@ export class StripeService {
       data: { paymentStatus: 'REFUNDED' },
     });
 
+    // A full refund implies the goods are being returned to inventory and
+    // the order itself should read as REFUNDED, not just its payment status.
+    // A partial refund (price adjustment, goodwill credit) doesn't imply a
+    // return, so we leave stock/order.status untouched for those.
+    const isFullRefund =
+      refundAmount >= Math.round(Number(order.totalAmount) * 100);
+    this.eventEmitter.emit(
+      'order.refunded',
+      new OrderRefundedEvent(orderId, isFullRefund),
+    );
+
     return {
       id: refund.id,
       amount: refund.amount / 100,
@@ -276,7 +304,7 @@ export class StripeService {
     if (!orderId) return;
 
     this.logger.warn(`Payment failed for order ${orderId}. Emitting failure event.`);
-    this.eventEmitter.emit(
+    await this.eventEmitter.emitAsync(
       'order.payment_failed',
       new OrderPaymentFailedEvent(
         orderId,
@@ -295,7 +323,7 @@ export class StripeService {
     }
 
     this.logger.log(`Emitting OrderPaidEvent for order ${orderId}...`);
-    this.eventEmitter.emit(
+    await this.eventEmitter.emitAsync(
       'order.paid',
       new OrderPaidEvent(
         orderId,

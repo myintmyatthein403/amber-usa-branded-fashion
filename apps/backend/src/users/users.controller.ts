@@ -13,7 +13,9 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { UserSchema } from '@amber/shared';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -42,7 +44,7 @@ export class UsersController {
 
   @Post()
   async create(
-    @Body() createDto: CreateUserDto,
+    @Body(new ZodValidationPipe(UserSchema)) createDto: CreateUserDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.usersService.create(createDto, req.user);
@@ -51,7 +53,7 @@ export class UsersController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body() updateDto: UpdateUserDto,
+    @Body(new ZodValidationPipe(UserSchema.partial())) updateDto: UpdateUserDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.usersService.update(id, updateDto, req.user);

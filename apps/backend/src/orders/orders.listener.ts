@@ -5,6 +5,7 @@ import {
   OrderPaidEvent,
   OrderPaymentFailedEvent,
   OrderStatusChangedEvent,
+  OrderRefundedEvent,
 } from '../common/events/domain.events';
 import { OrdersRepository } from './orders.repository';
 import { OrdersService } from './orders.service';
@@ -56,6 +57,11 @@ export class OrdersListener {
       this.logger.error(
         `Failed to process order.paid for ${event.orderId}: ${error.message}`,
       );
+      // Rethrow so StripeService's `await emitAsync(...)` rejects and the
+      // failure reaches the webhook controller unwrapped — NestJS returns a
+      // 5xx and Stripe retries the delivery, instead of us swallowing the
+      // error behind an already-sent 200 with only a log line as evidence.
+      throw error;
     }
   }
 
@@ -73,6 +79,30 @@ export class OrdersListener {
     } catch (error) {
       this.logger.error(
         `Failed to process order.payment_failed for ${event.orderId}: ${error.message}`,
+      );
+      // See handleOrderPaidEvent's comment — rethrow so the webhook path
+      // surfaces the failure instead of silently swallowing it.
+      throw error;
+    }
+  }
+
+  @OnEvent('order.refunded')
+  async handleOrderRefundedEvent(event: OrderRefundedEvent) {
+    if (!event.isFullRefund) {
+      this.logger.log(
+        `Partial refund for order ${event.orderId} — leaving stock/status untouched.`,
+      );
+      return;
+    }
+
+    try {
+      await this.ordersService.markRefunded(event.orderId);
+      this.logger.log(
+        `Order ${event.orderId} marked REFUNDED and inventory restocked (full refund).`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to process order.refunded for ${event.orderId}: ${error.message}`,
       );
     }
   }

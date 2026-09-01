@@ -274,6 +274,34 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         </div>
       )}
 
+      <div className="space-y-6 p-6 border border-dashed border-primary/20 bg-secondary/30">
+        <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Warranty &amp; Returns</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Warranty (months)</label>
+            <input
+              type="number"
+              min={0}
+              value={productForm.warrantyMonths ?? ''}
+              onChange={(e) => handleFieldChange('warrantyMonths', e.target.value ? Number(e.target.value) : null)}
+              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+              placeholder="Leave empty for no warranty"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Return Window Override (days)</label>
+            <input
+              type="number"
+              min={0}
+              value={productForm.returnWindowDaysOverride ?? ''}
+              onChange={(e) => handleFieldChange('returnWindowDaysOverride', e.target.value ? Number(e.target.value) : null)}
+              className="w-full h-10 border-b border-input bg-transparent px-0 text-sm focus:border-primary focus:outline-none"
+              placeholder="Leave empty to use category/site default"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="flex justify-end pt-10 border-t border-border">
         <button type="submit" disabled={submitting} className="flex items-center gap-3 bg-foreground text-primary-foreground px-10 py-4 text-xs font-bold uppercase tracking-[0.3em] hover:bg-primary transition-colors duration-500 disabled:opacity-50">
           {submitting ? 'Processing...' : editingProduct ? 'Proceed to Variants' : 'Proceed to Variants'}

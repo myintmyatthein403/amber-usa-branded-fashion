@@ -50,13 +50,22 @@ export class MediaService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, force = false) {
     const media = await this.prisma.media.findUnique({
       where: { id },
     });
 
     if (!media) {
       throw new NotFoundException(`Media with ID ${id} not found`);
+    }
+
+    if (!force) {
+      const usageCount = await this.prisma.mediaUsage.count({ where: { mediaId: id } });
+      if (usageCount > 0) {
+        throw new BadRequestException(
+          `This image is currently used by ${usageCount} product(s)/variant(s) — pass force=true to delete anyway.`,
+        );
+      }
     }
 
     try {

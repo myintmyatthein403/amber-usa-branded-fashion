@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Price from "@/components/Price";
 import { useStore, type CartItem } from "@/store/useStore";
+import { cloudinaryDeliveryUrl } from "@/lib/image";
 
 interface OrderSummaryProps {
   cartItems: CartItem[];
@@ -13,6 +14,13 @@ interface OrderSummaryProps {
   total: number;
   depositAmount?: number | null;
   balanceDue?: number;
+  couponCode?: string;
+  onCouponCodeChange?: (value: string) => void;
+  onApplyCoupon?: () => void;
+  onRemoveCoupon?: () => void;
+  couponApplying?: boolean;
+  couponError?: string | null;
+  appliedCoupon?: { code: string; discountAmount: number; freeShipping: boolean } | null;
 }
 
 export default function OrderSummary({
@@ -24,6 +32,13 @@ export default function OrderSummary({
   total,
   depositAmount,
   balanceDue,
+  couponCode,
+  onCouponCodeChange,
+  onApplyCoupon,
+  onRemoveCoupon,
+  couponApplying,
+  couponError,
+  appliedCoupon,
 }: OrderSummaryProps) {
   const formatPrice = useStore((state) => state.formatPrice);
 
@@ -49,7 +64,7 @@ export default function OrderSummary({
         <div className="relative w-20 aspect-[3/4] rounded-sm overflow-hidden bg-white shadow-sm shrink-0">
           {item.image ? (
             <Image
-              src={item.image}
+              src={cloudinaryDeliveryUrl(item.image, { width: 200 })}
               alt={item.name}
               fill
               className="object-cover"
@@ -116,21 +131,41 @@ export default function OrderSummary({
 
       <div className="space-y-4 pt-8 border-t border-[#1A1A1A]/10">
         <div className="space-y-3 pb-4">
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              placeholder="Discount Code"
-              className="flex-1 p-3 bg-white border border-[#1A1A1A]/5 text-[10px] uppercase tracking-widest font-bold outline-none focus:border-[#D4AF37]"
-            />
-            <button className="px-4 py-3 bg-[#1A1A1A] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all">
-              Apply
-            </button>
-          </div>
-          <input
-            type="text"
-            placeholder="Referral Code (Optional)"
-            className="w-full p-3 bg-white border border-[#1A1A1A]/5 text-[10px] uppercase tracking-widest font-bold outline-none focus:border-[#D4AF37]"
-          />
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between p-3 bg-[#D4AF37]/10 border border-[#D4AF37]/30">
+              <span className="text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]">
+                Code &quot;{appliedCoupon.code}&quot; applied
+              </span>
+              <button
+                type="button"
+                onClick={onRemoveCoupon}
+                className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/50 hover:text-[#1A1A1A]"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={couponCode ?? ""}
+                onChange={(e) => onCouponCodeChange?.(e.target.value.toUpperCase())}
+                placeholder="Discount Code"
+                className="flex-1 p-3 bg-white border border-[#1A1A1A]/5 text-[10px] uppercase tracking-widest font-bold outline-none focus:border-[#D4AF37]"
+              />
+              <button
+                type="button"
+                onClick={onApplyCoupon}
+                disabled={couponApplying || !couponCode?.trim()}
+                className="px-4 py-3 bg-[#1A1A1A] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37] transition-all disabled:opacity-50"
+              >
+                {couponApplying ? "..." : "Apply"}
+              </button>
+            </div>
+          )}
+          {couponError && (
+            <p className="text-[10px] text-red-500 font-bold uppercase tracking-widest">{couponError}</p>
+          )}
         </div>
 
         <div className="flex justify-between text-sm">
@@ -145,6 +180,14 @@ export default function OrderSummary({
             {shippingCost === 0 ? "FREE" : getShippingDisplay(shippingCost)}
           </span>
         </div>
+        {appliedCoupon && appliedCoupon.discountAmount > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-[#1A1A1A]/40 font-medium">Discount</span>
+            <span className="font-bold text-green-600">
+              -{formatPrice(appliedCoupon.discountAmount, currency === "USD")}
+            </span>
+          </div>
+        )}
         {depositAmount != null ? (
           <>
             <div className="flex justify-between text-sm">

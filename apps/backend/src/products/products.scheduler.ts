@@ -1,27 +1,34 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ProductsService } from './products.service';
 
 @Injectable()
-export class ProductsScheduler implements OnModuleInit, OnModuleDestroy {
+export class ProductsScheduler {
   private readonly logger = new Logger(ProductsScheduler.name);
-  private interval: ReturnType<typeof setInterval> | null = null;
 
   constructor(private productsService: ProductsService) {}
 
-  onModuleInit() {
-    this.interval = setInterval(async () => {
-      try {
-        const count = await this.productsService.publishScheduled();
-        if (count > 0) {
-          this.logger.log(`Published ${count} scheduled product(s)`);
-        }
-      } catch (err) {
-        this.logger.error('Scheduled publish failed', err);
+  @Cron(CronExpression.EVERY_MINUTE)
+  async publishScheduled() {
+    try {
+      const count = await this.productsService.publishScheduled();
+      if (count > 0) {
+        this.logger.log(`Published ${count} scheduled product(s)`);
       }
-    }, 60_000);
+    } catch (err) {
+      this.logger.error('Scheduled publish failed', err);
+    }
   }
 
-  onModuleDestroy() {
-    if (this.interval) clearInterval(this.interval);
+  @Cron(CronExpression.EVERY_HOUR)
+  async autoArchiveExpired() {
+    try {
+      const count = await this.productsService.autoArchiveExpired();
+      if (count > 0) {
+        this.logger.log(`Auto-archived ${count} expired product(s)`);
+      }
+    } catch (err) {
+      this.logger.error('Scheduled auto-archive failed', err);
+    }
   }
 }

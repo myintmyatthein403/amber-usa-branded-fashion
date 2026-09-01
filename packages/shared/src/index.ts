@@ -18,6 +18,8 @@ export {
   type PaymentStatus,
   type OrderWithRelations,
   type Meta as OrderMeta,
+  CreatePaymentIntentSchema,
+  type CreatePaymentIntentInput,
 } from './order.schema';
 export * from './checkout.utils';
 export {
@@ -29,6 +31,10 @@ export {
   type Inventory,
   UpdateStockSchema,
   type UpdateStockInput,
+  StockAdjustmentModeSchema,
+  type StockAdjustmentMode,
+  StockMovementReasonSchema,
+  type StockMovementReasonInput,
   TransferStockSchema,
   type TransferStockInput,
   BulkTransferStockSchema,
@@ -39,6 +45,7 @@ export {
   type Variant as LogisticVariant,
   type CargoShipment,
 } from './logistics.schema';
+export * from './return.schema';
 export * from './cms.schema';
 export * from './forms.schema';
 export * from './coupon.schema';

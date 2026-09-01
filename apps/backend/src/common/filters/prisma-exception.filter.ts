@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { Prisma } from '@prisma/client';
+import * as Sentry from '@sentry/node';
 
 @Catch(Prisma.PrismaClientKnownRequestError, Prisma.PrismaClientValidationError)
 export class PrismaExceptionFilter implements ExceptionFilter {
@@ -182,6 +183,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
           `Unhandled Prisma error: ${exception.code}`,
           exception.stack,
         );
+        Sentry.captureException(exception);
         message = 'An unexpected database error occurred';
     }
   }

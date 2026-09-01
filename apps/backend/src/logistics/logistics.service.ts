@@ -73,11 +73,40 @@ export class LogisticsService {
     target: InventoryTarget,
     warehouseId: string,
     quantity: number,
-    reason: 'ADJUSTMENT' | 'RECEIVING' = 'ADJUSTMENT',
+    reason: 'ADJUSTMENT' | 'RECEIVING' | 'DAMAGE' | 'SALE' | 'RESTOCK' = 'ADJUSTMENT',
     note?: string,
     userId?: string,
+    mode: 'SET' | 'DELTA' = 'SET',
   ) {
     assertValidTarget(target);
+
+    if (mode === 'DELTA') {
+      if (quantity === 0) {
+        throw new BadRequestException('Delta quantity cannot be zero');
+      }
+      const result = await this.logisticsRepository.adjustInventoryDelta(
+        target,
+        warehouseId,
+        quantity,
+      );
+      // DELTA entries record the actual change (e.g. -5 for a damage
+      // write-off), unlike SET entries below which historically recorded
+      // the resulting absolute total — see StockAdjustmentModeSchema.
+      await this.prisma.stockMovement.create({
+        data: {
+          variantId: target.variantId,
+          productId: target.productId,
+          toWarehouseId: quantity > 0 ? warehouseId : undefined,
+          fromWarehouseId: quantity < 0 ? warehouseId : undefined,
+          quantity: Math.abs(quantity),
+          reason,
+          note,
+          userId,
+        },
+      });
+      return result;
+    }
+
     const safeQuantity = Math.max(0, quantity);
     const result = await this.logisticsRepository.upsertInventory(
       target,
@@ -135,13 +164,13 @@ export class LogisticsService {
       },
     });
 
-    if (
-      fromWh &&
-      toWh &&
-      fromWh.location !== toWh.location &&
-      fromWh.location === 'USA' &&
-      toWh.location === 'MYANMAR'
-    ) {
+    // Any transfer that crosses warehouse locations gets cargo tracking —
+    // previously hardcoded to the literal pair 'USA' -> 'MYANMAR', which
+    // silently skipped tracking for any other location combination (e.g. a
+    // third warehouse, or the reverse direction). Location is still a free
+    // -text field (see WarehouseLocationSchema), but this at least stops
+    // assuming there are only ever two possible values.
+    if (fromWh && toWh && fromWh.location !== toWh.location) {
       await this.createCargoShipment({
         originId: data.fromWarehouseId,
         destinationId: data.toWarehouseId,
@@ -182,12 +211,9 @@ export class LogisticsService {
       { note: data.note, userId: data.userId },
     );
 
-    // Create cargo shipment if international
-    if (
-      fromWh.location !== toWh.location &&
-      fromWh.location === 'USA' &&
-      toWh.location === 'MYANMAR'
-    ) {
+    // Create cargo shipment for any cross-location transfer (see comment in
+    // transferStock above — no longer hardcoded to USA -> MYANMAR only).
+    if (fromWh.location !== toWh.location) {
       await this.createCargoShipment({
         originId: data.fromWarehouseId,
         destinationId: data.toWarehouseId,
@@ -203,8 +229,12 @@ export class LogisticsService {
     const variants = await this.prisma.variant.findMany({
       include: { product: true, inventory: { include: { warehouse: true } } },
     });
+    // reorderPoint (when an operator has set one) takes priority over the
+    // display-only lowStockThreshold — it's the actual "go reorder now"
+    // signal; lowStockThreshold remains the fallback for items that have
+    // never had a reorder point configured.
     const lowVariants = variants
-      .filter((v) => v.stock <= v.lowStockThreshold)
+      .filter((v) => v.stock <= (v.reorderPoint ?? v.lowStockThreshold))
       .map((v) => ({ type: 'variant' as const, ...v }));
 
     const products = await this.prisma.product.findMany({
@@ -212,10 +242,35 @@ export class LogisticsService {
       include: { inventory: { include: { warehouse: true } } },
     });
     const lowProducts = products
-      .filter((p) => p.stock <= p.lowStockThreshold)
+      .filter((p) => p.stock <= (p.reorderPoint ?? p.lowStockThreshold))
       .map((p) => ({ type: 'product' as const, ...p }));
 
     return [...lowVariants, ...lowProducts];
+  }
+
+  // Scheduled sweep (see LogisticsScheduler) — no transactional-email
+  // provider is configured in this environment (same situation as
+  // EmailService's password-reset path), so this is the same "log clearly,
+  // wire a real notification channel in later" pattern used there and in
+  // reconcileStock below, rather than a silent no-op.
+  async checkReorderAlerts(): Promise<{ count: number }> {
+    const lowStockItems = await this.getLowStockItems();
+
+    for (const item of lowStockItems) {
+      const name =
+        item.type === 'variant'
+          ? `${item.product.name} (${item.sku})`
+          : item.name;
+      const threshold = item.reorderPoint ?? item.lowStockThreshold;
+      this.logger.warn(
+        `Reorder alert: ${item.type} "${name}" at stock=${item.stock}, threshold=${threshold}`,
+      );
+    }
+    if (lowStockItems.length) {
+      this.logger.warn(`Reorder sweep found ${lowStockItems.length} item(s) at or below threshold`);
+    }
+
+    return { count: lowStockItems.length };
   }
 
   // --- Cargo Management ---

@@ -55,6 +55,8 @@ export const OrderSchema = z.object({
   balanceSettledAt: z.string().optional().nullable(),
   balanceSettledBy: z.string().optional().nullable(),
   lockedExchangeRate: z.number().optional().nullable(),
+  couponCode: z.string().optional().nullable(),
+  discountAmount: z.number().optional().nullable(),
   shippingAddress: z.string().min(1, 'Shipping address is required'),
   customerName: z.string().optional(),
   customerEmail: z.string().optional(),
@@ -139,3 +141,13 @@ export interface Meta {
   limit: number;
   totalPages: number;
 }
+
+// orderId is required: the amount/currency are always re-derived from the
+// DB order server-side (see stripe.service.ts#createPaymentIntent) rather
+// than trusted from the request body, so a caller can never mint a
+// PaymentIntent for an arbitrary amount against an order it doesn't own.
+export const CreatePaymentIntentSchema = z.object({
+  orderId: z.string().uuid('A valid orderId is required'),
+});
+
+export type CreatePaymentIntentInput = z.infer<typeof CreatePaymentIntentSchema>;

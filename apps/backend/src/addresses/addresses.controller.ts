@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AddressesService } from './addresses.service';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { AddressSchema, type AddressInput } from '@amber/shared';
 
 @Controller('addresses')
 @UseGuards(JwtAuthGuard)
@@ -25,18 +27,7 @@ export class AddressesController {
   @Post()
   create(
     @Req() req: { user: { userId: string } },
-    @Body()
-    body: {
-      label?: string;
-      country: string;
-      street: string;
-      city: string;
-      state?: string;
-      township?: string;
-      zipCode?: string;
-      phone?: string;
-      isDefault?: boolean;
-    },
+    @Body(new ZodValidationPipe(AddressSchema)) body: AddressInput,
   ) {
     return this.addressesService.create(req.user.userId, body);
   }
@@ -45,7 +36,7 @@ export class AddressesController {
   update(
     @Req() req: { user: { userId: string } },
     @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
+    @Body(new ZodValidationPipe(AddressSchema.partial())) body: Partial<AddressInput>,
   ) {
     return this.addressesService.update(req.user.userId, id, body);
   }
